@@ -90,6 +90,17 @@ case "${1:-help}" in
     "${DC_DEV[@]}" "${profiles[@]}" ps
     ;;
   down)       ensure_env; "${DC[@]}" --profile ai --profile gpu down ;;
+  copilot-login)
+    # Device login SEKALI: auth tersimpan di volume zaltr_copilot_state,
+    # token tidak pernah ditulis ke file host mana pun.
+    ensure_env
+    "${DC[@]}" --profile ai build copilot-runtime
+    sudo docker run --rm -it \
+      --entrypoint copilot \
+      -v zaltr_zaltr_copilot_state:/home/copilot/.copilot \
+      zaltr/copilot-runtime:local || true
+    echo "[copilot-login] selesai. Nyalakan runtime: bin/zaltrctl up-dev ai"
+    ;;
   deploy-web)
     ensure_env
     # Migrasi DB dijalankan dari HOST (butuh port dev PG 46432 -> up-dev aktif).

@@ -13,16 +13,43 @@ import type { ChatRequest, ProviderGenerator, StreamPart } from "./contract";
 
 const COPILOT_URL = process.env.ZALTR_COPILOT_URL ?? "127.0.0.1:46321";
 
-const globalForCopilot = globalThis as unknown as { zaltrCopilot?: CopilotClient };
+const globalForCopilot = globalThis as unknown as {
+  zaltrCopilot?: { client: CopilotClient; ready: Promise<unknown> };
+};
 
-function client(): CopilotClient {
+/**
+ * Klien SDK singleton. `start()` wajib dipanggil sebelum RPC apa pun
+ * (tanpa itu SDK selalu melempar "Client not connected"). Bila start
+ * gagal (runtime mati), cache dibuang supaya request berikut mencoba lagi.
+ */
+async function client(): Promise<CopilotClient> {
   if (!globalForCopilot.zaltrCopilot) {
-    globalForCopilot.zaltrCopilot = new CopilotClient({
+    const c = new CopilotClient({
       connection: RuntimeConnection.forUri(COPILOT_URL),
       mode: "empty",
     });
+    const entry = {
+      client: c,
+      ready: c.start().catch((err: unknown) => {
+        if (globalForCopilot.zaltrCopilot === entry) {
+          globalForCopilot.zaltrCopilot = undefined;
+        }
+        throw err;
+      }),
+    };
+    globalForCopilot.zaltrCopilot = entry;
   }
-  return globalForCopilot.zaltrCopilot;
+  const entry = globalForCopilot.zaltrCopilot;
+  await entry.ready;
+  // Runtime bisa saja direstart; koneksi mati -> buang cache dan sambung ulang.
+  try {
+    await entry.client.ping();
+  } catch {
+    globalForCopilot.zaltrCopilot = undefined;
+    await entry.client.forceStop().catch(() => {});
+    return client();
+  }
+  return entry.client;
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -43,7 +70,10 @@ const FALLBACK_MODELS: Array<[string, string, ModelDescriptor["capabilities"]]> 
 
 export async function copilotCatalog(): Promise<ModelDescriptor[]> {
   try {
-    const models = await withTimeout(client().listModels(), 1_500);
+    const models = await withTimeout(
+      client().then((c) => c.listModels()),
+      3_000,
+    );
     return models.map((m) => ({
       id: `copilot:${m.id}`,
       label: m.name || m.id,
@@ -72,7 +102,7 @@ const SYSTEM_MESSAGE =
   "(default Bahasa Indonesia), ringkas namun lengkap, dan gunakan Markdown bila membantu.";
 
 export async function* copilotChat(req: ChatRequest): ProviderGenerator {
-  const c = client();
+  const c = await client();
   const sessionId = `zaltr-${req.conversationId}`;
 
   // Resume sesi CLI milik conversation ini; bila belum ada, buat baru.

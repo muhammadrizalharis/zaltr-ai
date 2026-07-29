@@ -187,7 +187,7 @@ services:
     build:
       context: ./docker/copilot-runtime
       args:
-        COPILOT_CLI_VERSION: ${ZALTR_COPILOT_CLI_VERSION:-1.0.48}
+        COPILOT_CLI_VERSION: ${ZALTR_COPILOT_CLI_VERSION:-1.0.75}
     image: zaltr/copilot-runtime:local
     container_name: zaltr-copilot-runtime
     restart: unless-stopped
