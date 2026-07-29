@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0e14;
+  --panel: #10161f;
+  --panel-2: #151d29;
+  --border: #1f2937;
+  --text: #e6edf6;
+  --muted: #8b98a9;
+  --accent-a: #2dd4bf;
+  --accent-b: #8b5cf6;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-accent-a: var(--accent-a);
+  --color-accent-b: var(--accent-b);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Wordmark ZALTR.AI */
+.wordmark {
+  background: linear-gradient(92deg, var(--accent-a), var(--accent-b));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.08em;
+}
+
+/* Scrollbar tipis khas zaltr */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3648 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2a3648;
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Kursor ketik saat streaming */
+.stream-caret::after {
+  content: "▍";
+  margin-left: 2px;
+  color: var(--accent-a);
+  animation: caret-blink 1s steps(2) infinite;
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}

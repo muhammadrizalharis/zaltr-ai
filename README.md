@@ -25,6 +25,21 @@ bin/zaltr-restore.sh ~/zaltr-backups/<arsip>.tar.enc          # drill restore
 
 Isolasi dari proyek lain di server ini: project `zaltr`, network `zaltr-net`, volume `zaltr_*`, blok port dev 46xxx, backup di `~/zaltr-backups` (retensi 14 hari, AES-256, passphrase `secrets/backup.pass` — simpan salinannya di luar server).
 
+## Web Preview (SUDAH JALAN, 2026-07-30)
+
+Aplikasi web fase preview sudah berjalan di **http://localhost:46300** (Next.js 16 + Prisma 7 + PostgreSQL zaltr):
+
+```bash
+bin/zaltrctl up-dev              # pastikan Postgres terekspos di 127.0.0.1:46432
+. ~/.nvm/nvm.sh && nvm use 22    # host Node v18 — wajib Node 22
+npm install                      # sekali (postinstall menjalankan prisma generate)
+npx prisma migrate dev           # sekali / saat schema berubah
+npm run dev                      # http://localhost:46300
+```
+
+Yang sudah berfungsi pada preview: sidebar (chat baru, cari, pin, trash), streaming NDJSON dengan tombol Stop, markdown + blok kode, **model picker di samping composer** (grup Zaltr demo / Copilot Enterprise / Ollama dengan status live), judul otomatis, dan persistensi write-first ke tabel `Conversation`/`Message`. Provider `zaltr-core` adalah demo internal untuk pratinjau UI; Copilot aktif setelah `secrets/copilot_github_token` diisi + profile `ai`, Ollama setelah `bin/zaltrctl up gpu`.
+
+
 
 
 Produk ini dirancang sebagai **modular monolith**: sederhana untuk dibangun dan dijalankan pada tahap awal, tetapi setiap provider, tool, dan fitur tetap dipisahkan oleh kontrak yang jelas. Dengan pendekatan ini, fitur baru dapat ditambahkan tanpa mengubah inti aplikasi atau mengikat antarmuka ke satu penyedia AI.

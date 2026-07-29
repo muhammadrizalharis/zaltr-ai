@@ -6,3 +6,13 @@ node_modules/
 .next/
 dist/
 *.log
+
+# Next.js
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+
+# Prisma generated client
+src/generated/
