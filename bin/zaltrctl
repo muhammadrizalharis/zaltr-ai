@@ -8,6 +8,7 @@
 #   bin/zaltrctl init          buat .env + secrets (sekali)
 #   bin/zaltrctl up            start core (tanpa port host)
 #   bin/zaltrctl up-dev        start core + port loopback 46xxx
+#   bin/zaltrctl up-dev ai gpu start dev + profile tambahan (copilot/ollama)
 #   bin/zaltrctl up ai         start + profile copilot-runtime
 #   bin/zaltrctl up gpu        start + profile ollama (GPU)
 #   bin/zaltrctl down          stop stack (data/volume AMAN)
@@ -81,8 +82,11 @@ case "${1:-help}" in
     ;;
   up-dev)
     ensure_env
-    "${DC_DEV[@]}" up -d --build
-    "${DC_DEV[@]}" ps
+    shift || true
+    profiles=()
+    for p in "$@"; do profiles+=(--profile "$p"); done
+    "${DC_DEV[@]}" "${profiles[@]}" up -d --build
+    "${DC_DEV[@]}" "${profiles[@]}" ps
     ;;
   down)       ensure_env; "${DC[@]}" --profile ai --profile gpu down ;;
   status)     ensure_env; "${DC[@]}" ps ;;

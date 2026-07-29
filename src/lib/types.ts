@@ -1,4 +1,4 @@
-export type ProviderId = "zaltr" | "copilot" | "ollama";
+export type ProviderId = "zaltr" | "copilot" | "ollama" | "comfyui";
 
 export type Capability = "chat" | "vision" | "reasoning" | "tools" | "image";
 

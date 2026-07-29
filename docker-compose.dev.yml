@@ -22,3 +22,7 @@ services:
   ollama:
     ports:
       - "${ZALTR_DEV_BIND:-127.0.0.1}:${ZALTR_DEV_OLLAMA_PORT:-46434}:11434"
+
+  copilot-runtime:
+    ports:
+      - "${ZALTR_DEV_BIND:-127.0.0.1}:${ZALTR_DEV_COPILOT_PORT:-46321}:4321"

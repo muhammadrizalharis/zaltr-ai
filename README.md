@@ -39,6 +39,44 @@ npm run dev                      # http://localhost:46300
 
 Yang sudah berfungsi pada preview: sidebar (chat baru, cari, pin, trash), streaming NDJSON dengan tombol Stop, markdown + blok kode, **model picker di samping composer** (grup Zaltr demo / Copilot Enterprise / Ollama dengan status live), judul otomatis, dan persistensi write-first ke tabel `Conversation`/`Message`. Provider `zaltr-core` adalah demo internal untuk pratinjau UI; Copilot aktif setelah `secrets/copilot_github_token` diisi + profile `ai`, Ollama setelah `bin/zaltrctl up gpu`.
 
+### Aktivasi Provider (semuanya sudah dikodekan — tinggal colok)
+
+Lapisan provider di `src/server/providers/` sudah final (Copilot SDK resmi, Ollama,
+ComfyUI, demo). Tidak ada kode yang perlu diubah saat mengaktifkan; cukup langkah ini:
+
+**1. GitHub Copilot Enterprise (SDK resmi + CLI headless):**
+
+```bash
+# a. Isi token service account (gho_/ghu_/github_pat_) — satu baris, tanpa newline ganda:
+printf '%s' 'TOKEN_DI_SINI' > secrets/copilot_github_token
+# b. Nyalakan runtime + port dev loopback 46321:
+bin/zaltrctl up-dev ai
+# c. Restart web (npm run dev). Model picker otomatis menampilkan daftar model
+#    live dari client.listModels(); chat streaming via sesi CLI per-conversation.
+```
+
+**2. Ollama (container zaltr sendiri, JANGAN pakai Ollama host 11434):**
+
+```bash
+bin/zaltrctl up-dev gpu
+sudo docker exec zaltr-ollama ollama pull llama3.2   # atau model lain
+# Model muncul otomatis di picker (live dari /api/tags).
+```
+
+**3. ComfyUI (server disediakan operator):**
+
+```bash
+# Isi endpoint di .env lalu restart web:
+ZALTR_COMFYUI_URL=http://127.0.0.1:8188
+# Picker menampilkan setiap checkpoint sebagai model "ComfyUI (gambar)".
+# Hasil gambar dipersistenkan ke MinIO (bucket zaltr-files, ikut backup harian)
+# dan dilayani via /api/files/... — chat berisi markdown gambar.
+```
+
+Semua URL provider dibaca dari env (`ZALTR_COPILOT_URL`, `ZALTR_OLLAMA_URL`,
+`ZALTR_COMFYUI_URL`, `ZALTR_MINIO_URL`) sehingga topologi container nanti hanya
+mengganti nilai env, bukan kode.
+
 
 
 

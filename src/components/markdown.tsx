@@ -23,6 +23,16 @@ export function Markdown({ children }: { children: string }) {
         a: (p) => (
           <a className="text-accent-a underline underline-offset-2" target="_blank" {...p} />
         ),
+        img: ({ src, alt }) => (
+          // Hasil ComfyUI / lampiran — dilayani dari MinIO via /api/files.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={typeof src === "string" ? src : undefined}
+            alt={alt ?? ""}
+            loading="lazy"
+            className="mb-3 max-h-[480px] w-auto max-w-full rounded-xl border border-line"
+          />
+        ),
         table: (p) => (
           <div className="mb-3 overflow-x-auto">
             <table className="w-full border-collapse text-sm" {...p} />

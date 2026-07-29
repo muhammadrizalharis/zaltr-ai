@@ -109,6 +109,12 @@ export function Sidebar() {
     void load();
   }
 
+  async function renameConv(c: ConversationSummary) {
+    const title = prompt("Judul chat:", c.title)?.trim();
+    if (!title || title === c.title) return;
+    await patchConv(c.id, { title });
+  }
+
   async function moveToTrash(c: ConversationSummary) {
     if (!confirm(`Pindahkan "${c.title}" ke trash?`)) return;
     await fetch(`/api/conversations/${c.id}`, { method: "DELETE" });
@@ -134,6 +140,7 @@ export function Sidebar() {
       menuOpen={menuFor === c.id}
       onMenu={(open) => setMenuFor(open ? c.id : null)}
       onPatch={patchConv}
+      onRename={renameConv}
       onTrash={moveToTrash}
     />
   );
@@ -274,6 +281,9 @@ export function Sidebar() {
       </nav>
 
       <footer className="border-t border-line px-4 py-3 text-[11px] leading-relaxed text-muted">
+        <Link href="/chat/trash" className="mb-1 block text-xs text-muted hover:text-accent-a">
+          🗑 Trash
+        </Link>
         Chat tersimpan permanen di PostgreSQL zaltr.
         <br />
         Hapus = pindah ke trash (bukan musnah).
@@ -300,6 +310,7 @@ function Row({
   menuOpen,
   onMenu,
   onPatch,
+  onRename,
   onTrash,
 }: {
   c: ConversationSummary;
@@ -308,6 +319,7 @@ function Row({
   menuOpen: boolean;
   onMenu: (open: boolean) => void;
   onPatch: (id: string, body: Record<string, unknown>) => Promise<void>;
+  onRename: (c: ConversationSummary) => void;
   onTrash: (c: ConversationSummary) => void;
 }) {
   return (
@@ -342,6 +354,14 @@ function Row({
           onClick={(e) => e.stopPropagation()}
           className="absolute right-0 top-8 z-30 w-56 rounded-xl border border-line bg-panel p-1.5 shadow-2xl"
         >
+          <MenuBtn
+            onClick={() => {
+              onMenu(false);
+              onRename(c);
+            }}
+          >
+            Ganti nama
+          </MenuBtn>
           <MenuBtn
             onClick={() => {
               onMenu(false);

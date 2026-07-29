@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { ollamaBaseUrl } from "@/server/models";
+import { dispatch } from "@/server/providers";
 import type { StreamLine } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -57,9 +57,22 @@ export async function POST(req: Request) {
       let acc = "";
       let status: "completed" | "stopped" | "failed" = "completed";
       try {
-        for await (const chunk of generate(modelId, history, req.signal)) {
-          acc += chunk;
-          send({ type: "delta", text: chunk });
+        const gen = dispatch(modelId, {
+          history,
+          conversationId,
+          signal: req.signal,
+        });
+        for await (const part of gen) {
+          if (part.kind === "text") {
+            acc += part.text;
+            send({ type: "delta", text: part.text });
+          } else {
+            // Gambar sudah dipersistenkan ke MinIO oleh provider;
+            // simpan sebagai markdown agar ikut kontrak "chat = markdown".
+            const md = `\n\n![${part.alt}](${part.url})\n`;
+            acc += md;
+            send({ type: "delta", text: md });
+          }
         }
       } catch (err) {
         if (req.signal.aborted) {
@@ -77,7 +90,7 @@ export async function POST(req: Request) {
           role: "assistant",
           content: acc,
           model: modelId,
-          provider: modelId.split(":")[0] === modelId ? "zaltr" : modelId.split(":")[0],
+          provider: modelId.includes(":") ? modelId.split(":")[0] : "zaltr",
           status,
         },
         select: { id: true },
@@ -99,84 +112,4 @@ export async function POST(req: Request) {
       "X-Accel-Buffering": "no",
     },
   });
-}
-
-type HistoryItem = { role: string; content: string };
-
-async function* generate(
-  modelId: string,
-  history: HistoryItem[],
-  signal: AbortSignal,
-): AsyncGenerator<string> {
-  if (modelId.startsWith("ollama:")) {
-    yield* ollamaChat(modelId.slice("ollama:".length), history, signal);
-    return;
-  }
-  if (modelId.startsWith("copilot:")) {
-    throw new Error(
-      "Provider Copilot belum aktif pada fase preview. Isi secrets/copilot_github_token lalu nyalakan profile ai.",
-    );
-  }
-  yield* demoChat(history, signal);
-}
-
-/** Provider demo: streaming lokal tanpa model eksternal, untuk pratinjau UI. */
-async function* demoChat(history: HistoryItem[], signal: AbortSignal): AsyncGenerator<string> {
-  const prompt = history.at(-1)?.content ?? "";
-  const jumlahPesan = history.length;
-  const reply =
-    `Ini **Zaltr Core**, provider demo internal zaltr.ai — dipakai untuk menguji ` +
-    `antarmuka sebelum Copilot Enterprise dan Ollama diaktifkan.\n\n` +
-    `Pesanmu barusan:\n\n> ${prompt.slice(0, 500)}\n\n` +
-    `Beberapa hal yang sudah bekerja pada pratinjau ini:\n\n` +
-    `- Streaming token seperti ini, kata demi kata\n` +
-    `- Riwayat tersimpan di PostgreSQL (percakapan ini berisi ${jumlahPesan} pesan)\n` +
-    `- Tombol **model picker** di samping kolom chat\n` +
-    `- Markdown: \`inline code\`, daftar, dan blok kode\n\n` +
-    "```ts\n" +
-    `const provider = "zaltr-core"; // ganti ke Copilot/Ollama dari tombol model\n` +
-    "```\n\n" +
-    `Ganti model dari tombol di kiri kolom chat untuk melihat status provider lain.`;
-
-  for (const token of reply.split(/(?<=\s)/)) {
-    if (signal.aborted) throw new Error("aborted");
-    yield token;
-    await new Promise((r) => setTimeout(r, 12));
-  }
-}
-
-async function* ollamaChat(
-  model: string,
-  history: HistoryItem[],
-  signal: AbortSignal,
-): AsyncGenerator<string> {
-  const res = await fetch(`${ollamaBaseUrl()}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      stream: true,
-      messages: history.map((m) => ({ role: m.role, content: m.content })),
-    }),
-    signal,
-  });
-  if (!res.ok || !res.body) {
-    throw new Error(`Ollama menolak permintaan (${res.status}). Cek: bin/zaltrctl up gpu`);
-  }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      const data = JSON.parse(line) as { message?: { content?: string }; done?: boolean };
-      const text = data.message?.content;
-      if (text) yield text;
-    }
-  }
 }

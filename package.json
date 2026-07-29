@@ -10,8 +10,10 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@github/copilot-sdk": "^1.0.8",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
+    "minio": "^8.0.7",
     "next": "16.2.12",
     "pg": "^8.22.0",
     "react": "19.2.4",
