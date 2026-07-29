@@ -23,16 +23,36 @@ export function Markdown({ children }: { children: string }) {
         a: (p) => (
           <a className="text-accent-a underline underline-offset-2" target="_blank" {...p} />
         ),
-        img: ({ src, alt }) => (
+        img: ({ src, alt }) => {
           // Hasil ComfyUI / lampiran — dilayani dari MinIO via /api/files.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={typeof src === "string" ? src : undefined}
-            alt={alt ?? ""}
-            loading="lazy"
-            className="mb-3 max-h-[480px] w-auto max-w-full rounded-xl border border-line"
-          />
-        ),
+          // Provider media mengirim semua hasil sebagai markdown image;
+          // ekstensi menentukan render <video>/<audio>/<img>.
+          const url = typeof src === "string" ? src : undefined;
+          const ext = url?.split(".").pop()?.toLowerCase() ?? "";
+          if (["mp4", "webm", "mov"].includes(ext)) {
+            return (
+              <video
+                src={url}
+                controls
+                loop
+                playsInline
+                className="mb-3 max-h-[480px] w-auto max-w-full rounded-xl border border-line"
+              />
+            );
+          }
+          if (["mp3", "wav", "flac", "opus", "ogg", "m4a"].includes(ext)) {
+            return <audio src={url} controls className="mb-3 w-full max-w-md" />;
+          }
+          return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={url}
+              alt={alt ?? ""}
+              loading="lazy"
+              className="mb-3 max-h-[480px] w-auto max-w-full rounded-xl border border-line"
+            />
+          );
+        },
         table: (p) => (
           <div className="mb-3 overflow-x-auto">
             <table className="w-full border-collapse text-sm" {...p} />
