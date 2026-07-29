@@ -1,0 +1,195 @@
+# ============================================================
+# zaltr.ai — stack infrastruktur TERISOLASI
+# Project name : zaltr        (container zaltr-*, volume zaltr_*)
+# Network      : zaltr-net    (bridge khusus proyek ini)
+# Port host    : TIDAK ADA di file ini. Gunakan docker-compose.dev.yml
+#                bila butuh akses dari host (loopback 46xxx).
+# Web app      : BELUM dibuat — slot service "web" menyusul di fase web.
+#
+# Pakai lewat helper: bin/zaltrctl {init|up|down|status|backup-now|...}
+# ============================================================
+
+name: zaltr
+
+networks:
+  zaltr-net:
+    name: zaltr-net
+    driver: bridge
+
+volumes:
+  zaltr_pgdata:
+  zaltr_redisdata:
+  zaltr_miniodata:
+  zaltr_ollama:
+  zaltr_copilot_state:
+
+secrets:
+  zaltr_backup_pass:
+    file: ./secrets/backup.pass
+  zaltr_copilot_token:
+    file: ./secrets/copilot_github_token
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: zaltr-postgres
+    restart: unless-stopped
+    networks: [zaltr-net]
+    environment:
+      POSTGRES_DB: ${ZALTR_POSTGRES_DB:?}
+      POSTGRES_USER: ${ZALTR_POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${ZALTR_POSTGRES_PASSWORD:?}
+      TZ: ${TZ:-Asia/Makassar}
+    volumes:
+      - zaltr_pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    shm_size: 256mb
+
+  redis:
+    image: redis:7-alpine
+    container_name: zaltr-redis
+    restart: unless-stopped
+    networks: [zaltr-net]
+    command:
+      [
+        "redis-server",
+        "--requirepass", "${ZALTR_REDIS_PASSWORD:?}",
+        "--appendonly", "yes",
+        "--maxmemory", "256mb",
+        "--maxmemory-policy", "noeviction",
+      ]
+    volumes:
+      - zaltr_redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${ZALTR_REDIS_PASSWORD} ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    environment:
+      ZALTR_REDIS_PASSWORD: ${ZALTR_REDIS_PASSWORD:?}
+
+  minio:
+    image: minio/minio:latest
+    container_name: zaltr-minio
+    restart: unless-stopped
+    networks: [zaltr-net]
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${ZALTR_MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${ZALTR_MINIO_ROOT_PASSWORD:?}
+      TZ: ${TZ:-Asia/Makassar}
+    volumes:
+      - zaltr_miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || curl -sf http://127.0.0.1:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+
+  # One-shot: buat bucket privat lalu keluar.
+  minio-init:
+    image: minio/mc:latest
+    container_name: zaltr-minio-init
+    networks: [zaltr-net]
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -ec '
+        mc alias set zaltr http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD";
+        mc mb --ignore-existing "zaltr/$$BUCKET_FILES";
+        mc mb --ignore-existing "zaltr/$$BUCKET_ASSETS";
+        mc anonymous set none "zaltr/$$BUCKET_FILES";
+        mc anonymous set none "zaltr/$$BUCKET_ASSETS";
+        echo "minio-init: bucket siap";
+      '
+    environment:
+      MINIO_ROOT_USER: ${ZALTR_MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${ZALTR_MINIO_ROOT_PASSWORD:?}
+      BUCKET_FILES: ${ZALTR_MINIO_BUCKET_FILES:?}
+      BUCKET_ASSETS: ${ZALTR_MINIO_BUCKET_ASSETS:?}
+    restart: "no"
+
+  backup:
+    build: ./docker/backup
+    image: zaltr/backup:local
+    container_name: zaltr-backup
+    restart: unless-stopped
+    networks: [zaltr-net]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      ZALTR_BACKUP_CRON: ${ZALTR_BACKUP_CRON:-5 3 * * *}
+      ZALTR_BACKUP_KEEP_DAYS: ${ZALTR_BACKUP_KEEP_DAYS:-14}
+      PGHOST: postgres
+      PGDATABASE: ${ZALTR_POSTGRES_DB:?}
+      PGUSER: ${ZALTR_POSTGRES_USER:?}
+      PGPASSWORD: ${ZALTR_POSTGRES_PASSWORD:?}
+      MINIO_URL: http://minio:9000
+      MINIO_ROOT_USER: ${ZALTR_MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${ZALTR_MINIO_ROOT_PASSWORD:?}
+      TZ: ${TZ:-Asia/Makassar}
+    volumes:
+      - ${ZALTR_BACKUP_DIR:?}:/backups
+      - ./.env:/cfg/.env:ro
+    secrets:
+      - zaltr_backup_pass
+
+  # ------------------------------------------------------------------
+  # Profile "ai": runtime Copilot CLI headless (fase web menyusul).
+  # Tidak berjalan default; aktifkan dengan: zaltrctl up ai
+  # Token Enterprise HANYA lewat secret file, tidak pernah di image/env.
+  # ------------------------------------------------------------------
+  copilot-runtime:
+    build:
+      context: ./docker/copilot-runtime
+      args:
+        COPILOT_CLI_VERSION: ${ZALTR_COPILOT_CLI_VERSION:-1.0.48}
+    image: zaltr/copilot-runtime:local
+    container_name: zaltr-copilot-runtime
+    restart: unless-stopped
+    networks: [zaltr-net]
+    profiles: [ai]
+    secrets:
+      - zaltr_copilot_token
+    volumes:
+      - zaltr_copilot_state:/home/copilot/.copilot
+    environment:
+      TZ: ${TZ:-Asia/Makassar}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:4321/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ------------------------------------------------------------------
+  # Profile "gpu": Ollama milik zaltr SENDIRI (opsional).
+  # Server ini sudah punya Ollama host di 11434-11436 milik pihak lain —
+  # JANGAN dipakai/diganggu. Service ini memakai volume model terpisah.
+  # ------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: zaltr-ollama
+    restart: unless-stopped
+    networks: [zaltr-net]
+    profiles: [gpu]
+    volumes:
+      - zaltr_ollama:/root/.ollama
+    environment:
+      TZ: ${TZ:-Asia/Makassar}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

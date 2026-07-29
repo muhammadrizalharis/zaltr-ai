@@ -1,0 +1,106 @@
+#!/bin/bash
+# ============================================================
+# zaltrctl — kendali stack Docker zaltr.ai (TERISOLASI).
+# Hanya menyentuh project compose "zaltr" (container zaltr-*).
+# TIDAK pernah menjalankan prune/system-wide command.
+#
+# Pemakaian:
+#   bin/zaltrctl init          buat .env + secrets (sekali)
+#   bin/zaltrctl up            start core (tanpa port host)
+#   bin/zaltrctl up-dev        start core + port loopback 46xxx
+#   bin/zaltrctl up ai         start + profile copilot-runtime
+#   bin/zaltrctl up gpu        start + profile ollama (GPU)
+#   bin/zaltrctl down          stop stack (data/volume AMAN)
+#   bin/zaltrctl status        ps + health
+#   bin/zaltrctl logs [svc]    ikuti log
+#   bin/zaltrctl psql          shell psql ke database zaltr
+#   bin/zaltrctl backup-now    jalankan backup sekarang
+#   bin/zaltrctl backups       daftar arsip backup
+#   bin/zaltrctl config        validasi compose (render final)
+# ============================================================
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${ROOT}"
+
+DC=(sudo docker compose --project-name zaltr -f docker-compose.yml)
+DC_DEV=("${DC[@]}" -f docker-compose.dev.yml)
+
+gen_secret() { openssl rand -hex 24; }
+
+ensure_env() {
+  [ -f .env ] || { echo "Belum ada .env — jalankan: bin/zaltrctl init"; exit 1; }
+}
+
+cmd_init() {
+  mkdir -p secrets
+  touch secrets/.gitkeep
+
+  if [ ! -f .env ]; then
+    # Salin template sambil mengganti setiap __GENERATE__ dengan nilai acak unik
+    awk '{
+      while ($0 ~ /__GENERATE__/) {
+        cmd = "openssl rand -hex 24"; cmd | getline s; close(cmd)
+        sub(/__GENERATE__/, s)
+      }
+      print
+    }' .env.example > .env
+    chmod 600 .env
+    echo "[init] .env dibuat (password acak, chmod 600)"
+  else
+    echo "[init] .env sudah ada — tidak diubah"
+  fi
+
+  if [ ! -s secrets/backup.pass ]; then
+    gen_secret > secrets/backup.pass
+    chmod 600 secrets/backup.pass
+    echo "[init] secrets/backup.pass dibuat — SIMPAN SALINANNYA DI LUAR SERVER!"
+    echo "       Tanpa passphrase ini seluruh backup TIDAK BISA dibuka."
+  fi
+
+  if [ ! -f secrets/copilot_github_token ]; then
+    : > secrets/copilot_github_token
+    chmod 600 secrets/copilot_github_token
+    echo "[init] secrets/copilot_github_token dibuat KOSONG."
+    echo "       Isi dengan token service account saat fase web (profile ai)."
+  fi
+
+  mkdir -p "$(grep '^ZALTR_BACKUP_DIR=' .env | cut -d= -f2)"
+  echo "[init] selesai. Lanjut: bin/zaltrctl up"
+}
+
+case "${1:-help}" in
+  init)       cmd_init ;;
+  up)
+    ensure_env
+    shift || true
+    profiles=()
+    for p in "$@"; do profiles+=(--profile "$p"); done
+    "${DC[@]}" "${profiles[@]}" up -d --build
+    "${DC[@]}" ps
+    ;;
+  up-dev)
+    ensure_env
+    "${DC_DEV[@]}" up -d --build
+    "${DC_DEV[@]}" ps
+    ;;
+  down)       ensure_env; "${DC[@]}" --profile ai --profile gpu down ;;
+  status)     ensure_env; "${DC[@]}" ps ;;
+  logs)       ensure_env; shift || true; "${DC[@]}" logs -f --tail=100 "$@" ;;
+  psql)
+    ensure_env
+    sudo docker exec -it zaltr-postgres \
+      psql -U "$(grep '^ZALTR_POSTGRES_USER=' .env | cut -d= -f2)" \
+           -d "$(grep '^ZALTR_POSTGRES_DB=' .env | cut -d= -f2)"
+    ;;
+  backup-now) ensure_env; sudo docker exec zaltr-backup zaltr-backup ;;
+  backups)
+    ensure_env
+    ls -lh "$(grep '^ZALTR_BACKUP_DIR=' .env | cut -d= -f2)"/zaltr-*.tar.enc 2>/dev/null \
+      || echo "(belum ada backup)"
+    ;;
+  config)     ensure_env; "${DC[@]}" --profile ai --profile gpu config >/dev/null && echo "compose OK" ;;
+  *)
+    sed -n '2,20p' "$0"
+    ;;
+esac

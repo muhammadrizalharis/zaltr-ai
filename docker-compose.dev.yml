@@ -1,0 +1,24 @@
+# ============================================================
+# zaltr.ai — overlay DEV: buka port ke host (loopback saja).
+# Blok port 46xxx khusus zaltr; tidak dipakai proyek lain.
+# Pakai: bin/zaltrctl up-dev   (compose -f docker-compose.yml
+#        -f docker-compose.dev.yml up -d)
+# ============================================================
+
+services:
+  postgres:
+    ports:
+      - "${ZALTR_DEV_BIND:-127.0.0.1}:${ZALTR_DEV_PG_PORT:-46432}:5432"
+
+  redis:
+    ports:
+      - "${ZALTR_DEV_BIND:-127.0.0.1}:${ZALTR_DEV_REDIS_PORT:-46379}:6379"
+
+  minio:
+    ports:
+      - "${ZALTR_DEV_BIND:-127.0.0.1}:${ZALTR_DEV_MINIO_PORT:-46900}:9000"
+      - "${ZALTR_DEV_BIND:-127.0.0.1}:${ZALTR_DEV_MINIO_CONSOLE_PORT:-46901}:9001"
+
+  ollama:
+    ports:
+      - "${ZALTR_DEV_BIND:-127.0.0.1}:${ZALTR_DEV_OLLAMA_PORT:-46434}:11434"
