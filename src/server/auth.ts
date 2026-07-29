@@ -1,6 +1,6 @@
 import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { db } from "@/lib/db";
 
 const scrypt = promisify(scryptCb);
@@ -8,8 +8,19 @@ const scrypt = promisify(scryptCb);
 export const SESSION_COOKIE = "zaltr_session";
 const SESSION_DAYS = 30;
 
-/** Cookie Secure hanya bila situs diakses via HTTPS (intranet HTTP tetap bisa login). */
-export function cookieSecure(): boolean {
+/**
+ * Cookie Secure per-request: ikuti protokol yang dipakai pengunjung
+ * (x-forwarded-proto dari tunnel/proxy HTTPS), fallback ZALTR_PUBLIC_URL.
+ * Dengan ini login jalan BAIK via HTTPS (ngrok/domain) MAUPUN HTTP intranet.
+ */
+export async function cookieSecure(): Promise<boolean> {
+  try {
+    const h = await headers();
+    const proto = h.get("x-forwarded-proto");
+    if (proto) return proto.split(",")[0].trim() === "https";
+  } catch {
+    // di luar konteks request (mis. script) -> pakai fallback env
+  }
   return (process.env.ZALTR_PUBLIC_URL ?? "").startsWith("https://");
 }
 
@@ -43,7 +54,7 @@ export async function createSession(userId: string): Promise<void> {
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: cookieSecure(),
+    secure: await cookieSecure(),
     path: "/",
     maxAge: SESSION_DAYS * 86_400,
   });

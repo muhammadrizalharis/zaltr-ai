@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   jar.set(STATE_COOKIE, state, {
     httpOnly: true,
     sameSite: "lax",
-    secure: cookieSecure(),
+    secure: await cookieSecure(),
     path: "/",
     maxAge: 600,
   });
