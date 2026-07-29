@@ -144,6 +144,41 @@ services:
       - zaltr_backup_pass
 
   # ------------------------------------------------------------------
+  # Web app zaltr.ai (Next.js standalone) — AKTIF TERUS:
+  # restart unless-stopped + docker.service enabled = hidup 24/7 & tahan reboot.
+  # Port host: ${ZALTR_WEB_BIND}:${ZALTR_WEB_PORT} -> 3000.
+  # ------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    image: zaltr/web:local
+    container_name: zaltr-web
+    restart: unless-stopped
+    networks: [zaltr-net]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "${ZALTR_WEB_BIND:-0.0.0.0}:${ZALTR_WEB_PORT:-46300}:3000"
+    environment:
+      TZ: ${TZ:-Asia/Makassar}
+      DATABASE_URL: postgresql://${ZALTR_POSTGRES_USER:?}:${ZALTR_POSTGRES_PASSWORD:?}@postgres:5432/${ZALTR_POSTGRES_DB:?}?schema=public
+      # URL provider versi DALAM network zaltr-net (bukan loopback host)
+      ZALTR_COPILOT_URL: ${ZALTR_WEB_COPILOT_URL:-copilot-runtime:4321}
+      ZALTR_OLLAMA_URL: ${ZALTR_WEB_OLLAMA_URL:-http://ollama:11434}
+      ZALTR_COMFYUI_URL: ${ZALTR_COMFYUI_URL:-}
+      ZALTR_MINIO_URL: http://minio:9000
+      ZALTR_MINIO_ROOT_USER: ${ZALTR_MINIO_ROOT_USER:?}
+      ZALTR_MINIO_ROOT_PASSWORD: ${ZALTR_MINIO_ROOT_PASSWORD:?}
+      ZALTR_MINIO_BUCKET_FILES: ${ZALTR_MINIO_BUCKET_FILES:?}
+      ZALTR_PUBLIC_URL: ${ZALTR_PUBLIC_URL:-http://localhost:46300}
+      ZALTR_GOOGLE_CLIENT_ID: ${ZALTR_GOOGLE_CLIENT_ID:-}
+      ZALTR_GOOGLE_CLIENT_SECRET: ${ZALTR_GOOGLE_CLIENT_SECRET:-}
+
+  # ------------------------------------------------------------------
   # Profile "ai": runtime Copilot CLI headless (fase web menyusul).
   # Tidak berjalan default; aktifkan dengan: zaltrctl up ai
   # Token Enterprise HANYA lewat secret file, tidak pernah di image/env.

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { STATE_COOKIE } from "@/server/oauth";
+import { cookieSecure } from "@/server/auth";
 
 /**
  * Mulai alur "Masuk dengan Google" (OAuth 2.0 authorization code, server-side).
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
   jar.set(STATE_COOKIE, state, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: cookieSecure(),
     path: "/",
     maxAge: 600,
   });

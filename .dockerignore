@@ -1,0 +1,16 @@
+# Jangan bawa ini ke build context image web
+.git
+node_modules
+.next
+out
+*.tsbuildinfo
+.env
+.env.*
+secrets
+src/generated
+zaltr-backups
+docker/backup
+docker/copilot-runtime
+docker/postgres
+bin
+README.md

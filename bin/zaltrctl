@@ -11,6 +11,7 @@
 #   bin/zaltrctl up-dev ai gpu start dev + profile tambahan (copilot/ollama)
 #   bin/zaltrctl up ai         start + profile copilot-runtime
 #   bin/zaltrctl up gpu        start + profile ollama (GPU)
+#   bin/zaltrctl deploy-web    migrasi DB + build + start container web (produksi)
 #   bin/zaltrctl down          stop stack (data/volume AMAN)
 #   bin/zaltrctl status        ps + health
 #   bin/zaltrctl logs [svc]    ikuti log
@@ -89,6 +90,16 @@ case "${1:-help}" in
     "${DC_DEV[@]}" "${profiles[@]}" ps
     ;;
   down)       ensure_env; "${DC[@]}" --profile ai --profile gpu down ;;
+  deploy-web)
+    ensure_env
+    # Migrasi DB dijalankan dari HOST (butuh port dev PG 46432 -> up-dev aktif).
+    if command -v node >/dev/null 2>&1 || [ -s "$HOME/.nvm/nvm.sh" ]; then
+      ( . "$HOME/.nvm/nvm.sh" 2>/dev/null || true; nvm use 22 >/dev/null 2>&1 || true; \
+        npx prisma migrate deploy )
+    fi
+    "${DC_DEV[@]}" up -d --build web
+    "${DC[@]}" ps web
+    ;;
   status)     ensure_env; "${DC[@]}" ps ;;
   logs)       ensure_env; shift || true; "${DC[@]}" logs -f --tail=100 "$@" ;;
   psql)

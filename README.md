@@ -27,14 +27,22 @@ Isolasi dari proyek lain di server ini: project `zaltr`, network `zaltr-net`, vo
 
 ## Web Preview (SUDAH JALAN, 2026-07-30)
 
-Aplikasi web fase preview sudah berjalan di **http://localhost:46300** (Next.js 16 + Prisma 7 + PostgreSQL zaltr):
+Aplikasi web kini berjalan **permanen sebagai container** `zaltr-web` (Next.js standalone,
+`restart: unless-stopped`, Docker enabled saat boot) — hidup 24/7 di server kampus tanpa
+terminal/SSH: **http://localhost:46300** atau **http://10.33.33.11:46300** dari jaringan kampus.
 
 ```bash
-bin/zaltrctl up-dev              # pastikan Postgres terekspos di 127.0.0.1:46432
-. ~/.nvm/nvm.sh && nvm use 22    # host Node v18 — wajib Node 22
-npm install                      # sekali (postinstall menjalankan prisma generate)
-npx prisma migrate dev           # sekali / saat schema berubah
-npm run dev                      # http://localhost:46300
+bin/zaltrctl deploy-web          # migrasi DB + build image + start container web
+bin/zaltrctl logs web            # ikuti log
+sudo docker ps --filter name=zaltr-web
+```
+
+Untuk pengembangan (hot-reload), matikan container web dulu karena port sama:
+
+```bash
+sudo docker stop zaltr-web       # lepas port 46300
+. ~/.nvm/nvm.sh && nvm use 22
+npm run dev                      # selesai dev: bin/zaltrctl deploy-web lagi
 ```
 
 Yang sudah berfungsi pada preview: sidebar (chat baru, cari, pin, trash), streaming NDJSON dengan tombol Stop, markdown + blok kode, **model picker di samping composer** (grup Zaltr demo / Copilot Enterprise / Ollama dengan status live), judul otomatis, dan persistensi write-first ke tabel `Conversation`/`Message`. Provider `zaltr-core` adalah demo internal untuk pratinjau UI; Copilot aktif setelah `secrets/copilot_github_token` diisi + profile `ai`, Ollama setelah `bin/zaltrctl up gpu`.

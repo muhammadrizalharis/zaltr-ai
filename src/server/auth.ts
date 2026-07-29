@@ -8,6 +8,11 @@ const scrypt = promisify(scryptCb);
 export const SESSION_COOKIE = "zaltr_session";
 const SESSION_DAYS = 30;
 
+/** Cookie Secure hanya bila situs diakses via HTTPS (intranet HTTP tetap bisa login). */
+export function cookieSecure(): boolean {
+  return (process.env.ZALTR_PUBLIC_URL ?? "").startsWith("https://");
+}
+
 // ---------- Password (scrypt, tanpa dependency eksternal) ----------
 
 export async function hashPassword(password: string): Promise<string> {
@@ -38,7 +43,7 @@ export async function createSession(userId: string): Promise<void> {
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: cookieSecure(),
     path: "/",
     maxAge: SESSION_DAYS * 86_400,
   });
