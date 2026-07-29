@@ -19,6 +19,7 @@ export async function GET(_req: Request, { params }: Params) {
 const patchSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
   pinned: z.boolean().optional(),
+  projectId: z.string().min(1).nullable().optional(),
 });
 
 export async function PATCH(req: Request, { params }: Params) {
@@ -27,11 +28,17 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!body.success) {
     return NextResponse.json({ error: "Payload tidak valid" }, { status: 400 });
   }
+  if (body.data.projectId) {
+    const project = await db.project.findUnique({ where: { id: body.data.projectId } });
+    if (!project) {
+      return NextResponse.json({ error: "Project tidak ditemukan" }, { status: 404 });
+    }
+  }
   const conversation = await db.conversation
     .update({
       where: { id },
       data: body.data,
-      select: { id: true, title: true, pinned: true, updatedAt: true },
+      select: { id: true, title: true, pinned: true, projectId: true, updatedAt: true },
     })
     .catch(() => null);
   if (!conversation) {

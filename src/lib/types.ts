@@ -13,10 +13,17 @@ export interface ModelDescriptor {
   note?: string;
 }
 
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  count: number;
+}
+
 export interface ConversationSummary {
   id: string;
   title: string;
   pinned: boolean;
+  projectId: string | null;
   updatedAt: string;
 }
 

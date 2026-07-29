@@ -10,17 +10,30 @@ datasource db {
   provider = "postgresql"
 }
 
+model Project {
+  id            String         @id @default(cuid())
+  name          String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+
+  @@index([updatedAt(sort: Desc)])
+}
+
 model Conversation {
   id        String    @id @default(cuid())
   title     String    @default("Chat baru")
   pinned    Boolean   @default(false)
   archived  Boolean   @default(false)
   trashedAt DateTime?
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]
 
   @@index([updatedAt(sort: Desc)])
+  @@index([projectId])
 }
 
 model Message {
