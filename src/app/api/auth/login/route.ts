@@ -17,11 +17,17 @@ export async function POST(req: Request) {
   // Pesan seragam agar tidak membocorkan email mana yang terdaftar.
   const gagal = NextResponse.json({ error: "Email atau password salah" }, { status: 401 });
   if (!user) return gagal;
+  if (!user.passwordHash) {
+    return NextResponse.json(
+      { error: "Akun ini masuk lewat Google — pakai tombol “Masuk dengan Google”" },
+      { status: 400 },
+    );
+  }
   if (!(await verifyPassword(body.data.password, user.passwordHash))) return gagal;
 
   if (user.status === "pending") {
     return NextResponse.json(
-      { error: "Akun masih menunggu persetujuan admin" },
+      { error: "Akun masih menunggu aktivasi superadmin" },
       { status: 403 },
     );
   }

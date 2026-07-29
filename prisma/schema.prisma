@@ -15,7 +15,9 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   name          String
-  passwordHash  String
+  passwordHash  String? // null = akun Google-only
+  googleId      String?   @unique // sub Google — 1 akun Google = 1 akun zaltr
+  avatarUrl     String?
   role          String    @default("user") // superadmin | admin | user
   status        String    @default("pending") // pending | active | suspended
   // Kredit internal zaltr (dipotong oleh provider berbayar, mis. Copilot).

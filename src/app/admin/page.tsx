@@ -141,6 +141,8 @@ function UserCard({
   const isSuper = me?.role === "superadmin";
   const canManage =
     isSuper || (me?.role === "admin" && (u.role === "user" || u.id === me.id));
+  // Admin tidak boleh mengubah kredit dirinya sendiri (server juga menolak).
+  const canEditCredit = canManage && (isSuper || u.id !== me?.id);
 
   function togglePattern(p: string) {
     setAllowed((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
@@ -188,13 +190,18 @@ function UserCard({
           <div className="grid gap-6 lg:grid-cols-2">
             {/* --- Kolom kiri: akses & status --- */}
             <div className="space-y-5">
-              {u.status === "pending" && canManage && (
+              {u.status === "pending" && isSuper && (
                 <button
                   onClick={() => void onPatch(u.id, { status: "active" })}
                   className="w-full rounded-xl bg-accent-a py-2.5 font-semibold text-bg hover:opacity-90"
                 >
-                  ✓ Setujui akun ini
+                  ✓ Aktifkan akun ini
                 </button>
+              )}
+              {u.status === "pending" && !isSuper && (
+                <p className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
+                  Menunggu aktivasi — hanya superadmin yang bisa mengaktifkan akun baru.
+                </p>
               )}
 
               <Section title="Role & status">
@@ -231,12 +238,12 @@ function UserCard({
                     type="number"
                     min={0}
                     value={credit}
-                    disabled={!canManage}
+                    disabled={!canEditCredit}
                     onChange={(e) => setCredit(e.target.value)}
                     className="input w-40 tabular-nums"
                   />
                   <button
-                    disabled={!canManage}
+                    disabled={!canEditCredit}
                     onClick={() => void onPatch(u.id, { creditBalance: Number(credit) })}
                     className="rounded-xl border border-accent-a/50 px-4 text-sm text-accent-a hover:bg-accent-a/10 disabled:opacity-40"
                   >
@@ -245,7 +252,7 @@ function UserCard({
                   {[100, 1000, 10000].map((n) => (
                     <button
                       key={n}
-                      disabled={!canManage}
+                      disabled={!canEditCredit}
                       onClick={() => setCredit(String(Number(credit || 0) + n))}
                       className="rounded-xl border border-line px-3 text-xs text-muted hover:text-ink disabled:opacity-40"
                     >
@@ -255,6 +262,7 @@ function UserCard({
                 </div>
                 <p className="mt-1 text-[11px] text-muted">
                   1 kredit = 1 pesan Copilot. Model lokal (Ollama/ComfyUI/demo) gratis.
+                  {!isSuper && u.id === me?.id && " Kredit sendiri hanya bisa diubah superadmin."}
                 </p>
               </Section>
 

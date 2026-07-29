@@ -31,9 +31,33 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
 
   const target = await db.user.findUnique({
     where: { id },
-    select: { id: true, role: true },
+    select: { id: true, role: true, status: true },
   });
   if (!target) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
+
+  // Aktivasi akun (pending -> active) HANYA oleh superadmin.
+  if (
+    body.data.status === "active" &&
+    target.status === "pending" &&
+    actor.role !== "superadmin"
+  ) {
+    return NextResponse.json(
+      { error: "Hanya superadmin yang bisa mengaktifkan akun baru" },
+      { status: 403 },
+    );
+  }
+
+  // Admin tidak boleh mengubah kredit dirinya sendiri (anti self-topup).
+  if (
+    actor.role !== "superadmin" &&
+    target.id === actor.id &&
+    body.data.creditBalance !== undefined
+  ) {
+    return NextResponse.json(
+      { error: "Admin tidak bisa mengubah kredit sendiri — minta superadmin" },
+      { status: 403 },
+    );
+  }
 
   if (actor.role === "admin") {
     if (target.role !== "user" && target.id !== actor.id) {

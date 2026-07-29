@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, active: true }, { status: 201 });
   }
   return NextResponse.json(
-    { ok: true, active: false, message: "Akun dibuat. Tunggu persetujuan admin untuk mulai memakai zaltr.ai." },
+    { ok: true, active: false, message: "Akun dibuat. Tunggu aktivasi superadmin untuk mulai memakai zaltr.ai." },
     { status: 201 },
   );
 }

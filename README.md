@@ -77,6 +77,21 @@ Semua URL provider dibaca dari env (`ZALTR_COPILOT_URL`, `ZALTR_OLLAMA_URL`,
 `ZALTR_COMFYUI_URL`, `ZALTR_MINIO_URL`) sehingga topologi container nanti hanya
 mengganti nilai env, bukan kode.
 
+**4. Login Google (opsional, untuk akun pengguna):**
+
+```bash
+# Buat OAuth Client ID (Web) di console.cloud.google.com → Credentials.
+# Authorized redirect URI: http://localhost:46300/api/auth/google/callback
+# Lalu isi di .env dan restart web:
+ZALTR_PUBLIC_URL=http://localhost:46300
+ZALTR_GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
+ZALTR_GOOGLE_CLIENT_SECRET=GOCSPX-...
+```
+
+Aturan akun: 1 akun Google = 1 akun zaltr (`googleId` unik); akun baru selalu
+`pending` dan hanya **superadmin** yang bisa mengaktifkan; admin dapat mengubah
+kredit user tetapi tidak kredit dirinya sendiri.
+
 
 
 

@@ -4,12 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-export function AuthForm({ mode }: { mode: "login" | "register" }) {
+export function AuthForm({
+  mode,
+  initialError,
+}: {
+  mode: "login" | "register";
+  initialError?: string;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const isLogin = mode === "login";
@@ -53,7 +59,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             ZALTR.AI
           </Link>
           <p className="mt-2 text-sm text-muted">
-            {isLogin ? "Masuk ke ruang kerja AI-mu" : "Buat akun — akses disetujui admin"}
+            {isLogin ? "Masuk ke ruang kerja AI-mu" : "Buat akun — aktivasi oleh superadmin"}
           </p>
         </div>
 
@@ -116,6 +122,22 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           >
             {busy ? "Memproses…" : isLogin ? "Masuk" : "Daftar"}
           </button>
+
+          <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-muted">
+            <span className="h-px flex-1 bg-line" /> atau <span className="h-px flex-1 bg-line" />
+          </div>
+
+          <a
+            href="/api/auth/google"
+            className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-panel-2 py-2.5 text-sm font-medium hover:border-accent-b/60"
+          >
+            <GoogleIcon />
+            {isLogin ? "Masuk dengan Google" : "Daftar dengan Google"}
+          </a>
+          <p className="text-center text-[11px] leading-relaxed text-muted">
+            Satu akun Google hanya bisa terhubung ke satu akun zaltr.ai.
+            Akun baru menunggu aktivasi superadmin.
+          </p>
         </form>
 
         <p className="mt-4 text-center text-sm text-muted">
@@ -148,5 +170,28 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       </span>
       {children}
     </label>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden>
+      <path
+        fill="#4285F4"
+        d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.39 3.62v3h3.87c2.26-2.09 3.57-5.16 3.57-8.81z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.87-3c-1.07.72-2.44 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.29v3.1A12 12 0 0 0 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.27 14.28A7.2 7.2 0 0 1 4.9 12c0-.79.14-1.56.37-2.28v-3.1H1.29a12 12 0 0 0 0 10.76l3.98-3.1z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.76c1.76 0 3.34.6 4.59 1.79l3.44-3.44A11.97 11.97 0 0 0 12 0 12 12 0 0 0 1.29 6.62l3.98 3.1C6.22 6.87 8.87 4.76 12 4.76z"
+      />
+    </svg>
   );
 }
