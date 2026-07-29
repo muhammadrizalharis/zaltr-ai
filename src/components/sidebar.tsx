@@ -11,7 +11,11 @@ export function notifyConversationsChanged() {
   window.dispatchEvent(new Event(CONVERSATIONS_CHANGED));
 }
 
-export function Sidebar() {
+export function Sidebar({
+  user,
+}: {
+  user: { name: string; role: string; creditBalance: number };
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [convs, setConvs] = useState<ConversationSummary[]>([]);
@@ -281,12 +285,35 @@ export function Sidebar() {
       </nav>
 
       <footer className="border-t border-line px-4 py-3 text-[11px] leading-relaxed text-muted">
-        <Link href="/chat/trash" className="mb-1 block text-xs text-muted hover:text-accent-a">
-          🗑 Trash
-        </Link>
-        Chat tersimpan permanen di PostgreSQL zaltr.
-        <br />
-        Hapus = pindah ke trash (bukan musnah).
+        <div className="mb-2 flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-medium text-ink">{user.name}</p>
+            <p className="text-[10px] uppercase tracking-wider">
+              {user.role} · {user.creditBalance.toLocaleString("id-ID")} kredit
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              router.push("/login");
+              router.refresh();
+            }}
+            title="Keluar"
+            className="shrink-0 rounded-lg border border-line px-2 py-1 text-[11px] hover:border-red-400/60 hover:text-red-300"
+          >
+            Keluar
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href="/chat/trash" className="text-xs text-muted hover:text-accent-a">
+            🗑 Trash
+          </Link>
+          {(user.role === "admin" || user.role === "superadmin") && (
+            <Link href="/admin" className="text-xs text-muted hover:text-accent-b">
+              ⚙ Admin
+            </Link>
+          )}
+        </div>
       </footer>
     </aside>
   );

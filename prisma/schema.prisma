@@ -10,14 +10,52 @@ datasource db {
   provider = "postgresql"
 }
 
+// ---- Auth & role (superadmin | admin | user) ----
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  passwordHash  String
+  role          String    @default("user") // superadmin | admin | user
+  status        String    @default("pending") // pending | active | suspended
+  // Kredit internal zaltr (dipotong oleh provider berbayar, mis. Copilot).
+  creditBalance Int       @default(0)
+  creditUsed    Int       @default(0)
+  // Pola model yang diizinkan: "*", "copilot:*", "ollama:*", id spesifik, dst.
+  allowedModels String[]  @default(["zaltr-core"])
+  dailyMsgLimit Int? // batas pesan user per hari (null = tanpa batas)
+  notes         String? // catatan internal admin
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions      Session[]
+  projects      Project[]
+  conversations Conversation[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique // sha256(token); token mentah hanya di cookie
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model Project {
   id            String         @id @default(cuid())
   name          String
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   conversations Conversation[]
 
   @@index([updatedAt(sort: Desc)])
+  @@index([userId])
 }
 
 model Conversation {
@@ -28,12 +66,15 @@ model Conversation {
   trashedAt DateTime?
   projectId String?
   project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]
 
   @@index([updatedAt(sort: Desc)])
   @@index([projectId])
+  @@index([userId])
 }
 
 model Message {

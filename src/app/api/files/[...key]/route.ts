@@ -1,4 +1,5 @@
 import { getObjectStream } from "@/lib/storage";
+import { guarded, requireUser } from "@/server/auth";
 
 export const runtime = "nodejs";
 
@@ -6,9 +7,10 @@ type Params = { params: Promise<{ key: string[] }> };
 
 /**
  * Streaming file dari MinIO (bucket privat zaltr-files) ke browser.
- * Key divalidasi ketat: hanya path aman, tanpa traversal.
+ * Hanya untuk user login; key divalidasi ketat (tanpa traversal).
  */
-export async function GET(_req: Request, { params }: Params) {
+export const GET = guarded(async (_req: Request, { params }: Params) => {
+  await requireUser();
   const { key } = await params;
   const objectKey = key.join("/");
   if (!/^[\w][\w./-]*$/.test(objectKey) || objectKey.includes("..")) {
@@ -36,4 +38,4 @@ export async function GET(_req: Request, { params }: Params) {
   } catch {
     return Response.json({ error: "File tidak ditemukan" }, { status: 404 });
   }
-}
+});

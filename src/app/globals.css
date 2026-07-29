@@ -73,3 +73,21 @@ body {
     opacity: 0;
   }
 }
+
+/* Input form auth/admin */
+.input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  outline: none;
+}
+.input::placeholder {
+  color: var(--muted);
+}
+.input:focus {
+  border-color: color-mix(in srgb, var(--accent-b) 60%, transparent);
+}

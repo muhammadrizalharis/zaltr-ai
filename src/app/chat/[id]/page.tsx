@@ -1,6 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { ChatView } from "@/components/chat-view";
+import { getSessionUser } from "@/server/auth";
 import type { ChatMessage } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +11,11 @@ export default async function ConversationPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const me = await getSessionUser();
+  if (!me) redirect("/login");
   const { id } = await params;
   const conversation = await db.conversation.findFirst({
-    where: { id, trashedAt: null },
+    where: { id, userId: me.id, trashedAt: null },
     include: { messages: { orderBy: { createdAt: "asc" } } },
   });
   if (!conversation) notFound();
