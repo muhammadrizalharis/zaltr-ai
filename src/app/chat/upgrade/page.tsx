@@ -10,20 +10,34 @@ export const metadata = { title: "Beli Kredit — zaltr.ai" };
 
 const PAKET: Array<{
   nama: string;
-  kredit: number;
+  kredit: number | null;
   harga: string;
   limit: string;
   fitur: string[];
   unggulan?: boolean;
 }> = [
   {
+    nama: "Free",
+    kredit: null,
+    harga: "Gratis",
+    limit: "100 pesan / hari",
+    fitur: [
+      "Model Zaltr Free (ringan & cepat)",
+      "Riwayat chat tersimpan permanen",
+      "Projects & folder chat",
+    ],
+  },
+  {
     nama: "Starter",
     kredit: 100,
     harga: "Rp15.000",
     limit: "1.000 pesan / hari",
     fitur: [
-      "Model premium kelas cepat (Haiku, GPT Mini, Flash)",
+      "Model Zaltr Free (ringan & cepat)",
+      "Riwayat chat tersimpan permanen",
+      "Projects & folder chat",
       "Semua model Zaltr Turbo",
+      "Model premium kelas cepat (Haiku, GPT Mini, Flash)",
       "Lampiran file + web search + memori",
     ],
   },
@@ -33,9 +47,15 @@ const PAKET: Array<{
     harga: "Rp60.000",
     limit: "3.000 pesan / hari",
     fitur: [
-      "Semua fitur Starter",
+      "Model Zaltr Free (ringan & cepat)",
+      "Riwayat chat tersimpan permanen",
+      "Projects & folder chat",
+      "Semua model Zaltr Turbo",
+      "Model premium kelas cepat (Haiku, GPT Mini, Flash)",
+      "Lampiran file + web search + memori",
       "Model kelas utama (Sonnet, GPT-5, Gemini Pro)",
       "Studio gambar (teks → gambar HD)",
+      "Eksekusi kode Python di chat",
     ],
     unggulan: true,
   },
@@ -45,6 +65,15 @@ const PAKET: Array<{
     harga: "Rp150.000",
     limit: "TANPA batas pesan harian",
     fitur: [
+      "Model Zaltr Free (ringan & cepat)",
+      "Riwayat chat tersimpan permanen",
+      "Projects & folder chat",
+      "Semua model Zaltr Turbo",
+      "Model premium kelas cepat (Haiku, GPT Mini, Flash)",
+      "Lampiran file + web search + memori",
+      "Model kelas utama (Sonnet, GPT-5, Gemini Pro)",
+      "Studio gambar (teks → gambar HD)",
+      "Eksekusi kode Python di chat",
       "SEMUA model termasuk kelas flagship (Opus dkk)",
       "Studio penuh: gambar + video + musik",
       "Prioritas dukungan admin",
@@ -55,7 +84,7 @@ const PAKET: Array<{
 export default function UpgradePage() {
   const kontak = process.env.ZALTR_CONTACT_URL ?? "";
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-10">
+    <div className="mx-auto w-full max-w-5xl px-4 py-10">
       <h1 className="text-2xl font-bold">
         Buka <span className="wordmark">semua model</span>
       </h1>
@@ -65,7 +94,7 @@ export default function UpgradePage() {
         media. 1 kredit = 1 pesan model premium; model gratis & Turbo tidak memakai kredit.
       </p>
 
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {PAKET.map((p) => (
           <div
             key={p.nama}
@@ -81,10 +110,16 @@ export default function UpgradePage() {
               </span>
             )}
             <h2 className="mt-2 text-lg font-semibold">{p.nama}</h2>
-            <p className="mt-1 text-3xl font-bold text-accent-a">
-              {p.kredit.toLocaleString("id-ID")}
-              <span className="ml-1 text-sm font-normal text-muted">kredit</span>
-            </p>
+            {p.kredit === null ? (
+              <p className="mt-1 text-3xl font-bold text-accent-a">0
+                <span className="ml-1 text-sm font-normal text-muted">kredit</span>
+              </p>
+            ) : (
+              <p className="mt-1 text-3xl font-bold text-accent-a">
+                {p.kredit.toLocaleString("id-ID")}
+                <span className="ml-1 text-sm font-normal text-muted">kredit</span>
+              </p>
+            )}
             <p className="mt-1 font-semibold">{p.harga}</p>
             <p className="mt-1 text-xs font-semibold text-accent-b">{p.limit}</p>
             <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-muted">
