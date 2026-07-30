@@ -9,7 +9,11 @@ export default async function WelcomePage() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between px-6 py-4 md:px-10">
-        <span className="wordmark text-xl font-bold">ZALTR.AI</span>
+        <span className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-192.png" alt="zaltr.ai" className="h-8 w-8 rounded-lg" />
+          <span className="wordmark text-xl font-bold">ZALTR.AI</span>
+        </span>
         <nav className="flex items-center gap-3 text-sm">
           {user ? (
             <Link
@@ -35,6 +39,12 @@ export default async function WelcomePage() {
       </header>
 
       <main className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo-512.png"
+          alt="Logo zaltr.ai"
+          className="mb-6 h-28 w-28 rounded-3xl shadow-[0_0_60px_rgba(80,220,200,0.35)] md:h-36 md:w-36"
+        />
         <h1 className="wordmark text-5xl font-bold tracking-tight md:text-7xl">ZALTR.AI</h1>
         <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted">
           Satu ruang kerja AI pribadi — GPT, Claude, dan Gemini via{" "}

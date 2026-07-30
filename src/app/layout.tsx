@@ -9,6 +9,15 @@ export const metadata: Metadata = {
   title: "zaltr.ai",
   description:
     "Satu ruang kerja AI: Copilot Enterprise, Ollama, dan ComfyUI dalam satu chat.",
+  icons: {
+    icon: "/favicon.png",
+    apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    title: "zaltr.ai",
+    description: "Satu ruang kerja AI pribadi — GPT, Claude, Gemini, Ollama, ComfyUI.",
+    images: ["/logo-512.png"],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

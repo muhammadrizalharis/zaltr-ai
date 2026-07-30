@@ -337,7 +337,11 @@ export function ChatView({
 function EmptyState({ onPick }: { onPick: (s: string) => void }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-4">
-      <h1 className="wordmark text-4xl font-black tracking-widest">ZALTR.AI</h1>
+      <h1 className="flex items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-192.png" alt="" className="h-12 w-12 rounded-xl" />
+        <span className="wordmark text-4xl font-black tracking-widest">ZALTR.AI</span>
+      </h1>
       <p className="max-w-md text-center text-sm text-muted">
         Satu ruang kerja AI — Copilot Enterprise, Ollama, dan ComfyUI dalam satu chat.
         Pilih model dari tombol di samping kolom pesan.

@@ -55,8 +55,10 @@ export function AuthForm({
     <div className="flex min-h-screen items-center justify-center px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <Link href="/" className="wordmark text-3xl font-bold">
-            ZALTR.AI
+          <Link href="/" className="flex flex-col items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-192.png" alt="zaltr.ai" className="h-16 w-16 rounded-2xl" />
+            <span className="wordmark text-3xl font-bold">ZALTR.AI</span>
           </Link>
           <p className="mt-2 text-sm text-muted">
             {isLogin ? "Masuk ke ruang kerja AI-mu" : "Buat akun — aktivasi oleh superadmin"}

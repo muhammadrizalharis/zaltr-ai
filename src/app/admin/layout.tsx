@@ -13,8 +13,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen">
       <header className="flex items-center justify-between border-b border-line bg-panel px-6 py-3">
         <div className="flex items-center gap-4">
-          <Link href="/chat" className="wordmark text-lg font-bold">
-            ZALTR.AI
+          <Link href="/chat" className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-192.png" alt="" className="h-7 w-7 rounded-lg" />
+            <span className="wordmark text-lg font-bold">ZALTR.AI</span>
           </Link>
           <span className="rounded-full border border-accent-b/50 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent-b">
             {user.role}

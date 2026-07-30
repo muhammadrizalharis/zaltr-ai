@@ -152,8 +152,10 @@ export function Sidebar({
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-line bg-panel max-md:hidden">
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
-        <Link href="/chat" className="wordmark text-lg font-bold">
-          ZALTR.AI
+        <Link href="/chat" className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-192.png" alt="" className="h-7 w-7 rounded-lg" />
+          <span className="wordmark text-lg font-bold">ZALTR.AI</span>
         </Link>
         <span className="rounded-full border border-line px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted">
           preview
