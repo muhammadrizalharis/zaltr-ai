@@ -7,10 +7,10 @@ import { notifyConversationsChanged } from "@/components/sidebar";
 import type { ChatMessage, StreamLine } from "@/lib/types";
 
 const SUGGESTIONS = [
-  "Jelaskan arsitektur zaltr.ai secara singkat",
-  "Buat contoh fungsi TypeScript dengan penjelasan",
-  "Apa bedanya provider Copilot, Ollama, dan ComfyUI di sini?",
-  "Tulis rencana belajar AI 30 hari",
+  "Buatkan rencana belajar AI 30 hari untuk pemula",
+  "Tulis contoh fungsi TypeScript dengan penjelasan",
+  "Buatkan gambar pemandangan kota futuristik saat senja",
+  "Ringkas dokumen yang saya lampirkan",
 ];
 
 export function ChatView({
@@ -343,7 +343,7 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
         <span className="wordmark text-4xl font-black tracking-widest">ZALTR.AI</span>
       </h1>
       <p className="max-w-md text-center text-sm text-muted">
-        Satu ruang kerja AI — Copilot Enterprise, Ollama, dan ComfyUI dalam satu chat.
+        Satu ruang kerja untuk semua AI terbaik — chat, gambar, video, dan musik.
         Pilih model dari tombol di samping kolom pesan.
       </p>
       <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">

@@ -91,3 +91,104 @@ body {
 .input:focus {
   border-color: color-mix(in srgb, var(--accent-b) 60%, transparent);
 }
+
+/* ================= Animasi landing (CSS murni — jalan di HP & laptop) ===== */
+
+/* Latar aurora bergerak pelan */
+@keyframes aurora {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.anim-aurora {
+  background:
+    radial-gradient(60% 80% at 20% 10%, rgba(45, 212, 191, 0.10), transparent 60%),
+    radial-gradient(50% 70% at 80% 20%, rgba(139, 92, 246, 0.12), transparent 60%),
+    radial-gradient(70% 60% at 50% 100%, rgba(45, 212, 191, 0.07), transparent 60%);
+  background-size: 200% 200%;
+  animation: aurora 18s ease-in-out infinite;
+}
+
+/* Bola cahaya blur yang melayang */
+@keyframes drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(40px, -50px) scale(1.15); }
+  66%  { transform: translate(-30px, 30px) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+.orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.5;
+  pointer-events: none;
+  animation: drift 14s ease-in-out infinite;
+}
+
+/* Logo mengambang naik-turun */
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+.anim-float { animation: floaty 5s ease-in-out infinite; }
+
+/* Wordmark dengan gradien MENGALIR */
+@keyframes flow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.wordmark-flow {
+  background: linear-gradient(92deg, var(--accent-a), var(--accent-b), #f472b6, var(--accent-a));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.08em;
+  animation: flow 6s linear infinite;
+}
+
+/* Marquee daftar model bergulir */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 0.75rem;
+  animation: marquee 30s linear infinite;
+}
+.marquee-track:hover { animation-play-state: paused; }
+
+/* Muncul dari bawah dengan jeda berantai */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { opacity: 0; animation: fadeUp 0.7s ease-out forwards; }
+.d1 { animation-delay: 0.05s; }
+.d2 { animation-delay: 0.15s; }
+.d3 { animation-delay: 0.25s; }
+.d4 { animation-delay: 0.35s; }
+.d5 { animation-delay: 0.45s; }
+.d6 { animation-delay: 0.55s; }
+
+/* Glow logo berdenyut */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 40px rgba(45, 212, 191, 0.35); }
+  50%      { box-shadow: 0 0 90px rgba(139, 92, 246, 0.55); }
+}
+.glow-pulse { animation: pulseGlow 4s ease-in-out infinite; }
+
+/* Kartu terangkat saat disentuh/hover */
+.lift { transition: transform 0.25s ease, border-color 0.25s ease; }
+.lift:hover { transform: translateY(-5px); border-color: color-mix(in srgb, var(--accent-a) 50%, transparent); }
+
+/* Hormati preferensi aksesibilitas pengguna */
+@media (prefers-reduced-motion: reduce) {
+  .anim-aurora, .orb, .anim-float, .wordmark-flow, .marquee-track,
+  .fade-up, .glow-pulse {
+    animation: none !important;
+  }
+  .fade-up { opacity: 1; }
+}

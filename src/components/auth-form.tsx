@@ -52,12 +52,20 @@ export function AuthForm({
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
-      <div className="w-full max-w-sm">
+    <div className="anim-aurora relative flex min-h-screen items-center justify-center overflow-hidden px-6">
+      <div className="orb left-[-60px] top-[15%] h-64 w-64 bg-accent-a/30" />
+      <div className="orb bottom-[-80px] right-[-40px] h-72 w-72 bg-accent-b/30 [animation-delay:-6s]" />
+      <Link
+        href="/"
+        className="absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-xl border border-line bg-panel/70 px-3 py-2 text-sm text-muted backdrop-blur transition-colors hover:border-accent-a/50 hover:text-ink md:left-6 md:top-6"
+      >
+        ← Beranda
+      </Link>
+      <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 text-center">
           <Link href="/" className="flex flex-col items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-192.png" alt="zaltr.ai" className="h-16 w-16 rounded-2xl" />
+            <img src="/logo-192.png" alt="zaltr.ai" className="anim-float h-16 w-16 rounded-2xl" />
             <span className="wordmark text-3xl font-bold">ZALTR.AI</span>
           </Link>
           <p className="mt-2 text-sm text-muted">
