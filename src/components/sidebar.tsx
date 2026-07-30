@@ -308,6 +308,9 @@ export function Sidebar({
           <Link href="/chat/trash" className="text-xs text-muted hover:text-accent-a">
             🗑 Trash
           </Link>
+          <Link href="/chat/settings" className="text-xs text-muted hover:text-accent-a">
+            ⚙ Pengaturan
+          </Link>
           {(user.role === "admin" || user.role === "superadmin") && (
             <Link href="/admin" className="text-xs text-muted hover:text-accent-b">
               ⚙ Admin

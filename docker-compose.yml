@@ -15,6 +15,11 @@ networks:
   zaltr-net:
     name: zaltr-net
     driver: bridge
+  # Network KHUSUS code-interpreter: internal (tanpa internet), hanya web<->runner.
+  zaltr-exec:
+    name: zaltr-exec
+    driver: bridge
+    internal: true
 
 volumes:
   zaltr_pgdata:
@@ -155,7 +160,7 @@ services:
     image: zaltr/web:local
     container_name: zaltr-web
     restart: unless-stopped
-    networks: [zaltr-net]
+    networks: [zaltr-net, zaltr-exec]
     depends_on:
       postgres:
         condition: service_healthy
@@ -177,6 +182,42 @@ services:
       ZALTR_PUBLIC_URL: ${ZALTR_PUBLIC_URL:-http://localhost:46300}
       ZALTR_GOOGLE_CLIENT_ID: ${ZALTR_GOOGLE_CLIENT_ID:-}
       ZALTR_GOOGLE_CLIENT_SECRET: ${ZALTR_GOOGLE_CLIENT_SECRET:-}
+      ZALTR_SEARXNG_URL: http://searxng:8080
+      ZALTR_RUNNER_URL: http://runner:8484
+
+  # ------------------------------------------------------------------
+  # Web search self-hosted (fitur "Cari web" di chat). Internal-only.
+  # ------------------------------------------------------------------
+  searxng:
+    image: searxng/searxng:latest
+    container_name: zaltr-searxng
+    restart: unless-stopped
+    networks: [zaltr-net]
+    environment:
+      SEARXNG_SECRET: ${ZALTR_SEARXNG_SECRET:?}
+      SEARXNG_BASE_URL: http://searxng:8080/
+    volumes:
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
+
+  # ------------------------------------------------------------------
+  # Code interpreter (tombol "Jalankan" pada blok Python di chat).
+  # Terkunci: network internal tanpa internet & tanpa akses service zaltr
+  # lain, rootfs read-only, non-root, cap-drop ALL, mem/pids dibatasi.
+  # ------------------------------------------------------------------
+  runner:
+    build: ./docker/runner
+    image: zaltr/runner:local
+    container_name: zaltr-runner
+    restart: unless-stopped
+    networks: [zaltr-exec]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    mem_limit: 768m
+    pids_limit: 128
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
 
   # ------------------------------------------------------------------
   # Profile "ai": runtime Copilot CLI headless (fase web menyusul).

@@ -1,0 +1,12 @@
+use_default_settings: true
+
+# Format json WAJIB diaktifkan agar API /search?format=json bisa dipakai web.
+search:
+  formats:
+    - html
+    - json
+
+server:
+  # secret_key dioverride env SEARXNG_SECRET (di docker-compose).
+  limiter: false
+  public_instance: false

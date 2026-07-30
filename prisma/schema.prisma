@@ -27,6 +27,8 @@ model User {
   allowedModels String[]  @default(["zaltr-core"])
   dailyMsgLimit Int? // batas pesan user per hari (null = tanpa batas)
   notes         String? // catatan internal admin
+  // Instruksi pribadi user (ala ChatGPT custom instructions) — disuntik ke prompt.
+  customInstructions String?
   lastLoginAt   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -34,6 +36,19 @@ model User {
   sessions      Session[]
   projects      Project[]
   conversations Conversation[]
+  memories      Memory[]
+}
+
+// Memori antar-percakapan (ala ChatGPT Memory): fakta personal yang diekstrak
+// otomatis oleh model lokal, disuntik ke prompt semua chat user tsb.
+model Memory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Session {

@@ -4,6 +4,9 @@ import { dispatch } from "@/server/providers";
 import { guarded, modelAllowed, requireUser } from "@/server/auth";
 import { getObjectBuffer } from "@/lib/storage";
 import { extractText, fileExt, IMAGE_EXT } from "@/server/extract";
+import { webSearch, formatSearchContext } from "@/server/search";
+import { extractMemories, memoryContext } from "@/server/memories";
+import { describeImages, isNativeVisionModel } from "@/server/vision";
 import type { StreamLine } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -15,8 +18,12 @@ function creditCost(modelId: string): number {
 
 const bodySchema = z.object({
   conversationId: z.string().min(1),
-  content: z.string().trim().min(1).max(32_000),
+  content: z.string().trim().max(32_000).default(""),
   modelId: z.string().min(1),
+  /** Toggle "Cari web" dari composer. */
+  web: z.boolean().optional(),
+  /** Regenerate: buat ulang jawaban untuk pesan user TERAKHIR (tanpa pesan baru). */
+  regenerate: z.boolean().optional(),
 });
 
 export const POST = guarded(async (req: Request) => {
@@ -25,7 +32,11 @@ export const POST = guarded(async (req: Request) => {
   if (!parsed.success) {
     return Response.json({ error: "Payload tidak valid" }, { status: 400 });
   }
-  const { conversationId, content, modelId } = parsed.data;
+  const { conversationId, modelId, web, regenerate } = parsed.data;
+  let content = parsed.data.content;
+  if (!regenerate && !content) {
+    return Response.json({ error: "Pesan kosong" }, { status: 400 });
+  }
 
   // Kebijakan akun (diatur admin): model diizinkan? limit harian? kredit cukup?
   if (!modelAllowed(me.allowedModels, modelId)) {
@@ -69,21 +80,44 @@ export const POST = guarded(async (req: Request) => {
 
   // WRITE-FIRST (kontrak README): prompt tersimpan durable SEBELUM provider jalan.
   // Kredit dipotong pada transaksi yang sama; refund otomatis bila provider failed.
-  const title =
-    conversation.title === "Chat baru"
-      ? content.replace(/\s+/g, " ").slice(0, 60)
-      : conversation.title;
-  const [userMessage] = await db.$transaction([
-    db.message.create({
-      data: { conversationId, role: "user", content, model: modelId },
-      select: { id: true },
-    }),
-    db.conversation.update({ where: { id: conversationId }, data: { title } }),
-    db.user.update({
+  // Mode regenerate: TIDAK membuat pesan user baru — pakai pesan user terakhir.
+  let userMessageId: string;
+  let title = conversation.title;
+  if (regenerate) {
+    const lastUser = await db.message.findFirst({
+      where: { conversationId, role: "user" },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, content: true },
+    });
+    if (!lastUser) {
+      return Response.json({ error: "Belum ada pesan untuk diulang" }, { status: 400 });
+    }
+    userMessageId = lastUser.id;
+    content = lastUser.content;
+    await db.user.update({
       where: { id: me.id },
       data: { creditBalance: { decrement: cost }, creditUsed: { increment: cost } },
-    }),
-  ]);
+    });
+  } else {
+    title =
+      conversation.title === "Chat baru"
+        ? content.replace(/\s+/g, " ").slice(0, 60)
+        : conversation.title;
+    const [userMessage] = await db.$transaction([
+      db.message.create({
+        data: { conversationId, role: "user", content, model: modelId },
+        select: { id: true },
+      }),
+      db.conversation.update({ where: { id: conversationId }, data: { title } }),
+      db.user.update({
+        where: { id: me.id },
+        data: { creditBalance: { decrement: cost }, creditUsed: { increment: cost } },
+      }),
+    ]);
+    userMessageId = userMessage.id;
+    // Memori antar-percakapan: ekstrak fakta personal (async, gratis via Ollama).
+    void extractMemories(me.id, content);
+  }
 
   const history = await db.message.findMany({
     where: { conversationId, status: { not: "failed" } },
@@ -125,6 +159,36 @@ export const POST = guarded(async (req: Request) => {
     }
     if (extras.length > 0) last.content = `${last.content}\n\n${extras.join("\n\n")}`;
     if (images.length > 0) last.images = images;
+
+    // Vision-proxy: model tanpa kemampuan gambar tetap "melihat" lewat
+    // deskripsi dari model vision lokal (qwen2.5vl).
+    if (images.length > 0 && !isNativeVisionModel(modelId)) {
+      const desc = await describeImages(images);
+      if (desc) {
+        last.content += `\n\n=== Deskripsi gambar terlampir (oleh model vision lokal) ===\n${desc}\n=== Akhir deskripsi ===`;
+      }
+    }
+
+    // Konteks personal: custom instructions + memori antar-percakapan.
+    const preamble: string[] = [];
+    if (me.customInstructions?.trim()) {
+      preamble.push(`Instruksi pribadi dari pengguna (patuhi):\n${me.customInstructions.trim().slice(0, 2_000)}`);
+    }
+    const mem = await memoryContext(me.id);
+    if (mem) preamble.push(mem);
+
+    // Web search (toggle "Cari web" di composer).
+    if (web) {
+      try {
+        const hits = await webSearch(content.split("\n")[0] || content);
+        preamble.push(formatSearchContext(content.split("\n")[0] || content, hits));
+      } catch {
+        preamble.push("[Pencarian web gagal — jawab dari pengetahuanmu dan katakan itu.]");
+      }
+    }
+    if (preamble.length > 0) {
+      last.content = `${preamble.join("\n\n")}\n\n---\n\n${last.content}`;
+    }
   }
 
   const encoder = new TextEncoder();
@@ -133,7 +197,7 @@ export const POST = guarded(async (req: Request) => {
       const send = (line: StreamLine) =>
         controller.enqueue(encoder.encode(JSON.stringify(line) + "\n"));
 
-      send({ type: "meta", userMessageId: userMessage.id, conversationTitle: title });
+      send({ type: "meta", userMessageId, conversationTitle: title });
 
       let acc = "";
       let status: "completed" | "stopped" | "failed" = "completed";

@@ -28,6 +28,7 @@ export function ChatView({
   const [error, setError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -50,16 +51,17 @@ export function ChatView({
     return data.conversation.id;
   }
 
-  async function send(textArg?: string) {
+  async function send(textArg?: string, opts?: { regenerate?: boolean }) {
+    const regenerate = opts?.regenerate ?? false;
     const text = (textArg ?? draft).trim();
-    if ((!text && attachments.length === 0) || streaming || uploading) return;
+    if ((!text && attachments.length === 0 && !regenerate) || streaming || uploading) return;
     setDraft("");
     setError(null);
 
     // Upload lampiran dulu -> jadikan markdown di isi pesan (gambar inline,
     // dokumen sebagai link; server mengekstrak isinya untuk model).
     let content = text;
-    if (attachments.length > 0) {
+    if (!regenerate && attachments.length > 0) {
       setUploading(true);
       try {
         const fd = new FormData();
@@ -85,13 +87,15 @@ export function ChatView({
     }
 
     const convId = await ensureConversation();
-    const optimistic: ChatMessage = {
-      id: `tmp-${Date.now()}`,
-      role: "user",
-      content,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, optimistic]);
+    if (!regenerate) {
+      const optimistic: ChatMessage = {
+        id: `tmp-${Date.now()}`,
+        role: "user",
+        content,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, optimistic]);
+    }
     setStreamText("");
 
     const controller = new AbortController();
@@ -102,7 +106,13 @@ export function ChatView({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: convId, content, modelId: model }),
+        body: JSON.stringify({
+          conversationId: convId,
+          content,
+          modelId: model,
+          web: webSearch,
+          regenerate,
+        }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
@@ -182,8 +192,26 @@ export function ChatView({
           <EmptyState onPick={(s) => void send(s)} />
         ) : (
           <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8">
-            {messages.map((m) => (
-              <Bubble key={m.id} message={m} />
+            {messages.map((m, i) => (
+              <Bubble
+                key={m.id}
+                message={m}
+                isLastAssistant={
+                  m.role === "assistant" &&
+                  i === messages.length - 1 &&
+                  !streaming
+                }
+                isLastUser={
+                  m.role === "user" &&
+                  !messages.slice(i + 1).some((x) => x.role === "user") &&
+                  !streaming
+                }
+                onRegenerate={() => void send(undefined, { regenerate: true })}
+                onEdit={(text) => {
+                  setDraft(text);
+                  textareaRef.current?.focus();
+                }}
+              />
             ))}
             {streaming && (
               <div className="text-sm leading-relaxed">
@@ -247,6 +275,22 @@ export function ChatView({
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setWebSearch((v) => !v)}
+            disabled={streaming}
+            title={webSearch ? "Cari web: AKTIF — jawaban memakai hasil pencarian" : "Cari web: mati"}
+            aria-label="Toggle cari web"
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-sm disabled:opacity-40 ${
+              webSearch
+                ? "border-accent-a/70 bg-accent-a/10 text-accent-a"
+                : "border-line bg-panel-2 text-muted hover:border-accent-b/60 hover:text-ink"
+            }`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
             </svg>
           </button>
           <div className="flex min-h-10 flex-1 items-end rounded-xl border border-line bg-panel-2 focus-within:border-accent-b/60">
@@ -331,13 +375,33 @@ function RoleTag({ role }: { role: string }) {
   );
 }
 
-function Bubble({ message }: { message: ChatMessage }) {
+function Bubble({
+  message,
+  isLastAssistant,
+  isLastUser,
+  onRegenerate,
+  onEdit,
+}: {
+  message: ChatMessage;
+  isLastAssistant?: boolean;
+  isLastUser?: boolean;
+  onRegenerate?: () => void;
+  onEdit?: (text: string) => void;
+}) {
   const isUser = message.role === "user";
+  const [copied, setCopied] = useState(false);
   // Pesan user dengan lampiran berisi markdown gambar/link -> render markdown
   // supaya lampiran tampil; teks murni tetap plain (tanpa formatting tak sengaja).
   const hasAttachment = isUser && message.content.includes("](/api/files/");
+
+  async function copy() {
+    await navigator.clipboard.writeText(message.content).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
   return (
-    <div className="text-sm leading-relaxed">
+    <div className="group text-sm leading-relaxed">
       <RoleTag role={message.role} />
       <div
         className={`mt-1 ${
@@ -350,6 +414,34 @@ function Bubble({ message }: { message: ChatMessage }) {
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
           <Markdown>{message.content}</Markdown>
+        )}
+      </div>
+      {/* Aksi kecil ala ChatGPT: salin / regenerate / edit */}
+      <div className="mt-1 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          onClick={() => void copy()}
+          className="text-[11px] text-muted hover:text-ink"
+          title="Salin isi pesan"
+        >
+          {copied ? "Tersalin ✓" : "Salin"}
+        </button>
+        {isLastAssistant && onRegenerate && (
+          <button
+            onClick={onRegenerate}
+            className="text-[11px] text-muted hover:text-accent-a"
+            title="Buat ulang jawaban (model menjawab lagi)"
+          >
+            ↻ Ulangi jawaban
+          </button>
+        )}
+        {isUser && isLastUser && onEdit && (
+          <button
+            onClick={() => onEdit(message.content.split("\n\n![")[0].split("\n\n[📎")[0])}
+            className="text-[11px] text-muted hover:text-accent-a"
+            title="Salin teks ke kolom pesan untuk diedit lalu kirim ulang"
+          >
+            ✎ Edit
+          </button>
         )}
       </div>
       {message.status === "stopped" && (

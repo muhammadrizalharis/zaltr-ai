@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -75,15 +76,119 @@ export function Markdown({ children }: { children: string }) {
             </code>
           );
         },
-        pre: (p) => (
-          <pre
-            className="mb-3 overflow-x-auto rounded-xl border border-line bg-[#0d1320] p-3 font-mono text-[13px] leading-relaxed"
-            {...p}
-          />
-        ),
+        pre: ({ children, ...p }) => <CodeBlock {...p}>{children}</CodeBlock>,
       }}
     >
       {children}
     </ReactMarkdown>
+  );
+}
+
+/** Ambil teks mentah dari children React (untuk salin/eksekusi kode). */
+function extractText(node: React.ReactNode): string {
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) return node.map(extractText).join("");
+  if (node && typeof node === "object" && "props" in node) {
+    return extractText((node as { props: { children?: React.ReactNode } }).props.children);
+  }
+  return "";
+}
+
+function isPythonBlock(node: React.ReactNode): boolean {
+  if (node && typeof node === "object" && "props" in node) {
+    const cls =
+      (node as { props: { className?: string } }).props.className ?? "";
+    return /language-(python|py)\b/.test(cls);
+  }
+  return false;
+}
+
+/**
+ * Blok kode dengan tombol Salin; khusus Python ada tombol Jalankan
+ * (code interpreter — dieksekusi di container runner terisolasi).
+ */
+function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) {
+  const [copied, setCopied] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<{
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+    timeMs: number;
+  } | null>(null);
+
+  const inner = children as React.ReactNode;
+  const python = isPythonBlock(Array.isArray(inner) ? inner[0] : inner);
+
+  async function copy() {
+    await navigator.clipboard.writeText(extractText(inner)).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function run() {
+    setRunning(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: extractText(inner) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`);
+      setResult(data);
+    } catch (err) {
+      setResult({
+        stdout: "",
+        stderr: err instanceof Error ? err.message : "Gagal menjalankan",
+        exitCode: -1,
+        timeMs: 0,
+      });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="group relative mb-3">
+      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        {python && (
+          <button
+            onClick={() => void run()}
+            disabled={running}
+            className="rounded-md border border-line bg-panel px-2 py-0.5 text-[11px] text-muted hover:text-accent-a disabled:opacity-50"
+          >
+            {running ? "Menjalankan…" : "▶ Jalankan"}
+          </button>
+        )}
+        <button
+          onClick={() => void copy()}
+          className="rounded-md border border-line bg-panel px-2 py-0.5 text-[11px] text-muted hover:text-ink"
+        >
+          {copied ? "Tersalin ✓" : "Salin"}
+        </button>
+      </div>
+      <pre
+        className="overflow-x-auto rounded-xl border border-line bg-[#0d1320] p-3 font-mono text-[13px] leading-relaxed"
+        {...rest}
+      >
+        {children}
+      </pre>
+      {result && (
+        <div className="mt-1 rounded-xl border border-line bg-panel-2 p-3 font-mono text-[12px]">
+          <p className="mb-1 text-[10px] uppercase tracking-wider text-muted">
+            Hasil eksekusi · exit {result.exitCode} · {result.timeMs} ms
+          </p>
+          {result.stdout && <pre className="whitespace-pre-wrap">{result.stdout}</pre>}
+          {result.stderr && (
+            <pre className="whitespace-pre-wrap text-red-400">{result.stderr}</pre>
+          )}
+          {!result.stdout && !result.stderr && (
+            <p className="text-muted">(tanpa output)</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

@@ -79,6 +79,7 @@ export interface SessionUser {
   creditUsed: number;
   allowedModels: string[];
   dailyMsgLimit: number | null;
+  customInstructions: string | null;
 }
 
 /** Ambil user dari cookie session; null bila tidak login/kedaluwarsa. */
@@ -101,6 +102,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
           creditUsed: true,
           allowedModels: true,
           dailyMsgLimit: true,
+          customInstructions: true,
         },
       },
     },
