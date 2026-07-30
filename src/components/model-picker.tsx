@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ModelDescriptor } from "@/lib/types";
 
 const STORAGE_KEY = "zaltr:model";
-export const DEFAULT_MODEL = "zaltr-core";
+/** Default = model pintar (bukan demo) — pengalaman pertama harus terasa GPT/Claude. */
+export const DEFAULT_MODEL = "copilot:claude-sonnet-4.6";
 
 export function ModelPicker({
   value,
@@ -126,5 +127,8 @@ export function ModelPicker({
 
 export function loadSavedModel(): string {
   if (typeof window === "undefined") return DEFAULT_MODEL;
-  return localStorage.getItem(STORAGE_KEY) ?? DEFAULT_MODEL;
+  const saved = localStorage.getItem(STORAGE_KEY);
+  // Migrasi: default lama "zaltr-core" (demo) dianggap belum memilih.
+  if (!saved || saved === "zaltr-core") return DEFAULT_MODEL;
+  return saved;
 }
