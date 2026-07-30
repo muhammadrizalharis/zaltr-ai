@@ -8,13 +8,34 @@ const MODELS = [
   "Llama 3", "Qwen Coder", "Phi Reasoning", "FLUX", "Wan Video", "ACE Music",
 ];
 
+const IKON: Record<string, React.ReactNode> = {
+  model: (
+    <path d="M9 3v2m6-2v2M9 19v2m6-2v2M3 9h2m-2 6h2m14-6h2m-2 6h2M7 7h10v10H7zM10 10h4v4h-4z" />
+  ),
+  studio: (
+    <path d="M4 5h16v11H4zM4 16l5-5 3 3 4-4 4 4M9 21h6m-3-5v5" />
+  ),
+  file: (
+    <path d="M14 3H6v18h12V7zM14 3v4h4M9 12h6M9 16h6" />
+  ),
+  web: (
+    <path d="M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" />
+  ),
+  memori: (
+    <path d="M5 5a7 3 0 0114 0v14a7 3 0 01-14 0zM5 5a7 3 0 0014 0M5 12a7 3 0 0014 0" />
+  ),
+  kode: (
+    <path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 6l-2 12" />
+  ),
+};
+
 const FITUR: Array<[string, string, string]> = [
-  ["🧠", "Semua model unggulan", "GPT, Claude, Gemini, dan puluhan model lain dalam satu tempat — ganti model semudah satu klik, di tengah percakapan sekalipun."],
-  ["🎨", "Studio media", "Buat gambar berkualitas tinggi, video pendek, dan musik hanya dari teks. Semua hasil tersimpan otomatis di galeri percakapanmu."],
-  ["📎", "Membaca semua file", "Lampirkan PDF, Word, PowerPoint, Excel, gambar, atau kode — AI membaca isinya dan menjawab langsung dari dokumenmu."],
-  ["🌐", "Terhubung ke internet", "Nyalakan mode cari web dan AI menjawab dengan informasi terkini lengkap dengan tautan sumbernya."],
-  ["💾", "Mengingatmu", "Memori antar percakapan dan instruksi pribadi — AI tahu siapa kamu, proyekmu, dan gaya jawaban yang kamu suka."],
-  ["⚡", "Menjalankan kode", "Blok Python di jawaban AI bisa langsung dieksekusi di lingkungan aman yang terisolasi — hasil tampil di chat."],
+  ["model", "Semua model unggulan", "GPT, Claude, Gemini, dan puluhan model lain dalam satu tempat — ganti model semudah satu klik, di tengah percakapan sekalipun."],
+  ["studio", "Studio media", "Buat gambar berkualitas tinggi, video pendek, dan musik hanya dari teks. Semua hasil tersimpan otomatis di galeri percakapanmu."],
+  ["file", "Membaca semua file", "Lampirkan PDF, Word, PowerPoint, Excel, gambar, atau kode — AI membaca isinya dan menjawab langsung dari dokumenmu."],
+  ["web", "Terhubung ke internet", "Nyalakan mode cari web dan AI menjawab dengan informasi terkini lengkap dengan tautan sumbernya."],
+  ["memori", "Mengingatmu", "Memori antar percakapan dan instruksi pribadi — AI tahu siapa kamu, proyekmu, dan gaya jawaban yang kamu suka."],
+  ["kode", "Menjalankan kode", "Blok Python di jawaban AI bisa langsung dieksekusi di lingkungan aman yang terisolasi — hasil tampil di chat."],
 ];
 
 export default async function WelcomePage() {
@@ -146,8 +167,20 @@ export default async function WelcomePage() {
               key={judul}
               className={`lift fade-up d${(i % 6) + 1} rounded-2xl border border-line bg-panel/70 p-5 backdrop-blur`}
             >
-              <span className="text-2xl">{ikon}</span>
-              <h3 className="mb-1.5 mt-2 font-semibold text-accent-a">{judul}</h3>
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-accent-a/40 bg-accent-a/10 text-accent-a">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  {IKON[ikon]}
+                </svg>
+              </span>
+              <h3 className="mb-1.5 mt-3 font-semibold text-accent-a">{judul}</h3>
               <p className="text-sm leading-relaxed text-muted">{isi}</p>
             </div>
           ))}
