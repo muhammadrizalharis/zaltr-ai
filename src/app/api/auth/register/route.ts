@@ -10,11 +10,11 @@ const schema = z.object({
 });
 
 /**
- * Registrasi:
- * - User PERTAMA otomatis superadmin + active + akses semua model, dan
- *   mengklaim data preview lama (conversation/project tanpa pemilik).
- * - User berikutnya berstatus "pending" sampai disetujui admin
- *   (kontrak README: akses invitation-only/allowlist server-side).
+ * Registrasi (freemium):
+ * - User PERTAMA otomatis superadmin + akses semua model, dan mengklaim
+ *   data preview lama (conversation/project tanpa pemilik).
+ * - User berikutnya LANGSUNG AKTIF dengan mode Free (zaltr-core saja);
+ *   model premium terlihat tapi terkunci sampai membeli kredit/upgrade.
  */
 export async function POST(req: Request) {
   const body = schema.safeParse(await req.json().catch(() => ({})));
@@ -41,10 +41,10 @@ export async function POST(req: Request) {
         email,
         passwordHash,
         role: isFirst ? "superadmin" : "user",
-        status: isFirst ? "active" : "pending",
+        status: "active",
         creditBalance: isFirst ? 100_000 : 0,
         allowedModels: isFirst ? ["*"] : ["zaltr-core"],
-        lastLoginAt: isFirst ? new Date() : null,
+        lastLoginAt: new Date(),
       },
       select: { id: true, role: true, status: true },
     });
@@ -59,12 +59,6 @@ export async function POST(req: Request) {
     return created;
   });
 
-  if (user.status === "active") {
-    await createSession(user.id);
-    return NextResponse.json({ ok: true, active: true }, { status: 201 });
-  }
-  return NextResponse.json(
-    { ok: true, active: false, message: "Akun dibuat. Tunggu aktivasi superadmin untuk mulai memakai zaltr.ai." },
-    { status: 201 },
-  );
+  await createSession(user.id);
+  return NextResponse.json({ ok: true, active: true }, { status: 201 });
 }

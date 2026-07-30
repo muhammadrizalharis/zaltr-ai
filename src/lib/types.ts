@@ -11,6 +11,8 @@ export interface ModelDescriptor {
   available: boolean;
   local: boolean;
   note?: string;
+  /** Freemium: model di luar paket akun — terlihat tapi tak bisa dipilih. */
+  locked?: boolean;
 }
 
 export interface ProjectSummary {

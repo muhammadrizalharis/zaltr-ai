@@ -78,7 +78,7 @@ export async function copilotCatalog(): Promise<ModelDescriptor[]> {
       id: `copilot:${m.id}`,
       label: m.name || m.id,
       provider: "copilot" as const,
-      providerLabel: "GitHub Copilot Enterprise",
+      providerLabel: "Zaltr Pro",
       capabilities: ["chat"] as ModelDescriptor["capabilities"],
       available: true,
       local: false,
@@ -88,11 +88,11 @@ export async function copilotCatalog(): Promise<ModelDescriptor[]> {
       id: `copilot:${id}`,
       label,
       provider: "copilot" as const,
-      providerLabel: "GitHub Copilot Enterprise",
+      providerLabel: "Zaltr Pro",
       capabilities,
       available: false,
       local: false,
-      note: "Runtime belum aktif — isi secrets/copilot_github_token lalu: bin/zaltrctl up-dev ai",
+      note: "Sedang offline — coba lagi nanti",
     }));
   }
 }

@@ -170,15 +170,17 @@ export const POST = guarded(async (req: Request) => {
     }
 
     // Konteks personal: custom instructions + memori antar-percakapan.
+    // Paket FREE (zaltr-core): tanpa memori/instruksi/web — konteks pendek.
+    const isFree = modelId === "zaltr-core";
     const preamble: string[] = [];
-    if (me.customInstructions?.trim()) {
+    if (!isFree && me.customInstructions?.trim()) {
       preamble.push(`Instruksi pribadi dari pengguna (patuhi):\n${me.customInstructions.trim().slice(0, 2_000)}`);
     }
-    const mem = await memoryContext(me.id);
+    const mem = isFree ? null : await memoryContext(me.id);
     if (mem) preamble.push(mem);
 
     // Web search (toggle "Cari web" di composer).
-    if (web) {
+    if (web && !isFree) {
       try {
         const hits = await webSearch(content.split("\n")[0] || content);
         preamble.push(formatSearchContext(content.split("\n")[0] || content, hits));

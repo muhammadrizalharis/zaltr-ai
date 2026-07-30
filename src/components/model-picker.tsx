@@ -62,7 +62,7 @@ export function ModelPicker({
         className="flex h-10 items-center gap-1.5 rounded-xl border border-line bg-panel-2 px-3 text-sm text-ink hover:border-accent-b/60 disabled:opacity-50"
       >
         <span className="size-2 rounded-full bg-gradient-to-r from-accent-a to-accent-b" />
-        <span className="max-w-36 truncate">{selected?.label ?? value}</span>
+        <span className="max-w-36 truncate">{selected?.label ?? "Model…"}</span>
         <span className="text-[10px] text-muted">▾</span>
       </button>
 
@@ -75,11 +75,12 @@ export function ModelPicker({
               </p>
               {list.map((m) => {
                 const active = m.id === value;
+                const disabled = !m.available || m.locked;
                 return (
                   <button
                     key={m.id}
                     type="button"
-                    disabled={!m.available}
+                    disabled={disabled}
                     onClick={() => {
                       onChange(m.id);
                       localStorage.setItem(STORAGE_KEY, m.id);
@@ -87,11 +88,16 @@ export function ModelPicker({
                     }}
                     className={`flex w-full flex-col items-start rounded-lg px-2 py-1.5 text-left ${
                       active ? "bg-panel-2" : "hover:bg-panel-2"
-                    } ${m.available ? "" : "cursor-not-allowed opacity-45"}`}
+                    } ${disabled ? "cursor-not-allowed opacity-45" : ""}`}
                   >
                     <span className="flex w-full items-center gap-2 text-sm">
                       <span className="truncate">{m.label}</span>
-                      {m.local && (
+                      {m.locked && (
+                        <span className="rounded border border-amber-400/50 px-1 text-[9px] uppercase text-amber-300">
+                          🔒 upgrade
+                        </span>
+                      )}
+                      {m.local && !m.locked && (
                         <span className="rounded border border-accent-a/40 px-1 text-[9px] uppercase text-accent-a">
                           local
                         </span>

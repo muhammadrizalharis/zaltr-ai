@@ -78,7 +78,7 @@ export async function GET(req: Request) {
           googleId: payload.sub,
           avatarUrl: payload.picture,
           role: isFirst ? "superadmin" : "user",
-          status: isFirst ? "active" : "pending",
+          status: "active",
           creditBalance: isFirst ? 100_000 : 0,
           allowedModels: isFirst ? ["*"] : ["zaltr-core"],
         },
@@ -86,11 +86,11 @@ export async function GET(req: Request) {
     }
   }
 
-  if (user.status === "pending") {
-    return fail("Akun dibuat — menunggu aktivasi superadmin sebelum bisa masuk");
-  }
   if (user.status === "suspended") {
     return fail("Akun dinonaktifkan admin");
+  }
+  if (user.status === "pending") {
+    await db.user.update({ where: { id: user.id }, data: { status: "active" } });
   }
 
   await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });

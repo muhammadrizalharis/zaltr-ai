@@ -25,6 +25,15 @@ export function Sidebar({
   const [projectName, setProjectName] = useState("");
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  // Sidebar ciut (rail mini) — pilihan tersimpan di localStorage.
+  const [mini, setMini] = useState(false);
+  useEffect(() => {
+    setMini(localStorage.getItem("zaltr:sidebar") === "mini");
+  }, []);
+  function setMiniPersist(v: boolean) {
+    setMini(v);
+    localStorage.setItem("zaltr:sidebar", v ? "mini" : "full");
+  }
 
   const load = useCallback(async () => {
     const [cRes, pRes] = await Promise.all([
@@ -149,6 +158,32 @@ export function Sidebar({
     />
   );
 
+  // Sidebar bisa DICIUTKAN (tersimpan antar-kunjungan).
+  if (mini) {
+    return (
+      <aside className="flex w-14 shrink-0 flex-col items-center gap-3 border-r border-line bg-panel py-4 max-md:hidden">
+        <button onClick={() => setMiniPersist(false)} title="Bentangkan sidebar">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-192.png" alt="zaltr" className="h-8 w-8 rounded-lg" />
+        </button>
+        <Link
+          href="/chat"
+          title="Chat baru"
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-lg text-accent-a hover:border-accent-a/60"
+        >
+          +
+        </Link>
+        <button
+          onClick={() => setMiniPersist(false)}
+          title="Bentangkan sidebar"
+          className="mt-auto flex h-9 w-9 items-center justify-center rounded-xl border border-line text-muted hover:text-ink"
+        >
+          »
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-line bg-panel max-md:hidden">
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
@@ -157,9 +192,13 @@ export function Sidebar({
           <img src="/logo-192.png" alt="" className="h-7 w-7 rounded-lg" />
           <span className="wordmark text-lg font-bold">ZALTR.AI</span>
         </Link>
-        <span className="rounded-full border border-line px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted">
-          preview
-        </span>
+        <button
+          onClick={() => setMiniPersist(true)}
+          title="Ciutkan sidebar"
+          className="rounded-lg border border-line px-2 py-1 text-xs text-muted hover:text-ink"
+        >
+          «
+        </button>
       </div>
 
       <div className="px-3 pb-2">
@@ -319,6 +358,14 @@ export function Sidebar({
             </Link>
           )}
         </div>
+        {user.role === "user" && (
+          <Link
+            href="/chat/upgrade"
+            className="mt-2 block rounded-xl bg-gradient-to-r from-accent-a to-accent-b px-3 py-2 text-center text-xs font-semibold text-black hover:opacity-90"
+          >
+            ✨ Beli Kredit
+          </Link>
+        )}
       </footer>
     </aside>
   );

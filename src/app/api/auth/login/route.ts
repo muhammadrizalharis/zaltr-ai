@@ -25,14 +25,12 @@ export async function POST(req: Request) {
   }
   if (!(await verifyPassword(body.data.password, user.passwordHash))) return gagal;
 
-  if (user.status === "pending") {
-    return NextResponse.json(
-      { error: "Akun masih menunggu aktivasi superadmin" },
-      { status: 403 },
-    );
-  }
+  // Freemium: akun pending peninggalan lama dianggap aktif (aktivasi dihapus).
   if (user.status === "suspended") {
     return NextResponse.json({ error: "Akun dinonaktifkan admin" }, { status: 403 });
+  }
+  if (user.status === "pending") {
+    await db.user.update({ where: { id: user.id }, data: { status: "active" } });
   }
 
   await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });

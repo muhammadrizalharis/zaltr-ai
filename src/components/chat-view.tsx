@@ -35,6 +35,24 @@ export function ChatView({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setModel(loadSavedModel()), []);
+  // Freemium: bila model tersimpan terkunci/tidak tersedia utk akun ini,
+  // otomatis pindah ke model pertama yang bisa dipakai (mis. Zaltr Free).
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/models", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        models: Array<{ id: string; available: boolean; locked?: boolean }>;
+      };
+      const saved = loadSavedModel();
+      const usable = (id: string) =>
+        data.models.some((m) => m.id === id && m.available && !m.locked);
+      if (!usable(saved)) {
+        const first = data.models.find((m) => m.available && !m.locked);
+        if (first) setModel(first.id);
+      }
+    })();
+  }, []);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamText]);

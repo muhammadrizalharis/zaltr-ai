@@ -24,11 +24,11 @@ export async function ollamaCatalog(): Promise<ModelDescriptor[]> {
           id: "ollama:kosong",
           label: "Belum ada model",
           provider: "ollama",
-          providerLabel: "Ollama (zaltr)",
+          providerLabel: "Zaltr Turbo",
           capabilities: ["chat"],
           available: false,
           local: true,
-          note: "Tarik model: sudo docker exec zaltr-ollama ollama pull llama3.2",
+          note: "Belum ada model terpasang",
         },
       ];
     }
@@ -36,7 +36,7 @@ export async function ollamaCatalog(): Promise<ModelDescriptor[]> {
       id: `ollama:${m.name}`,
       label: m.name,
       provider: "ollama" as const,
-      providerLabel: "Ollama (zaltr)",
+      providerLabel: "Zaltr Turbo",
       capabilities: ["chat"] as ModelDescriptor["capabilities"],
       available: true,
       local: true,
@@ -47,11 +47,11 @@ export async function ollamaCatalog(): Promise<ModelDescriptor[]> {
         id: "ollama:offline",
         label: "Ollama offline",
         provider: "ollama",
-        providerLabel: "Ollama (zaltr)",
+        providerLabel: "Zaltr Turbo",
         capabilities: ["chat"],
         available: false,
         local: true,
-        note: "Nyalakan dengan: bin/zaltrctl up gpu",
+        note: "Sedang offline — coba lagi nanti",
       },
     ];
   }
@@ -68,8 +68,11 @@ export async function* ollamaChat(req: ChatRequest): ProviderGenerator {
       // Ollama tetap hangat 10 menit agar pergantian pesan tidak reload model.
       keep_alive: "10m",
       messages: [
-        // Persona & standar kualitas zaltr — tanpa ini model lokal jalan "polos".
-        { role: "system", content: SYSTEM_MESSAGE },
+        // Persona & standar kualitas zaltr — kecuali pemanggil sudah membawa
+        // system message sendiri (mis. Zaltr Free dengan persona free).
+        ...(req.history[0]?.role === "system"
+          ? []
+          : [{ role: "system", content: SYSTEM_MESSAGE }]),
         ...req.history.map((m) => ({
           role: m.role,
           content: m.content,
@@ -81,7 +84,7 @@ export async function* ollamaChat(req: ChatRequest): ProviderGenerator {
     signal: req.signal,
   });
   if (!res.ok || !res.body) {
-    throw new Error(`Ollama menolak permintaan (${res.status}). Cek: bin/zaltrctl up gpu`);
+    throw new Error(`Model sedang tidak tersedia (${res.status}) — coba lagi sebentar`);
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

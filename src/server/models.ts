@@ -15,13 +15,13 @@ export { ollamaBaseUrl } from "./providers/ollama";
 export async function listModels(): Promise<ModelDescriptor[]> {
   const core: ModelDescriptor = {
     id: "zaltr-core",
-    label: "Zaltr Core",
+    label: "Zaltr Free",
     provider: "zaltr",
-    providerLabel: "Zaltr (demo lokal)",
+    providerLabel: "Gratis",
     capabilities: ["chat"],
     available: true,
     local: true,
-    note: "Provider demo untuk pratinjau UI — tanpa model eksternal",
+    note: "Model gratis — cepat untuk percakapan sehari-hari",
   };
   const [copilot, ollama, comfy] = await Promise.all([
     copilotCatalog(),

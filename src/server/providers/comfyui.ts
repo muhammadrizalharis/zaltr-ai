@@ -184,7 +184,7 @@ const CURATED: CuratedModel[] = [
 export async function comfyCatalog(): Promise<ModelDescriptor[]> {
   const base = {
     provider: "comfyui" as const,
-    providerLabel: "ComfyUI (media)",
+    providerLabel: "Zaltr Studio",
     local: true,
   };
   if (!COMFY_URL) {
@@ -195,7 +195,7 @@ export async function comfyCatalog(): Promise<ModelDescriptor[]> {
         label: "ComfyUI belum terhubung",
         capabilities: ["image"] as ModelDescriptor["capabilities"],
         available: false,
-        note: "Isi ZALTR_COMFYUI_URL di .env lalu restart web",
+        note: "Studio sedang offline",
       },
     ];
   }
@@ -233,7 +233,7 @@ export async function comfyCatalog(): Promise<ModelDescriptor[]> {
         label: "ComfyUI offline",
         capabilities: ["image"] as ModelDescriptor["capabilities"],
         available: false,
-        note: `Tidak bisa menghubungi ${COMFY_URL}`,
+        note: "Studio sedang offline",
       },
     ];
   }

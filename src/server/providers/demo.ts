@@ -1,26 +1,29 @@
 import type { ChatRequest, ProviderGenerator } from "./contract";
+import { ollamaChat } from "./ollama";
 
-/** Provider demo internal: streaming lokal tanpa model eksternal. */
+/**
+ * Zaltr Free — model gratis untuk semua akun baru.
+ * Di balik layar memakai model lokal kecil (gratis, GPU sendiri), dengan
+ * batasan khas paket free: riwayat pendek (6 pesan), tanpa memori
+ * antar-percakapan, tanpa web search, jawaban ringkas.
+ */
+
+const FREE_MODEL = process.env.ZALTR_FREE_MODEL ?? "llama3.2:latest";
+const FREE_HISTORY = 6;
+
+const FREE_SYSTEM =
+  "Kamu adalah Zaltr Free — versi gratis asisten zaltr.ai. Jawab dalam bahasa " +
+  "pengguna (default Bahasa Indonesia), ramah dan ringkas (umumnya 1-4 paragraf). " +
+  "Kamu model ringan: untuk tugas berat (analisis dokumen panjang, koding rumit, " +
+  "riset mendalam, gambar/video/musik) sarankan dengan sopan upgrade ke model " +
+  "premium lewat tombol Beli Kredit. Jangan mengarang fakta; bila tidak yakin, " +
+  "katakan. Gunakan Markdown seperlunya.";
+
 export async function* demoChat(req: ChatRequest): ProviderGenerator {
-  const prompt = req.history.at(-1)?.content ?? "";
-  const jumlahPesan = req.history.length;
-  const reply =
-    `Ini **Zaltr Core**, provider demo internal zaltr.ai — dipakai untuk menguji ` +
-    `antarmuka sebelum Copilot Enterprise dan Ollama diaktifkan.\n\n` +
-    `Pesanmu barusan:\n\n> ${prompt.slice(0, 500)}\n\n` +
-    `Beberapa hal yang sudah bekerja pada pratinjau ini:\n\n` +
-    `- Streaming token seperti ini, kata demi kata\n` +
-    `- Riwayat tersimpan di PostgreSQL (percakapan ini berisi ${jumlahPesan} pesan)\n` +
-    `- Tombol **model picker** di samping kolom chat\n` +
-    `- Markdown: \`inline code\`, daftar, dan blok kode\n\n` +
-    "```ts\n" +
-    `const provider = "zaltr-core"; // ganti ke Copilot/Ollama dari tombol model\n` +
-    "```\n\n" +
-    `Ganti model dari tombol di kiri kolom chat untuk melihat status provider lain.`;
-
-  for (const token of reply.split(/(?<=\s)/)) {
-    if (req.signal.aborted) throw new Error("aborted");
-    yield { kind: "text", text: token };
-    await new Promise((r) => setTimeout(r, 12));
-  }
+  // Paket free: konteks dipangkas + persona free menggantikan prompt utama.
+  const shortHistory = [
+    { role: "system", content: FREE_SYSTEM },
+    ...req.history.slice(-FREE_HISTORY).map((m) => ({ role: m.role, content: m.content })),
+  ];
+  yield* ollamaChat({ ...req, model: FREE_MODEL, history: shortHistory });
 }
