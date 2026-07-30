@@ -167,7 +167,7 @@ services:
       minio:
         condition: service_healthy
     ports:
-      - "${ZALTR_WEB_BIND:-0.0.0.0}:${ZALTR_WEB_PORT:-46300}:3000"
+      - "${ZALTR_WEB_BIND:-127.0.0.1}:${ZALTR_WEB_PORT:-46300}:3000"
     environment:
       TZ: ${TZ:-Asia/Makassar}
       DATABASE_URL: postgresql://${ZALTR_POSTGRES_USER:?}:${ZALTR_POSTGRES_PASSWORD:?}@postgres:5432/${ZALTR_POSTGRES_DB:?}?schema=public
