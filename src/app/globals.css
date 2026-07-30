@@ -39,14 +39,13 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* ===== Latar kota neon GLOBAL (semua halaman) + gerak Ken Burns ===== */
+/* ===== SCENE LANDING: foto kota neon + gerak Ken Burns ===== */
 @keyframes kenburns {
   0%   { transform: scale(1) translate(0, 0); }
   50%  { transform: scale(1.1) translate(-1.5%, -1%); }
   100% { transform: scale(1) translate(0, 0); }
 }
-body::before {
-  content: "";
+.scene-city {
   position: fixed;
   inset: -6%;
   z-index: -3;
@@ -55,15 +54,168 @@ body::before {
   animation: kenburns 36s ease-in-out infinite;
   will-change: transform;
 }
-/* Overlay gelap supaya konten selalu kontras di atas foto */
-body::after {
-  content: "";
+.scene-city-veil {
   position: fixed;
   inset: 0;
   z-index: -2;
   background:
     radial-gradient(90% 60% at 50% 0%, rgba(10, 14, 20, 0.25), rgba(10, 14, 20, 0.6) 75%),
     linear-gradient(rgba(10, 14, 20, 0.42), rgba(10, 14, 20, 0.6));
+}
+
+/* ===== SCENE LOGIN: gerbang orbit zaltr (tanpa foto) ===== */
+.scene-portal {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  background:
+    radial-gradient(80% 65% at 50% 36%, rgba(139, 92, 246, 0.16), transparent 62%),
+    radial-gradient(55% 45% at 50% 42%, rgba(45, 212, 191, 0.1), transparent 55%),
+    #05070d;
+}
+/* lantai grid perspektif yang mengalir */
+@keyframes gridflow {
+  from { background-position: 0 0; }
+  to   { background-position: 0 44px; }
+}
+.scene-portal::before {
+  content: "";
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  bottom: -6%;
+  height: 46%;
+  background-image:
+    linear-gradient(rgba(45, 212, 191, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.14) 1px, transparent 1px);
+  background-size: 44px 44px;
+  transform: perspective(420px) rotateX(62deg);
+  transform-origin: top;
+  animation: gridflow 3.2s linear infinite;
+  -webkit-mask-image: linear-gradient(transparent, #000 35%);
+  mask-image: linear-gradient(transparent, #000 35%);
+}
+/* bintang berkedip */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 0.9; }
+}
+.scene-portal::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 2px;
+  height: 2px;
+  border-radius: 9999px;
+  animation: twinkle 4s ease-in-out infinite;
+  box-shadow:
+    12vw 18vh 0 rgba(230, 237, 246, 0.7), 26vw 8vh 0 rgba(45, 212, 191, 0.8),
+    38vw 26vh 0 rgba(230, 237, 246, 0.5), 55vw 12vh 0 rgba(139, 92, 246, 0.8),
+    68vw 30vh 0 rgba(230, 237, 246, 0.6), 82vw 16vh 0 rgba(45, 212, 191, 0.7),
+    90vw 34vh 0 rgba(230, 237, 246, 0.5), 8vw 42vh 0 rgba(139, 92, 246, 0.6),
+    47vw 5vh 0 rgba(230, 237, 246, 0.75), 74vw 44vh 0 rgba(45, 212, 191, 0.55);
+}
+/* cincin orbit berputar mengelilingi kartu login */
+.orbit-wrap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+@keyframes spin     { to { transform: rotate(360deg); } }
+@keyframes spin-rev { to { transform: rotate(-360deg); } }
+.orbit {
+  position: absolute;
+  border-radius: 9999px;
+  border: 1px dashed rgba(45, 212, 191, 0.28);
+}
+.orbit-a { animation: spin 44s linear infinite; }
+.orbit-b {
+  border-color: rgba(139, 92, 246, 0.24);
+  border-style: solid;
+  border-width: 1px;
+  animation: spin-rev 70s linear infinite;
+}
+.orbit-c {
+  border-color: rgba(244, 114, 182, 0.16);
+  animation: spin 100s linear infinite;
+}
+.sat {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 9999px;
+  background: var(--accent-a);
+  box-shadow: 0 0 14px var(--accent-a), 0 0 34px rgba(45, 212, 191, 0.6);
+}
+.sat-b {
+  background: var(--accent-b);
+  box-shadow: 0 0 14px var(--accent-b), 0 0 34px rgba(139, 92, 246, 0.6);
+}
+/* kartu login: garis pemindai melintas + nafas glow */
+@keyframes cardscan {
+  0%   { top: 4%; opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { top: 94%; opacity: 0; }
+}
+.scan-card { position: relative; overflow: hidden; }
+.scan-card::after {
+  content: "";
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 4%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(45, 212, 191, 0.75), transparent);
+  animation: cardscan 5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes cardbreathe {
+  0%, 100% { box-shadow: 0 0 36px rgba(45, 212, 191, 0.14), 0 0 80px rgba(139, 92, 246, 0.1); border-color: rgba(45, 212, 191, 0.35); }
+  50%      { box-shadow: 0 0 60px rgba(139, 92, 246, 0.22), 0 0 110px rgba(45, 212, 191, 0.12); border-color: rgba(139, 92, 246, 0.4); }
+}
+.glow-card { animation: cardbreathe 6s ease-in-out infinite; }
+
+/* ===== SCENE APLIKASI (chat/admin): neural grid gelap ===== */
+.scene-app {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  background: #070b12;
+}
+@keyframes gridslide {
+  to { transform: translate(44px, 44px); }
+}
+.scene-app::before {
+  content: "";
+  position: absolute;
+  inset: -44px;
+  background-image:
+    linear-gradient(rgba(45, 212, 191, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  animation: gridslide 26s linear infinite;
+}
+@keyframes glowshift {
+  0%, 100% { opacity: 0.65; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.06); }
+}
+.scene-app::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(42% 36% at 10% 6%, rgba(45, 212, 191, 0.13), transparent 62%),
+    radial-gradient(48% 42% at 90% 94%, rgba(139, 92, 246, 0.15), transparent 62%),
+    radial-gradient(30% 26% at 78% 12%, rgba(244, 114, 182, 0.07), transparent 60%);
+  animation: glowshift 13s ease-in-out infinite;
 }
 
 /* ===== Lapisan efek GLOBAL (semua halaman): aurora + orb + partikel ===== */

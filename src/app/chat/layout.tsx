@@ -9,6 +9,7 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   if (!user) redirect("/login");
   return (
     <div className="flex h-full">
+      <div className="scene-app" aria-hidden />
       <Sidebar
         user={{ name: user.name, role: user.role, creditBalance: user.creditBalance }}
       />

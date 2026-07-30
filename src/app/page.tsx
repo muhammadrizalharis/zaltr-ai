@@ -22,6 +22,17 @@ export default async function WelcomePage() {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden">
+      {/* Scene landing: foto kota neon + aurora + orb + partikel */}
+      <div className="scene-city" aria-hidden />
+      <div className="scene-city-veil" aria-hidden />
+      <div className="fx-layer" aria-hidden>
+        <div className="anim-aurora absolute inset-0" />
+        <div className="orb left-[-80px] top-[8%] h-72 w-72 bg-accent-a/40" />
+        <div className="orb right-[-60px] top-[38%] h-80 w-80 bg-accent-b/40 [animation-delay:-5s]" />
+        <div className="orb bottom-[-110px] left-[28%] h-96 w-96 bg-pink-500/25 [animation-delay:-9s]" />
+        <div className="fx-p fx-p1" />
+        <div className="fx-p fx-p2" />
+      </div>
       {/* Bola cahaya melayang di latar */}
 
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line/50 bg-bg/70 px-6 py-3.5 backdrop-blur md:px-10">

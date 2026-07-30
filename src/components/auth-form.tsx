@@ -53,6 +53,17 @@ export function AuthForm({
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-6">
+      {/* Scene login: gerbang orbit zaltr — grid mengalir, bintang, cincin berputar */}
+      <div className="scene-portal" aria-hidden />
+      <div className="orbit-wrap" aria-hidden>
+        <div className="orbit orbit-a h-[560px] w-[560px]">
+          <span className="sat" />
+        </div>
+        <div className="orbit orbit-b h-[680px] w-[680px]">
+          <span className="sat sat-b" />
+        </div>
+        <div className="orbit orbit-c h-[820px] w-[820px]" />
+      </div>
       <Link
         href="/"
         className="absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-xl border border-line bg-panel/70 px-3 py-2 text-sm text-muted backdrop-blur transition-colors hover:border-accent-a/50 hover:text-ink md:left-6 md:top-6"
@@ -63,17 +74,19 @@ export function AuthForm({
         <div className="mb-8 text-center">
           <Link href="/" className="flex flex-col items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-192.png" alt="zaltr.ai" className="anim-float h-16 w-16 rounded-2xl" />
-            <span className="wordmark text-3xl font-bold">ZALTR.AI</span>
+            <img src="/logo-192.png" alt="zaltr.ai" className="anim-float glow-pulse h-16 w-16 rounded-2xl" />
+            <span className="wordmark-flow text-3xl font-bold">ZALTR.AI</span>
           </Link>
-          <p className="mt-2 text-sm text-muted">
-            {isLogin ? "Masuk ke ruang kerja AI-mu" : "Buat akun — aktivasi oleh superadmin"}
+          <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.22em] text-accent-a/90">
+            <span className="stream-caret">
+              {isLogin ? "> gerbang siap — menunggu kredensial" : "> registrasi node baru"}
+            </span>
           </p>
         </div>
 
         <form
           onSubmit={submit}
-          className="space-y-4 rounded-2xl border border-line bg-panel p-6 backdrop-blur-md"
+          className="scan-card glow-card space-y-4 rounded-2xl border border-line bg-panel p-6 backdrop-blur-md"
         >
           {!isLogin && (
             <Field label="Nama">

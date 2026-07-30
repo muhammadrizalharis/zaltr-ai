@@ -11,6 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen">
+      <div className="scene-app" aria-hidden />
       <header className="flex items-center justify-between border-b border-line bg-panel px-6 py-3">
         <div className="flex items-center gap-4">
           <Link href="/chat" className="flex items-center gap-2">
