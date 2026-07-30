@@ -184,6 +184,7 @@ services:
       ZALTR_GOOGLE_CLIENT_SECRET: ${ZALTR_GOOGLE_CLIENT_SECRET:-}
       ZALTR_SEARXNG_URL: http://searxng:8080
       ZALTR_RUNNER_URL: http://runner:8484
+      ZALTR_WA_ADMIN: ${ZALTR_WA_ADMIN:-}
 
   # ------------------------------------------------------------------
   # Web search self-hosted (fitur "Cari web" di chat). Internal-only.

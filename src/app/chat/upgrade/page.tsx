@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { getSessionUser } from "@/server/auth";
 
 export const metadata = { title: "Beli Kredit — zaltr.ai" };
+export const dynamic = "force-dynamic";
 
 /**
- * Halaman upgrade/beli kredit. Pembayaran masih manual: pengguna memilih
- * paket lalu menghubungi admin (kontak diatur via env ZALTR_CONTACT_URL).
+ * Halaman upgrade/beli kredit. Pembayaran manual via WhatsApp:
+ * tombol paket membuka wa.me admin (env ZALTR_WA_ADMIN, format 628xxxx)
+ * dengan pesan berisi email user + paket terpilih yang sudah terketik.
  * Kredit ditambahkan admin dari halaman Admin setelah pembayaran.
  */
 
@@ -81,8 +84,26 @@ const PAKET: Array<{
   },
 ];
 
-export default function UpgradePage() {
-  const kontak = process.env.ZALTR_CONTACT_URL ?? "";
+export default async function UpgradePage() {
+  const user = await getSessionUser();
+  const waAdmin = (process.env.ZALTR_WA_ADMIN ?? "").replace(/[^0-9]/g, "");
+
+  const waLink = (p: (typeof PAKET)[number]) => {
+    const pesan = [
+      "Halo Admin zaltr.ai, saya ingin upgrade paket.",
+      "",
+      `Email akun: ${user?.email ?? "-"}`,
+      `Paket: ${p.nama}${p.kredit ? ` (${p.kredit.toLocaleString("id-ID")} kredit — ${p.harga})` : ""}`,
+      "",
+      "Mohon info cara pembayarannya. Terima kasih.",
+    ].join("\n");
+    return `https://wa.me/${waAdmin}?text=${encodeURIComponent(pesan)}`;
+  };
+
+  const waUmum = `https://wa.me/${waAdmin}?text=${encodeURIComponent(
+    `Halo Admin zaltr.ai, saya ${user?.email ?? ""} ingin bertanya soal upgrade paket / pembayaran.`
+  )}`;
+
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-10">
       <h1 className="text-2xl font-bold">
@@ -130,6 +151,20 @@ export default function UpgradePage() {
                 </li>
               ))}
             </ul>
+            {p.kredit !== null && waAdmin && (
+              <a
+                href={waLink(p)}
+                target="_blank"
+                rel="noreferrer"
+                className={`mt-4 rounded-xl py-2 text-center text-sm font-semibold transition-opacity hover:opacity-90 ${
+                  p.unggulan
+                    ? "bg-gradient-to-r from-accent-a to-accent-b text-black"
+                    : "border border-accent-a/50 text-accent-a hover:bg-accent-a/10"
+                }`}
+              >
+                Pilih {p.nama} →
+              </a>
+            )}
           </div>
         ))}
       </div>
@@ -137,19 +172,19 @@ export default function UpgradePage() {
       <div className="mt-8 rounded-2xl border border-line bg-panel p-6">
         <h3 className="font-semibold">Cara membeli</h3>
         <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-muted">
-          <li>Pilih paket di atas.</li>
-          <li>Hubungi admin dan sebutkan email akunmu + paket yang dipilih.</li>
-          <li>Setelah pembayaran dikonfirmasi, kredit langsung masuk ke akunmu.</li>
+          <li>Klik tombol paket di atas — WhatsApp terbuka dengan pesan yang sudah terisi email akunmu dan paket pilihanmu.</li>
+          <li>Kirim pesannya; admin membalas dengan nomor rekening/cara bayar.</li>
+          <li>Setelah pembayaran dikonfirmasi, kredit & paket langsung aktif di akunmu.</li>
         </ol>
         <div className="mt-5 flex flex-wrap gap-3">
-          {kontak ? (
+          {waAdmin ? (
             <a
-              href={kontak}
+              href={waUmum}
               target="_blank"
               rel="noreferrer"
               className="rounded-xl bg-gradient-to-r from-accent-a to-accent-b px-5 py-2.5 text-sm font-semibold text-black hover:opacity-90"
             >
-              Hubungi Admin →
+              Chat Admin via WhatsApp →
             </a>
           ) : (
             <p className="text-sm text-muted">
