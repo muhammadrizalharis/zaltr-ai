@@ -97,9 +97,7 @@ export async function copilotCatalog(): Promise<ModelDescriptor[]> {
   }
 }
 
-const SYSTEM_MESSAGE =
-  "Kamu adalah zaltr.ai, asisten AI pribadi. Jawab dalam bahasa yang dipakai pengguna " +
-  "(default Bahasa Indonesia), ringkas namun lengkap, dan gunakan Markdown bila membantu.";
+import { SYSTEM_MESSAGE } from "./prompt";
 
 export async function* copilotChat(req: ChatRequest): ProviderGenerator {
   const c = await client();
