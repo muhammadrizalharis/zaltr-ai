@@ -8,12 +8,12 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   const user = await getSessionUser();
   if (!user) redirect("/login");
   return (
-    <div className="flex h-full">
+    <div className="flex h-dvh overflow-hidden">
       <div className="scene-app" aria-hidden />
       <Sidebar
         user={{ name: user.name, role: user.role, creditBalance: user.creditBalance }}
       />
-      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">{children}</main>
     </div>
   );
 }
