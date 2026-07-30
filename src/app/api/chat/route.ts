@@ -2,6 +2,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { dispatch } from "@/server/providers";
 import { guarded, modelAllowed, requireUser } from "@/server/auth";
+import { getObjectBuffer } from "@/lib/storage";
+import { extractText, fileExt, IMAGE_EXT } from "@/server/extract";
 import type { StreamLine } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -90,6 +92,41 @@ export const POST = guarded(async (req: Request) => {
     take: 40,
   });
 
+  // Lampiran: baca file /api/files/uploads/... di pesan terakhir, ekstrak
+  // isinya untuk PROMPT saja (DB tetap menyimpan konten asli + link).
+  const providerHistory: Array<{ role: string; content: string; images?: string[] }> =
+    history.map((m) => ({ role: m.role, content: m.content }));
+  const last = providerHistory.at(-1);
+  if (last) {
+    const keys = [...content.matchAll(/\]\(\/api\/files\/(uploads\/[\w./-]+)\)/g)].map(
+      (m) => m[1],
+    );
+    const extras: string[] = [];
+    const images: string[] = [];
+    for (const key of keys.slice(0, 5)) {
+      if (!key.startsWith(`uploads/${me.id}/`)) continue; // hanya file miliknya
+      const name = key.split("/").pop() ?? key;
+      try {
+        const buf = await getObjectBuffer(key);
+        if (IMAGE_EXT.has(fileExt(name))) {
+          images.push(buf.toString("base64"));
+          extras.push(`[Lampiran gambar: ${name}]`);
+        } else {
+          const text = await extractText(buf, name);
+          extras.push(
+            text
+              ? `=== Isi lampiran "${name}" ===\n${text}\n=== Akhir lampiran ===`
+              : `[Lampiran "${name}" tidak bisa dibaca sebagai teks]`,
+          );
+        }
+      } catch {
+        extras.push(`[Lampiran "${name}" gagal dibaca]`);
+      }
+    }
+    if (extras.length > 0) last.content = `${last.content}\n\n${extras.join("\n\n")}`;
+    if (images.length > 0) last.images = images;
+  }
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -102,7 +139,7 @@ export const POST = guarded(async (req: Request) => {
       let status: "completed" | "stopped" | "failed" = "completed";
       try {
         const gen = dispatch(modelId, {
-          history,
+          history: providerHistory,
           conversationId,
           signal: req.signal,
         });

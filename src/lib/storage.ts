@@ -37,3 +37,13 @@ export async function getObjectStream(key: string) {
   const stream = await minio.getObject(FILES_BUCKET, key);
   return { stream, stat };
 }
+
+/** Baca objek utuh sebagai Buffer (untuk ekstraksi isi lampiran chat). */
+export async function getObjectBuffer(key: string): Promise<Buffer> {
+  const stream = await minio.getObject(FILES_BUCKET, key);
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks);
+}

@@ -66,7 +66,12 @@ export async function* ollamaChat(req: ChatRequest): ProviderGenerator {
       stream: true,
       // Ollama tetap hangat 10 menit agar pergantian pesan tidak reload model.
       keep_alive: "10m",
-      messages: req.history.map((m) => ({ role: m.role, content: m.content })),
+      messages: req.history.map((m) => ({
+        role: m.role,
+        content: m.content,
+        // Model vision (mis. qwen2.5vl) menerima gambar base64 per pesan.
+        ...(m.images && m.images.length > 0 ? { images: m.images } : {}),
+      })),
     }),
     signal: req.signal,
   });

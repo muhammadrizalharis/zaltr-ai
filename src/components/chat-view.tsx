@@ -26,9 +26,12 @@ export function ChatView({
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [streamText, setStreamText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setModel(loadSavedModel()), []);
   useEffect(() => {
@@ -49,15 +52,43 @@ export function ChatView({
 
   async function send(textArg?: string) {
     const text = (textArg ?? draft).trim();
-    if (!text || streaming) return;
+    if ((!text && attachments.length === 0) || streaming || uploading) return;
     setDraft("");
     setError(null);
+
+    // Upload lampiran dulu -> jadikan markdown di isi pesan (gambar inline,
+    // dokumen sebagai link; server mengekstrak isinya untuk model).
+    let content = text;
+    if (attachments.length > 0) {
+      setUploading(true);
+      try {
+        const fd = new FormData();
+        for (const f of attachments) fd.append("file", f);
+        const up = await fetch("/api/uploads", { method: "POST", body: fd });
+        const data = (await up.json()) as {
+          files?: Array<{ url: string; name: string; type: string }>;
+          error?: string;
+        };
+        if (!up.ok || !data.files) throw new Error(data.error ?? "Upload gagal");
+        const lines = data.files.map((f) =>
+          f.type.startsWith("image/") ? `![${f.name}](${f.url})` : `[\u{1F4CE} ${f.name}](${f.url})`,
+        );
+        content = [text, ...lines].filter(Boolean).join("\n\n");
+        setAttachments([]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Upload gagal");
+        setDraft(text);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
 
     const convId = await ensureConversation();
     const optimistic: ChatMessage = {
       id: `tmp-${Date.now()}`,
       role: "user",
-      content: text,
+      content,
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, optimistic]);
@@ -71,7 +102,7 @@ export function ChatView({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: convId, content: text, modelId: model }),
+        body: JSON.stringify({ conversationId: convId, content, modelId: model }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
@@ -173,9 +204,51 @@ export function ChatView({
       </div>
 
       <div className="border-t border-line bg-panel/60 px-4 py-3 backdrop-blur">
+        {attachments.length > 0 && (
+          <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap gap-1.5">
+            {attachments.map((f, i) => (
+              <span
+                key={`${f.name}-${i}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-2 py-1 text-xs"
+              >
+                <span className="max-w-[180px] truncate">{f.name}</span>
+                <span className="text-muted">{formatSize(f.size)}</span>
+                <button
+                  onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                  className="text-muted hover:text-red-400"
+                  aria-label={`Hapus ${f.name}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
           {/* Tombol model DI SAMPING kolom chat — fitur inti zaltr.ai */}
           <ModelPicker value={model} onChange={setModel} disabled={streaming} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => {
+              const picked = Array.from(e.target.files ?? []);
+              setAttachments((prev) => [...prev, ...picked].slice(0, 5));
+              e.target.value = "";
+            }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={streaming || uploading}
+            title="Lampirkan file (maks 5, 25 MB per file)"
+            aria-label="Lampirkan file"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-panel-2 text-muted hover:border-accent-b/60 hover:text-ink disabled:opacity-40"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
           <div className="flex min-h-10 flex-1 items-end rounded-xl border border-line bg-panel-2 focus-within:border-accent-b/60">
             <textarea
               ref={textareaRef}
@@ -202,10 +275,10 @@ export function ChatView({
           ) : (
             <button
               onClick={() => void send()}
-              disabled={!draft.trim()}
+              disabled={(!draft.trim() && attachments.length === 0) || uploading}
               className="h-10 rounded-xl bg-gradient-to-r from-accent-a to-accent-b px-4 text-sm font-semibold text-black disabled:opacity-40"
             >
-              Kirim
+              {uploading ? "Mengunggah…" : "Kirim"}
             </button>
           )}
         </div>
@@ -240,6 +313,12 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
   );
 }
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function RoleTag({ role }: { role: string }) {
   return role === "user" ? (
     <span className="text-[11px] font-semibold uppercase tracking-wider text-accent-b">
@@ -254,6 +333,9 @@ function RoleTag({ role }: { role: string }) {
 
 function Bubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
+  // Pesan user dengan lampiran berisi markdown gambar/link -> render markdown
+  // supaya lampiran tampil; teks murni tetap plain (tanpa formatting tak sengaja).
+  const hasAttachment = isUser && message.content.includes("](/api/files/");
   return (
     <div className="text-sm leading-relaxed">
       <RoleTag role={message.role} />
@@ -264,7 +346,7 @@ function Bubble({ message }: { message: ChatMessage }) {
             : ""
         }`}
       >
-        {isUser ? (
+        {isUser && !hasAttachment ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
           <Markdown>{message.content}</Markdown>

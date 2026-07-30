@@ -4,7 +4,12 @@
  * route /api/chat tidak pernah melihat format mentah Copilot/Ollama/ComfyUI.
  */
 
-export type HistoryItem = { role: string; content: string };
+export type HistoryItem = {
+  role: string;
+  content: string;
+  /** Gambar lampiran (base64 tanpa prefix data:) — dipakai model vision Ollama. */
+  images?: string[];
+};
 
 export type StreamPart =
   | { kind: "text"; text: string }
