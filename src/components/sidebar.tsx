@@ -431,7 +431,7 @@ function Row({
         <div
           data-menu-root
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-0 top-8 z-30 w-56 rounded-xl border border-line bg-panel p-1.5 shadow-2xl"
+          className="absolute right-0 top-8 z-30 w-56 rounded-xl border border-line bg-panel p-1.5 shadow-2xl backdrop-blur-xl"
         >
           <MenuBtn
             onClick={() => {

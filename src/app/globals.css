@@ -2,8 +2,8 @@
 
 :root {
   --bg: #0a0e14;
-  --panel: #10161f;
-  --panel-2: #151d29;
+  --panel: rgba(16, 22, 31, 0.72);
+  --panel-2: rgba(21, 29, 41, 0.74);
   --border: #1f2937;
   --text: #e6edf6;
   --muted: #8b98a9;
@@ -49,8 +49,9 @@ body::before {
   content: "";
   position: fixed;
   inset: -6%;
-  z-index: -2;
+  z-index: -3;
   background: url("/bg-city.jpg") center 30% / cover no-repeat;
+  filter: saturate(1.2) brightness(1.08);
   animation: kenburns 36s ease-in-out infinite;
   will-change: transform;
 }
@@ -59,10 +60,51 @@ body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: -2;
   background:
-    radial-gradient(90% 60% at 50% 0%, rgba(10, 14, 20, 0.55), rgba(10, 14, 20, 0.86) 70%),
-    linear-gradient(rgba(10, 14, 20, 0.82), rgba(10, 14, 20, 0.9));
+    radial-gradient(90% 60% at 50% 0%, rgba(10, 14, 20, 0.25), rgba(10, 14, 20, 0.6) 75%),
+    linear-gradient(rgba(10, 14, 20, 0.42), rgba(10, 14, 20, 0.6));
+}
+
+/* ===== Lapisan efek GLOBAL (semua halaman): aurora + orb + partikel ===== */
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+@keyframes rise {
+  from { transform: translateY(0); opacity: 0.9; }
+  to   { transform: translateY(-108vh); opacity: 0; }
+}
+.fx-p {
+  position: absolute;
+  left: 0;
+  top: 102vh;
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  animation: rise linear infinite;
+}
+.fx-p1 {
+  animation-duration: 26s;
+  box-shadow:
+    8vw 0 0 rgba(45, 212, 191, 0.8), 21vw -34vh 0 rgba(139, 92, 246, 0.7),
+    33vw -12vh 0 rgba(45, 212, 191, 0.55), 47vw -58vh 0 rgba(244, 114, 182, 0.6),
+    59vw -25vh 0 rgba(139, 92, 246, 0.75), 72vw -70vh 0 rgba(45, 212, 191, 0.6),
+    86vw -44vh 0 rgba(244, 114, 182, 0.5), 95vw -8vh 0 rgba(139, 92, 246, 0.65);
+}
+.fx-p2 {
+  width: 2px;
+  height: 2px;
+  animation-duration: 42s;
+  animation-delay: -18s;
+  box-shadow:
+    4vw -50vh 0 rgba(45, 212, 191, 0.5), 15vw -15vh 0 rgba(139, 92, 246, 0.45),
+    28vw -80vh 0 rgba(244, 114, 182, 0.4), 41vw -38vh 0 rgba(45, 212, 191, 0.5),
+    54vw -64vh 0 rgba(139, 92, 246, 0.4), 66vw -5vh 0 rgba(45, 212, 191, 0.45),
+    79vw -90vh 0 rgba(244, 114, 182, 0.35), 91vw -28vh 0 rgba(139, 92, 246, 0.5);
 }
 
 /* Wordmark ZALTR.AI */
@@ -109,7 +151,7 @@ body::after {
   width: 100%;
   border-radius: 0.75rem;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: rgba(10, 14, 20, 0.6);
   padding: 0.55rem 0.8rem;
   font-size: 0.9rem;
   color: var(--text);

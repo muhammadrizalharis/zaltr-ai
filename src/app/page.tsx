@@ -21,11 +21,8 @@ export default async function WelcomePage() {
   const user = await getSessionUser();
 
   return (
-    <div className="anim-aurora relative flex min-h-screen flex-col overflow-hidden">
+    <div className="relative flex min-h-screen flex-col overflow-hidden">
       {/* Bola cahaya melayang di latar */}
-      <div className="orb left-[-80px] top-[10%] h-72 w-72 bg-accent-a/40" />
-      <div className="orb right-[-60px] top-[35%] h-80 w-80 bg-accent-b/40 [animation-delay:-5s]" />
-      <div className="orb bottom-[-100px] left-[30%] h-96 w-96 bg-pink-500/25 [animation-delay:-9s]" />
 
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line/50 bg-bg/70 px-6 py-3.5 backdrop-blur md:px-10">
         <span className="flex items-center gap-2">

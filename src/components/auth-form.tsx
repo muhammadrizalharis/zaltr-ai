@@ -52,9 +52,7 @@ export function AuthForm({
   }
 
   return (
-    <div className="anim-aurora relative flex min-h-screen items-center justify-center overflow-hidden px-6">
-      <div className="orb left-[-60px] top-[15%] h-64 w-64 bg-accent-a/30" />
-      <div className="orb bottom-[-80px] right-[-40px] h-72 w-72 bg-accent-b/30 [animation-delay:-6s]" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-6">
       <Link
         href="/"
         className="absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-xl border border-line bg-panel/70 px-3 py-2 text-sm text-muted backdrop-blur transition-colors hover:border-accent-a/50 hover:text-ink md:left-6 md:top-6"
@@ -75,7 +73,7 @@ export function AuthForm({
 
         <form
           onSubmit={submit}
-          className="space-y-4 rounded-2xl border border-line bg-panel p-6"
+          className="space-y-4 rounded-2xl border border-line bg-panel p-6 backdrop-blur-md"
         >
           {!isLogin && (
             <Field label="Nama">
