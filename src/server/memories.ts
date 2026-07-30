@@ -15,7 +15,7 @@ const EXTRACT_PROMPT =
   "yang berguna diingat jangka panjang (nama, pekerjaan/studi, lokasi, preferensi, " +
   "proyek yang sedang dikerjakan, orang penting). ABAIKAN: pertanyaan, perintah tugas, " +
   "opini sesaat, isi lampiran/dokumen. Jawab HANYA daftar fakta, satu per baris, " +
-  "maksimal 3 baris, bahasa Indonesia ringkas (mis. \"Nama pengguna: Rizal\"). " +
+  "maksimal 3 baris, bahasa Indonesia ringkas (mis. \"Nama pengguna: Andi\"). " +
   "Bila tidak ada fakta personal baru, jawab persis: NONE";
 
 export async function extractMemories(userId: string, userText: string): Promise<void> {

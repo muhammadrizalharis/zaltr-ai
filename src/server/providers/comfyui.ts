@@ -6,7 +6,7 @@ import type { ChatRequest, ProviderGenerator } from "./contract";
 /**
  * Provider ComfyUI (README: generasi visual — kini gambar/video/audio).
  * - Endpoint diatur ZALTR_COMFYUI_URL (kosong = provider tampil disabled).
- * - Instalasi kampus memakai model SPLIT (bukan checkpoint tunggal):
+ * - Instalasi server GPU memakai model SPLIT (bukan checkpoint tunggal):
  *   FLUX.2 dev (UNET+CLIP+VAE+LoRA turbo), Wan 2.2 (video), ACE-Step (audio).
  *   Karena itu katalog = daftar KURASI (id stabil), bukan hasil scan file.
  * - Alur: POST /prompt -> poll /history/<id> -> unduh /view -> persist MinIO

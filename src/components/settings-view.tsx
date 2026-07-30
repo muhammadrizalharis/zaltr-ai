@@ -54,8 +54,8 @@ export function SettingsView() {
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">Instruksi pribadi</h2>
         <p className="text-xs text-muted">
-          Ala ChatGPT Custom Instructions — misal: “Panggil saya Rizal. Saya mahasiswa
-          informatika. Jawab ringkas dan beri contoh kode Python bila relevan.”
+          Ala ChatGPT Custom Instructions — misal: “Panggil saya Andi. Saya
+          developer web. Jawab ringkas dan beri contoh kode Python bila relevan.”
         </p>
         <textarea
           value={instructions}

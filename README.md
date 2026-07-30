@@ -28,8 +28,8 @@ Isolasi dari proyek lain di server ini: project `zaltr`, network `zaltr-net`, vo
 ## Web Preview (SUDAH JALAN, 2026-07-30)
 
 Aplikasi web kini berjalan **permanen sebagai container** `zaltr-web` (Next.js standalone,
-`restart: unless-stopped`, Docker enabled saat boot) — hidup 24/7 di server kampus tanpa
-terminal/SSH: **http://localhost:46300** atau **http://10.33.33.11:46300** dari jaringan kampus.
+`restart: unless-stopped`, Docker enabled saat boot) — hidup 24/7 di server GPU tanpa
+terminal/SSH: **http://localhost:46300** (atau IP server pada jaringan lokal).
 
 ```bash
 bin/zaltrctl deploy-web          # migrasi DB + build image + start container web
@@ -111,7 +111,7 @@ Produk ini dirancang sebagai **modular monolith**: sederhana untuk dibangun dan 
 - **Wordmark:** ZALTR.AI
 - **Nama folder/repository:** `zaltr-ai`
 - **Domain utama yang diinginkan:** `zaltr.ai`
-- **Asal nama:** unsur `zal` diambil secara halus dari Rizal; `tr` dapat merepresentasikan transformer atau router; `.ai` menegaskan kategori produk.
+- **Asal nama:** gabungan suku kata pendek yang ringkas, mudah diingat, dan terdengar teknologis; `tr` dapat merepresentasikan transformer atau router; `.ai` menegaskan kategori produk.
 
 > Ketersediaan domain pada saat perencanaan bukan jaminan kepemilikan. Domain dan merek perlu diamankan serta diperiksa kembali sebelum peluncuran publik.
 
