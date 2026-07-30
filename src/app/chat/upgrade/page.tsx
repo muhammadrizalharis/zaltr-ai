@@ -8,10 +8,48 @@ export const metadata = { title: "Beli Kredit — zaltr.ai" };
  * Kredit ditambahkan admin dari halaman Admin setelah pembayaran.
  */
 
-const PAKET: Array<{ nama: string; kredit: number; harga: string; catatan: string; unggulan?: boolean }> = [
-  { nama: "Starter", kredit: 100, harga: "Rp15.000", catatan: "±100 pesan model premium" },
-  { nama: "Plus", kredit: 500, harga: "Rp60.000", catatan: "±500 pesan — hemat 20%", unggulan: true },
-  { nama: "Power", kredit: 1500, harga: "Rp150.000", catatan: "±1.500 pesan — hemat 33%" },
+const PAKET: Array<{
+  nama: string;
+  kredit: number;
+  harga: string;
+  limit: string;
+  fitur: string[];
+  unggulan?: boolean;
+}> = [
+  {
+    nama: "Starter",
+    kredit: 100,
+    harga: "Rp15.000",
+    limit: "1.000 pesan / hari",
+    fitur: [
+      "Model premium kelas cepat (Haiku, GPT Mini, Flash)",
+      "Semua model Zaltr Turbo",
+      "Lampiran file + web search + memori",
+    ],
+  },
+  {
+    nama: "Plus",
+    kredit: 500,
+    harga: "Rp60.000",
+    limit: "3.000 pesan / hari",
+    fitur: [
+      "Semua fitur Starter",
+      "Model kelas utama (Sonnet, GPT-5, Gemini Pro)",
+      "Studio gambar (teks → gambar HD)",
+    ],
+    unggulan: true,
+  },
+  {
+    nama: "Power",
+    kredit: 1500,
+    harga: "Rp150.000",
+    limit: "TANPA batas pesan harian",
+    fitur: [
+      "SEMUA model termasuk kelas flagship (Opus dkk)",
+      "Studio penuh: gambar + video + musik",
+      "Prioritas dukungan admin",
+    ],
+  },
 ];
 
 export default function UpgradePage() {
@@ -22,23 +60,23 @@ export default function UpgradePage() {
         Buka <span className="wordmark">semua model</span>
       </h1>
       <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-        Paket Free memakai model ringan. Dengan kredit, kamu membuka model premium
-        paling pintar plus studio gambar, video, dan musik. 1 kredit = 1 pesan model premium;
-        model gratis tetap tanpa batas.
+        Paket Free: model ringan gratis, 100 pesan/hari. Dengan paket berbayar kamu
+        membuka model premium yang jauh lebih pintar, limit lebih longgar, dan studio
+        media. 1 kredit = 1 pesan model premium; model gratis & Turbo tidak memakai kredit.
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {PAKET.map((p) => (
           <div
             key={p.nama}
-            className={`lift rounded-2xl border p-5 ${
+            className={`lift flex flex-col rounded-2xl border p-5 ${
               p.unggulan
                 ? "border-accent-a/60 bg-accent-a/5"
                 : "border-line bg-panel"
             }`}
           >
             {p.unggulan && (
-              <span className="rounded-full bg-accent-a px-2 py-0.5 text-[10px] font-bold uppercase text-black">
+              <span className="self-start rounded-full bg-accent-a px-2 py-0.5 text-[10px] font-bold uppercase text-black">
                 Paling laris
               </span>
             )}
@@ -48,7 +86,15 @@ export default function UpgradePage() {
               <span className="ml-1 text-sm font-normal text-muted">kredit</span>
             </p>
             <p className="mt-1 font-semibold">{p.harga}</p>
-            <p className="mt-2 text-xs leading-relaxed text-muted">{p.catatan}</p>
+            <p className="mt-1 text-xs font-semibold text-accent-b">{p.limit}</p>
+            <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-muted">
+              {p.fitur.map((f) => (
+                <li key={f} className="flex gap-1.5">
+                  <span className="text-accent-a">✓</span>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         ))}
       </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guarded, hashPassword, requireAdmin } from "@/server/auth";
+import { PLAN_MODELS, isPlan } from "@/server/plans";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -10,6 +11,7 @@ const patchSchema = z.object({
   status: z.enum(["pending", "active", "suspended"]).optional(),
   creditBalance: z.number().int().min(0).max(100_000_000).optional(),
   allowedModels: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
+  plan: z.enum(["free", "starter", "plus", "power"]).optional(),
   dailyMsgLimit: z.number().int().min(1).max(100_000).nullable().optional(),
   notes: z.string().max(2_000).nullable().optional(),
   newPassword: z.string().min(8).max(200).optional(),
@@ -82,6 +84,16 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
   const { newPassword, ...rest } = body.data;
   const data: Record<string, unknown> = { ...rest };
   if (newPassword) data.passwordHash = await hashPassword(newPassword);
+  // Ganti paket = buka model bawaan paket + limit ikut paket (reset override),
+  // kecuali admin juga mengirim allowedModels/dailyMsgLimit kustom.
+  if (body.data.plan && isPlan(body.data.plan)) {
+    if (body.data.allowedModels === undefined) {
+      data.allowedModels = PLAN_MODELS[body.data.plan];
+    }
+    if (body.data.dailyMsgLimit === undefined) {
+      data.dailyMsgLimit = null;
+    }
+  }
 
   const user = await db.user.update({
     where: { id },
@@ -95,6 +107,7 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
       creditBalance: true,
       creditUsed: true,
       allowedModels: true,
+      plan: true,
       dailyMsgLimit: true,
       notes: true,
       lastLoginAt: true,

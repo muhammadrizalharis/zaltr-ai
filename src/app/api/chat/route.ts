@@ -7,6 +7,7 @@ import { extractText, fileExt, IMAGE_EXT } from "@/server/extract";
 import { webSearch, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
 import { describeImages, isNativeVisionModel } from "@/server/vision";
+import { effectiveDailyLimit } from "@/server/plans";
 import type { StreamLine } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -45,7 +46,10 @@ export const POST = guarded(async (req: Request) => {
       { status: 403 },
     );
   }
-  if (me.dailyMsgLimit != null) {
+  // Limit harian: override admin menang; selain itu ikut paket
+  // (free 100 / starter 1000 / plus 3000 / power tanpa batas).
+  const dailyLimit = effectiveDailyLimit(me.plan, me.dailyMsgLimit);
+  if (dailyLimit != null) {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const sentToday = await db.message.count({
@@ -55,9 +59,11 @@ export const POST = guarded(async (req: Request) => {
         conversation: { userId: me.id },
       },
     });
-    if (sentToday >= me.dailyMsgLimit) {
+    if (sentToday >= dailyLimit) {
       return Response.json(
-        { error: `Batas harian ${me.dailyMsgLimit} pesan tercapai — coba lagi besok` },
+        {
+          error: `Batas harian paket ${me.plan} (${dailyLimit} pesan) tercapai — upgrade paket atau coba lagi besok`,
+        },
         { status: 429 },
       );
     }

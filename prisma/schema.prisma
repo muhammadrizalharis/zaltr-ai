@@ -25,7 +25,9 @@ model User {
   creditUsed    Int       @default(0)
   // Pola model yang diizinkan: "*", "copilot:*", "ollama:*", id spesifik, dst.
   allowedModels String[]  @default(["zaltr-core"])
-  dailyMsgLimit Int? // batas pesan user per hari (null = tanpa batas)
+  // Paket langganan: free | starter | plus | power (menentukan limit harian default).
+  plan          String    @default("free")
+  dailyMsgLimit Int? // override manual admin (null = ikut default paket)
   notes         String? // catatan internal admin
   // Instruksi pribadi user (ala ChatGPT custom instructions) — disuntik ke prompt.
   customInstructions String?

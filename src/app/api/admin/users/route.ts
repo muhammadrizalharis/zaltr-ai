@@ -16,6 +16,7 @@ export const GET = guarded(async () => {
       creditBalance: true,
       creditUsed: true,
       allowedModels: true,
+      plan: true,
       dailyMsgLimit: true,
       notes: true,
       lastLoginAt: true,

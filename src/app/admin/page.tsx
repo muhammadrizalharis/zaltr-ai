@@ -12,6 +12,7 @@ interface AdminUser {
   creditBalance: number;
   creditUsed: number;
   allowedModels: string[];
+  plan?: string;
   dailyMsgLimit: number | null;
   notes: string | null;
   lastLoginAt: string | null;
@@ -203,6 +204,24 @@ function UserCard({
                   Menunggu aktivasi — hanya superadmin yang bisa mengaktifkan akun baru.
                 </p>
               )}
+
+              <Section title="Paket langganan">
+                <select
+                  disabled={!canManage}
+                  value={u.plan ?? "free"}
+                  onChange={(e) => void onPatch(u.id, { plan: e.target.value })}
+                  className="input w-auto disabled:opacity-40"
+                >
+                  <option value="free">Free — 100 pesan/hari</option>
+                  <option value="starter">Starter — 1.000 pesan/hari</option>
+                  <option value="plus">Plus — 3.000 pesan/hari</option>
+                  <option value="power">Power — tanpa batas</option>
+                </select>
+                <p className="mt-1 text-[11px] text-muted">
+                  Ganti paket otomatis membuka model bawaan paket & menyetel limit harian.
+                  Jangan lupa tambah kredit sesuai pembelian.
+                </p>
+              </Section>
 
               <Section title="Role & status">
                 <div className="flex flex-wrap gap-2">

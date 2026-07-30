@@ -78,6 +78,7 @@ export interface SessionUser {
   creditBalance: number;
   creditUsed: number;
   allowedModels: string[];
+  plan: string;
   dailyMsgLimit: number | null;
   customInstructions: string | null;
 }
@@ -101,6 +102,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
           creditBalance: true,
           creditUsed: true,
           allowedModels: true,
+          plan: true,
           dailyMsgLimit: true,
           customInstructions: true,
         },

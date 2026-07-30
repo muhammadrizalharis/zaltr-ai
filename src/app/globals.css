@@ -29,10 +29,40 @@ body {
   height: 100%;
 }
 
-body {
+html {
   background: var(--bg);
+}
+
+body {
+  background: transparent;
   color: var(--text);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ===== Latar kota neon GLOBAL (semua halaman) + gerak Ken Burns ===== */
+@keyframes kenburns {
+  0%   { transform: scale(1) translate(0, 0); }
+  50%  { transform: scale(1.1) translate(-1.5%, -1%); }
+  100% { transform: scale(1) translate(0, 0); }
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: -6%;
+  z-index: -2;
+  background: url("/bg-city.jpg") center 30% / cover no-repeat;
+  animation: kenburns 36s ease-in-out infinite;
+  will-change: transform;
+}
+/* Overlay gelap supaya konten selalu kontras di atas foto */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(90% 60% at 50% 0%, rgba(10, 14, 20, 0.55), rgba(10, 14, 20, 0.86) 70%),
+    linear-gradient(rgba(10, 14, 20, 0.82), rgba(10, 14, 20, 0.9));
 }
 
 /* Wordmark ZALTR.AI */
@@ -184,11 +214,6 @@ body {
 .lift { transition: transform 0.25s ease, border-color 0.25s ease; }
 .lift:hover { transform: translateY(-5px); border-color: color-mix(in srgb, var(--accent-a) 50%, transparent); }
 
-/* Hormati preferensi aksesibilitas pengguna */
-@media (prefers-reduced-motion: reduce) {
-  .anim-aurora, .orb, .anim-float, .wordmark-flow, .marquee-track,
-  .fade-up, .glow-pulse {
-    animation: none !important;
-  }
-  .fade-up { opacity: 1; }
-}
+/* Animasi SELALU aktif di semua perangkat — keputusan produk zaltr:
+   setelan "kurangi gerakan" OS sengaja TIDAK mematikan animasi, karena
+   gerakan adalah bagian identitas visual halaman. */
