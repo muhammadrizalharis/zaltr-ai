@@ -92,11 +92,13 @@ export default async function WelcomePage() {
         </span>
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logo-512.png"
-          alt="Logo calyzr.ai"
-          className="anim-float glow-pulse fade-up d2 mt-8 h-28 w-28 rounded-3xl md:h-36 md:w-36"
-        />
+        <div className="fade-up d2 mt-8">
+          <img
+            src="/logo-512.png"
+            alt="Logo calyzr.ai"
+            className="logo-live h-28 w-28 rounded-3xl md:h-36 md:w-36"
+          />
+        </div>
         <h1 className="wordmark-flow fade-up d3 mt-6 text-5xl font-bold tracking-tight md:text-7xl">
           CALYZR.AI
         </h1>

@@ -74,7 +74,7 @@ export function AuthForm({
         <div className="mb-8 text-center">
           <Link href="/" className="flex flex-col items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-192.png" alt="calyzr.ai" className="anim-float glow-pulse h-16 w-16 rounded-2xl" />
+            <img src="/logo-192.png" alt="calyzr.ai" className="logo-live h-16 w-16 rounded-2xl" />
             <span className="wordmark-flow text-3xl font-bold">CALYZR.AI</span>
           </Link>
           <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.22em] text-accent-a/90">

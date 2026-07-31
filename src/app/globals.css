@@ -404,6 +404,14 @@ body {
 }
 .glow-pulse { animation: pulseGlow 4s ease-in-out infinite; }
 
+/* Logo hidup: mengambang + glow BERSAMAAN (satu deklarasi multi-animation —
+   memisah class akan saling menimpa properti animation) */
+.logo-live {
+  animation:
+    floaty 5s ease-in-out infinite,
+    pulseGlow 4s ease-in-out infinite;
+}
+
 /* Kartu terangkat saat disentuh/hover */
 .lift { transition: transform 0.25s ease, border-color 0.25s ease; }
 .lift:hover { transform: translateY(-5px); border-color: color-mix(in srgb, var(--accent-a) 50%, transparent); }
