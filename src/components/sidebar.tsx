@@ -190,7 +190,7 @@ export function Sidebar({
         <Link href="/chat" className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-192.png" alt="" className="h-7 w-7 rounded-lg" />
-          <span className="wordmark text-lg font-bold">ZALTR.AI</span>
+          <span className="wordmark text-lg font-bold">CALYZR.AI</span>
         </Link>
         <button
           onClick={() => setMiniPersist(true)}

@@ -24,7 +24,7 @@ export async function ollamaCatalog(): Promise<ModelDescriptor[]> {
           id: "ollama:kosong",
           label: "Belum ada model",
           provider: "ollama",
-          providerLabel: "Zaltr Turbo",
+          providerLabel: "Calyzr Turbo",
           capabilities: ["chat"],
           available: false,
           local: true,
@@ -36,7 +36,7 @@ export async function ollamaCatalog(): Promise<ModelDescriptor[]> {
       id: `ollama:${m.name}`,
       label: m.name,
       provider: "ollama" as const,
-      providerLabel: "Zaltr Turbo",
+      providerLabel: "Calyzr Turbo",
       capabilities: ["chat"] as ModelDescriptor["capabilities"],
       available: true,
       local: true,
@@ -47,7 +47,7 @@ export async function ollamaCatalog(): Promise<ModelDescriptor[]> {
         id: "ollama:offline",
         label: "Ollama offline",
         provider: "ollama",
-        providerLabel: "Zaltr Turbo",
+        providerLabel: "Calyzr Turbo",
         capabilities: ["chat"],
         available: false,
         local: true,
@@ -69,7 +69,7 @@ export async function* ollamaChat(req: ChatRequest): ProviderGenerator {
       keep_alive: "10m",
       messages: [
         // Persona & standar kualitas zaltr — kecuali pemanggil sudah membawa
-        // system message sendiri (mis. Zaltr Free dengan persona free).
+        // system message sendiri (mis. Calyzr Free dengan persona free).
         ...(req.history[0]?.role === "system"
           ? []
           : [{ role: "system", content: SYSTEM_MESSAGE }]),

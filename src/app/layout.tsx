@@ -6,7 +6,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "zaltr.ai",
+  title: "calyzr.ai",
   description:
     "Semua AI terbaik dunia dalam satu ruang kerja pribadi — chat, gambar, video, dan musik.",
   icons: {
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "zaltr.ai",
+    title: "calyzr.ai",
     description: "Semua AI terbaik dunia dalam satu ruang kerja pribadi.",
     images: ["/logo-512.png"],
   },

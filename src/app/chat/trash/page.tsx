@@ -59,7 +59,7 @@ export default function TrashPage() {
 
       <p className="mb-6 text-sm text-muted">
         Chat di sini tersimpan selamanya sampai kamu memulihkan atau menghapusnya permanen.
-        Hapus permanen adalah satu-satunya cara memusnahkan data (kontrak persistensi zaltr.ai).
+        Hapus permanen adalah satu-satunya cara memusnahkan data (kontrak persistensi calyzr.ai).
       </p>
 
       {loading && <p className="text-sm text-muted">Memuat…</p>}

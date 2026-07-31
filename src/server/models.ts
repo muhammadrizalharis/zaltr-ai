@@ -6,7 +6,7 @@ import { comfyCatalog } from "./providers/comfyui";
 export { ollamaBaseUrl } from "./providers/ollama";
 
 /**
- * Registry model zaltr.ai — status setiap provider dicek live secara paralel:
+ * Registry model calyzr.ai — status setiap provider dicek live secara paralel:
  * - zaltr-core : demo internal, selalu tersedia.
  * - copilot    : listModels() dari runtime CLI headless; fallback kurasi bila mati.
  * - ollama     : /api/tags container zaltr-ollama.
@@ -15,7 +15,7 @@ export { ollamaBaseUrl } from "./providers/ollama";
 export async function listModels(): Promise<ModelDescriptor[]> {
   const core: ModelDescriptor = {
     id: "zaltr-core",
-    label: "Zaltr Free",
+    label: "Calyzr Free",
     provider: "zaltr",
     providerLabel: "Gratis",
     capabilities: ["chat"],

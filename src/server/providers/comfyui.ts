@@ -184,7 +184,7 @@ const CURATED: CuratedModel[] = [
 export async function comfyCatalog(): Promise<ModelDescriptor[]> {
   const base = {
     provider: "comfyui" as const,
-    providerLabel: "Zaltr Studio",
+    providerLabel: "Calyzr Studio",
     local: true,
   };
   if (!COMFY_URL) {

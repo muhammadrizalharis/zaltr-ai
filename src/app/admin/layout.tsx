@@ -17,7 +17,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/chat" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-192.png" alt="" className="h-7 w-7 rounded-lg" />
-            <span className="wordmark text-lg font-bold">ZALTR.AI</span>
+            <span className="wordmark text-lg font-bold">CALYZR.AI</span>
           </Link>
           <span className="rounded-full border border-accent-b/50 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent-b">
             {user.role}

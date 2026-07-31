@@ -59,8 +59,8 @@ export default async function WelcomePage() {
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line/50 bg-bg/70 px-6 py-3.5 backdrop-blur md:px-10">
         <span className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-192.png" alt="zaltr.ai" className="h-8 w-8 rounded-lg" />
-          <span className="wordmark text-xl font-bold">ZALTR.AI</span>
+          <img src="/logo-192.png" alt="calyzr.ai" className="h-8 w-8 rounded-lg" />
+          <span className="wordmark text-xl font-bold">CALYZR.AI</span>
         </span>
         <nav className="flex items-center gap-3 text-sm">
           {user ? (
@@ -94,11 +94,11 @@ export default async function WelcomePage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo-512.png"
-          alt="Logo zaltr.ai"
+          alt="Logo calyzr.ai"
           className="anim-float glow-pulse fade-up d2 mt-8 h-28 w-28 rounded-3xl md:h-36 md:w-36"
         />
         <h1 className="wordmark-flow fade-up d3 mt-6 text-5xl font-bold tracking-tight md:text-7xl">
-          ZALTR.AI
+          CALYZR.AI
         </h1>
         <p className="fade-up d4 mt-5 max-w-xl text-lg leading-relaxed text-muted">
           Semua AI terbaik dunia dalam <span className="text-ink">satu ruang kerja pribadi</span>.
@@ -208,7 +208,7 @@ export default async function WelcomePage() {
       </main>
 
       <footer className="relative z-10 border-t border-line/50 px-6 py-6 text-center text-xs text-muted">
-        © {new Date().getFullYear()} zaltr.ai — ruang kerja AI pribadi.
+        © {new Date().getFullYear()} calyzr.ai — ruang kerja AI pribadi.
       </footer>
     </div>
   );

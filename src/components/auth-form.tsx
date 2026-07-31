@@ -74,8 +74,8 @@ export function AuthForm({
         <div className="mb-8 text-center">
           <Link href="/" className="flex flex-col items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-192.png" alt="zaltr.ai" className="anim-float glow-pulse h-16 w-16 rounded-2xl" />
-            <span className="wordmark-flow text-3xl font-bold">ZALTR.AI</span>
+            <img src="/logo-192.png" alt="calyzr.ai" className="anim-float glow-pulse h-16 w-16 rounded-2xl" />
+            <span className="wordmark-flow text-3xl font-bold">CALYZR.AI</span>
           </Link>
           <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.22em] text-accent-a/90">
             <span className="stream-caret">
@@ -156,7 +156,7 @@ export function AuthForm({
             {isLogin ? "Masuk dengan Google" : "Daftar dengan Google"}
           </a>
           <p className="text-center text-[11px] leading-relaxed text-muted">
-            Satu akun Google hanya bisa terhubung ke satu akun zaltr.ai.
+            Satu akun Google hanya bisa terhubung ke satu akun calyzr.ai.
             Akun baru menunggu aktivasi superadmin.
           </p>
         </form>

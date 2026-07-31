@@ -36,7 +36,7 @@ export function ChatView({
 
   useEffect(() => setModel(loadSavedModel()), []);
   // Freemium: bila model tersimpan terkunci/tidak tersedia utk akun ini,
-  // otomatis pindah ke model pertama yang bisa dipakai (mis. Zaltr Free).
+  // otomatis pindah ke model pertama yang bisa dipakai (mis. Calyzr Free).
   useEffect(() => {
     void (async () => {
       const res = await fetch("/api/models", { cache: "no-store" });
@@ -271,7 +271,7 @@ export function ChatView({
           </div>
         )}
         <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
-          {/* Tombol model DI SAMPING kolom chat — fitur inti zaltr.ai */}
+          {/* Tombol model DI SAMPING kolom chat — fitur inti calyzr.ai */}
           <ModelPicker value={model} onChange={setModel} disabled={streaming} />
           <input
             ref={fileInputRef}
@@ -358,7 +358,7 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
       <h1 className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-192.png" alt="" className="h-12 w-12 rounded-xl" />
-        <span className="wordmark text-4xl font-black tracking-widest">ZALTR.AI</span>
+        <span className="wordmark text-4xl font-black tracking-widest">CALYZR.AI</span>
       </h1>
       <p className="max-w-md text-center text-sm text-muted">
         Satu ruang kerja untuk semua AI terbaik — chat, gambar, video, dan musik.

@@ -62,7 +62,7 @@ body {
     linear-gradient(rgba(10, 14, 20, 0.42), rgba(10, 14, 20, 0.6));
 }
 
-/* ===== SCENE LOGIN: gerbang orbit zaltr (tanpa foto) ===== */
+/* ===== SCENE LOGIN: gerbang orbit calyzr (tanpa foto) ===== */
 .scene-portal {
   position: fixed;
   inset: 0;
@@ -258,7 +258,7 @@ body {
     79vw -90vh 0 rgba(244, 114, 182, 0.35), 91vw -28vh 0 rgba(139, 92, 246, 0.5);
 }
 
-/* Wordmark ZALTR.AI */
+/* Wordmark CALYZR.AI */
 .wordmark {
   background: linear-gradient(92deg, var(--accent-a), var(--accent-b));
   -webkit-background-clip: text;
@@ -267,7 +267,7 @@ body {
   letter-spacing: 0.08em;
 }
 
-/* Scrollbar tipis khas zaltr */
+/* Scrollbar tipis khas calyzr */
 * {
   scrollbar-width: thin;
   scrollbar-color: #2a3648 transparent;
@@ -408,6 +408,6 @@ body {
 .lift { transition: transform 0.25s ease, border-color 0.25s ease; }
 .lift:hover { transform: translateY(-5px); border-color: color-mix(in srgb, var(--accent-a) 50%, transparent); }
 
-/* Animasi SELALU aktif di semua perangkat — keputusan produk zaltr:
+/* Animasi SELALU aktif di semua perangkat — keputusan produk calyzr:
    setelan "kurangi gerakan" OS sengaja TIDAK mematikan animasi, karena
    gerakan adalah bagian identitas visual halaman. */

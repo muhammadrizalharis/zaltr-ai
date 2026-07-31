@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getSessionUser } from "@/server/auth";
 
-export const metadata = { title: "Beli Kredit — zaltr.ai" };
+export const metadata = { title: "Beli Kredit — calyzr.ai" };
 export const dynamic = "force-dynamic";
 
 /**
@@ -25,7 +25,7 @@ const PAKET: Array<{
     harga: "Gratis",
     limit: "100 pesan / hari",
     fitur: [
-      "Model Zaltr Free (ringan & cepat)",
+      "Model Calyzr Free (ringan & cepat)",
       "Riwayat chat tersimpan permanen",
       "Projects & folder chat",
     ],
@@ -36,10 +36,10 @@ const PAKET: Array<{
     harga: "Rp15.000",
     limit: "1.000 pesan / hari",
     fitur: [
-      "Model Zaltr Free (ringan & cepat)",
+      "Model Calyzr Free (ringan & cepat)",
       "Riwayat chat tersimpan permanen",
       "Projects & folder chat",
-      "Semua model Zaltr Turbo",
+      "Semua model Calyzr Turbo",
       "Model premium kelas cepat (Haiku, GPT Mini, Flash)",
       "Lampiran file + web search + memori",
     ],
@@ -50,10 +50,10 @@ const PAKET: Array<{
     harga: "Rp60.000",
     limit: "3.000 pesan / hari",
     fitur: [
-      "Model Zaltr Free (ringan & cepat)",
+      "Model Calyzr Free (ringan & cepat)",
       "Riwayat chat tersimpan permanen",
       "Projects & folder chat",
-      "Semua model Zaltr Turbo",
+      "Semua model Calyzr Turbo",
       "Model premium kelas cepat (Haiku, GPT Mini, Flash)",
       "Lampiran file + web search + memori",
       "Model kelas utama (Sonnet, GPT-5, Gemini Pro)",
@@ -68,10 +68,10 @@ const PAKET: Array<{
     harga: "Rp150.000",
     limit: "TANPA batas pesan harian",
     fitur: [
-      "Model Zaltr Free (ringan & cepat)",
+      "Model Calyzr Free (ringan & cepat)",
       "Riwayat chat tersimpan permanen",
       "Projects & folder chat",
-      "Semua model Zaltr Turbo",
+      "Semua model Calyzr Turbo",
       "Model premium kelas cepat (Haiku, GPT Mini, Flash)",
       "Lampiran file + web search + memori",
       "Model kelas utama (Sonnet, GPT-5, Gemini Pro)",
@@ -90,7 +90,7 @@ export default async function UpgradePage() {
 
   const waLink = (p: (typeof PAKET)[number]) => {
     const pesan = [
-      "Halo Admin zaltr.ai, saya ingin upgrade paket.",
+      "Halo Admin calyzr.ai, saya ingin upgrade paket.",
       "",
       `Email akun: ${user?.email ?? "-"}`,
       `Paket: ${p.nama}${p.kredit ? ` (${p.kredit.toLocaleString("id-ID")} kredit — ${p.harga})` : ""}`,
@@ -101,7 +101,7 @@ export default async function UpgradePage() {
   };
 
   const waUmum = `https://wa.me/${waAdmin}?text=${encodeURIComponent(
-    `Halo Admin zaltr.ai, saya ${user?.email ?? ""} ingin bertanya soal upgrade paket / pembayaran.`
+    `Halo Admin calyzr.ai, saya ${user?.email ?? ""} ingin bertanya soal upgrade paket / pembayaran.`
   )}`;
 
   return (
@@ -188,7 +188,7 @@ export default async function UpgradePage() {
             </a>
           ) : (
             <p className="text-sm text-muted">
-              Hubungi admin zaltr.ai yang mengundangmu untuk menyelesaikan pembayaran.
+              Hubungi admin calyzr.ai yang mengundangmu untuk menyelesaikan pembayaran.
             </p>
           )}
           <Link

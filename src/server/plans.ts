@@ -1,5 +1,5 @@
 /**
- * Definisi paket zaltr.ai — satu sumber kebenaran untuk limit harian
+ * Definisi paket calyzr.ai — satu sumber kebenaran untuk limit harian
  * dan model bawaan tiap paket (dipakai route chat, admin, dan halaman upgrade).
  */
 
