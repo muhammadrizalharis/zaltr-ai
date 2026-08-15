@@ -68,21 +68,43 @@ const FALLBACK_MODELS: Array<[string, string, ModelDescriptor["capabilities"]]> 
   ["gemini-3-flash", "Gemini 3 Flash", ["chat", "vision"]],
 ];
 
+/** Model Copilot yang bisa menerima gambar langsung (diisi dari listModels). */
+const visionModels = new Set<string>();
+
+/** Dipakai route chat untuk memutuskan perlu-tidaknya deskripsi gambar lokal. */
+export async function copilotSupportsVision(modelId: string): Promise<boolean> {
+  if (visionModels.size === 0) {
+    try {
+      await copilotCatalog();
+    } catch {
+      return false;
+    }
+  }
+  return visionModels.has(modelId);
+}
+
 export async function copilotCatalog(): Promise<ModelDescriptor[]> {
   try {
     const models = await withTimeout(
       client().then((c) => c.listModels()),
       3_000,
     );
-    return models.map((m) => ({
-      id: `copilot:${m.id}`,
-      label: m.name || m.id,
-      provider: "copilot" as const,
-      providerLabel: "Calyzr Pro",
-      capabilities: ["chat"] as ModelDescriptor["capabilities"],
-      available: true,
-      local: false,
-    }));
+    visionModels.clear();
+    return models.map((m) => {
+      const vision = m.capabilities?.supports?.vision === true;
+      if (vision) visionModels.add(m.id);
+      return {
+        id: `copilot:${m.id}`,
+        label: m.name || m.id,
+        provider: "copilot" as const,
+        providerLabel: "Calyzr Pro",
+        capabilities: (vision
+          ? ["chat", "vision"]
+          : ["chat"]) as ModelDescriptor["capabilities"],
+        available: true,
+        local: false,
+      };
+    });
   } catch {
     return FALLBACK_MODELS.map(([id, label, capabilities]) => ({
       id: `copilot:${id}`,
@@ -154,6 +176,7 @@ export async function* copilotChat(req: ChatRequest): ProviderGenerator {
 
   try {
     const last = req.history.at(-1)?.content ?? "";
+    const gambar = req.history.at(-1)?.images ?? [];
     // Sesi baru untuk conversation lama: sisipkan ringkasan riwayat sekali saja.
     const prompt =
       created && req.history.length > 1
@@ -164,7 +187,21 @@ export async function* copilotChat(req: ChatRequest): ProviderGenerator {
             .join("\n\n")}\n\n---\n\nPesan baru pengguna:\n${last}`
         : last;
 
-    await session.send({ prompt });
+    await session.send({
+      prompt,
+      // Gambar dikirim APA ADANYA ke model (Claude/GPT/Gemini bisa melihat) —
+      // jauh lebih cepat & akurat daripada dideskripsikan model lokal dulu.
+      ...(gambar.length > 0
+        ? {
+            attachments: gambar.map((g) => ({
+              type: "blob" as const,
+              data: g.data,
+              mimeType: g.mimeType,
+              ...(g.name ? { displayName: g.name } : {}),
+            })),
+          }
+        : {}),
+    });
 
     while (!finished || queue.length > 0) {
       if (queue.length === 0) {

@@ -4,6 +4,9 @@
   --bg: #0a0e14;
   --panel: rgba(16, 22, 31, 0.72);
   --panel-2: rgba(21, 29, 41, 0.74);
+  /* Panel melayang (dropdown/menu): WAJIB solid — backdrop-blur anak tidak
+     bekerja bila leluhurnya sudah punya backdrop-filter, teks di belakang tembus. */
+  --panel-solid: #0f151e;
   --border: #1f2937;
   --text: #e6edf6;
   --muted: #8b98a9;
@@ -15,6 +18,7 @@
   --color-bg: var(--bg);
   --color-panel: var(--panel);
   --color-panel-2: var(--panel-2);
+  --color-panel-solid: var(--panel-solid);
   --color-line: var(--border);
   --color-ink: var(--text);
   --color-muted: var(--muted);
@@ -313,6 +317,13 @@ body {
 }
 .input:focus {
   border-color: color-mix(in srgb, var(--accent-b) 60%, transparent);
+}
+
+/* iOS otomatis memperbesar halaman saat fokus ke input berukuran < 16px. */
+@media (max-width: 767px) {
+  .input {
+    font-size: 1rem;
+  }
 }
 
 /* ================= Animasi landing (CSS murni — jalan di HP & laptop) ===== */

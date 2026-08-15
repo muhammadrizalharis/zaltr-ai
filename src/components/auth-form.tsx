@@ -52,7 +52,7 @@ export function AuthForm({
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-6">
+    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden px-6 py-[env(safe-area-inset-top)]">
       {/* Scene login: gerbang orbit zaltr — grid mengalir, bintang, cincin berputar */}
       <div className="scene-portal" aria-hidden />
       <div className="orbit-wrap" aria-hidden>
@@ -157,7 +157,6 @@ export function AuthForm({
           </a>
           <p className="text-center text-[11px] leading-relaxed text-muted">
             Satu akun Google hanya bisa terhubung ke satu akun calyzr.ai.
-            Akun baru menunggu aktivasi superadmin.
           </p>
         </form>
 

@@ -18,6 +18,13 @@ const TEXT_EXT = new Set([
 
 export const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "avif"]);
 
+/** MIME gambar untuk lampiran ke model vision (default png bila tak dikenal). */
+export function imageMime(name: string): string {
+  const ext = fileExt(name);
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  return IMAGE_EXT.has(ext) ? `image/${ext}` : "image/png";
+}
+
 export function fileExt(name: string): string {
   return (name.split(".").pop() ?? "").toLowerCase();
 }

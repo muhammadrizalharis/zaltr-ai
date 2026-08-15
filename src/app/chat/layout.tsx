@@ -13,7 +13,9 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
       <Sidebar
         user={{ name: user.name, role: user.role, creditBalance: user.creditBalance }}
       />
-      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">{children}</main>
+      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto max-md:pt-[calc(3rem+env(safe-area-inset-top))]">
+        {children}
+      </main>
     </div>
   );
 }

@@ -32,7 +32,7 @@ export async function describeImages(imagesBase64: string[]): Promise<string | n
           },
         ],
       }),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { message?: { content?: string } };

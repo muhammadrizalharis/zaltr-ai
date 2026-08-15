@@ -78,7 +78,7 @@ export default function AdminUsersPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Pengguna</h1>
           <p className="mt-1 text-sm text-muted">
@@ -142,8 +142,9 @@ function UserCard({
   const isSuper = me?.role === "superadmin";
   const canManage =
     isSuper || (me?.role === "admin" && (u.role === "user" || u.id === me.id));
-  // Admin tidak boleh mengubah kredit dirinya sendiri (server juga menolak).
-  const canEditCredit = canManage && (isSuper || u.id !== me?.id);
+  // Admin tidak boleh menaikkan wewenang/kuota akunnya sendiri (server juga menolak).
+  const canEditPolicy = canManage && (isSuper || u.id !== me?.id);
+  const isSelfAdmin = !isSuper && u.id === me?.id;
 
   function togglePattern(p: string) {
     setAllowed((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
@@ -158,8 +159,11 @@ function UserCard({
 
   return (
     <div className="rounded-2xl border border-line bg-panel">
-      <button onClick={onToggle} className="flex w-full items-center gap-4 px-5 py-4 text-left">
-        <div className="min-w-0 flex-1">
+      <button
+        onClick={onToggle}
+        className="flex w-full items-center gap-4 px-5 py-4 text-left max-md:flex-col max-md:items-start max-md:gap-2 max-md:px-4"
+      >
+        <div className="min-w-0 flex-1 max-md:w-full">
           <p className="truncate font-medium">
             {u.name} <span className="text-sm text-muted">· {u.email}</span>
           </p>
@@ -169,23 +173,31 @@ function UserCard({
             {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("id-ID") : "belum pernah"}
           </p>
         </div>
-        <span className="rounded-full border border-accent-b/40 bg-accent-b/10 px-2.5 py-1 text-[11px] uppercase tracking-wider text-accent-b">
-          {u.role}
-        </span>
-        <span className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-wider ${statusColor}`}>
-          {u.status}
-        </span>
-        <span className="text-sm tabular-nums text-muted">
-          {u.creditBalance.toLocaleString("id-ID")} kr
-        </span>
-        <span className="text-muted">{open ? "▾" : "▸"}</span>
+        <div className="flex items-center gap-4 max-md:w-full max-md:flex-wrap max-md:gap-2">
+          <span className="rounded-full border border-accent-b/40 bg-accent-b/10 px-2.5 py-1 text-[11px] uppercase tracking-wider text-accent-b">
+            {u.role}
+          </span>
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-wider ${statusColor}`}>
+            {u.status}
+          </span>
+          <span className="text-sm tabular-nums text-muted">
+            {u.creditBalance.toLocaleString("id-ID")} kr
+          </span>
+          <span className="text-muted max-md:ml-auto">{open ? "▾" : "▸"}</span>
+        </div>
       </button>
 
       {open && (
-        <div className="border-t border-line px-5 py-5">
+        <div className="border-t border-line px-5 py-5 max-md:px-4 max-md:py-4">
           {!canManage && (
             <p className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
               Hanya superadmin yang bisa mengatur akun admin/superadmin lain.
+            </p>
+          )}
+          {isSelfAdmin && (
+            <p className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
+              Ini akunmu sendiri — kamu hanya bisa mengubah catatan & password. Paket, model,
+              limit, kredit, dan status harus diatur superadmin.
             </p>
           )}
           <div className="grid gap-6 lg:grid-cols-2">
@@ -207,7 +219,7 @@ function UserCard({
 
               <Section title="Paket langganan">
                 <select
-                  disabled={!canManage}
+                  disabled={!canEditPolicy}
                   value={u.plan ?? "free"}
                   onChange={(e) => void onPatch(u.id, { plan: e.target.value })}
                   className="input w-auto disabled:opacity-40"
@@ -236,7 +248,7 @@ function UserCard({
                     <option value="superadmin">superadmin</option>
                   </select>
                   <select
-                    disabled={!canManage}
+                    disabled={!canEditPolicy}
                     value={u.status}
                     onChange={(e) => void onPatch(u.id, { status: e.target.value })}
                     className="input w-auto disabled:opacity-40"
@@ -252,28 +264,28 @@ function UserCard({
               </Section>
 
               <Section title="Kredit AI">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="number"
                     min={0}
                     value={credit}
-                    disabled={!canEditCredit}
+                    disabled={!canEditPolicy}
                     onChange={(e) => setCredit(e.target.value)}
-                    className="input w-40 tabular-nums"
+                    className="input w-40 tabular-nums max-md:flex-1"
                   />
                   <button
-                    disabled={!canEditCredit}
+                    disabled={!canEditPolicy}
                     onClick={() => void onPatch(u.id, { creditBalance: Number(credit) })}
-                    className="rounded-xl border border-accent-a/50 px-4 text-sm text-accent-a hover:bg-accent-a/10 disabled:opacity-40"
+                    className="rounded-xl border border-accent-a/50 px-4 py-2 text-sm text-accent-a hover:bg-accent-a/10 disabled:opacity-40"
                   >
                     Simpan
                   </button>
                   {[100, 1000, 10000].map((n) => (
                     <button
                       key={n}
-                      disabled={!canEditCredit}
+                      disabled={!canEditPolicy}
                       onClick={() => setCredit(String(Number(credit || 0) + n))}
-                      className="rounded-xl border border-line px-3 text-xs text-muted hover:text-ink disabled:opacity-40"
+                      className="rounded-xl border border-line px-3 py-2 text-xs text-muted hover:text-ink disabled:opacity-40"
                     >
                       +{n.toLocaleString("id-ID")}
                     </button>
@@ -286,22 +298,22 @@ function UserCard({
               </Section>
 
               <Section title="Batas pesan per hari">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="number"
                     min={1}
                     placeholder="tanpa batas"
                     value={limit}
-                    disabled={!canManage}
+                    disabled={!canEditPolicy}
                     onChange={(e) => setLimit(e.target.value)}
-                    className="input w-40 tabular-nums"
+                    className="input w-40 tabular-nums max-md:flex-1"
                   />
                   <button
-                    disabled={!canManage}
+                    disabled={!canEditPolicy}
                     onClick={() =>
                       void onPatch(u.id, { dailyMsgLimit: limit === "" ? null : Number(limit) })
                     }
-                    className="rounded-xl border border-accent-a/50 px-4 text-sm text-accent-a hover:bg-accent-a/10 disabled:opacity-40"
+                    className="rounded-xl border border-accent-a/50 px-4 py-2 text-sm text-accent-a hover:bg-accent-a/10 disabled:opacity-40"
                   >
                     Simpan
                   </button>
@@ -331,7 +343,7 @@ function UserCard({
                     <Chip
                       key={p}
                       active={allowed.includes(p)}
-                      disabled={!canManage}
+                      disabled={!canEditPolicy}
                       onClick={() => togglePattern(p)}
                     >
                       {label}
@@ -348,7 +360,7 @@ function UserCard({
                       >
                         <input
                           type="checkbox"
-                          disabled={!canManage}
+                          disabled={!canEditPolicy}
                           checked={allowed.includes(m.id)}
                           onChange={() => togglePattern(m.id)}
                         />
@@ -360,7 +372,7 @@ function UserCard({
                     ))}
                 </div>
                 <button
-                  disabled={!canManage}
+                  disabled={!canEditPolicy}
                   onClick={() => void onPatch(u.id, { allowedModels: allowed })}
                   className="mt-2 rounded-xl border border-accent-a/50 px-4 py-1.5 text-sm text-accent-a hover:bg-accent-a/10 disabled:opacity-40"
                 >

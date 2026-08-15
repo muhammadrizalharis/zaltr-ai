@@ -53,7 +53,7 @@ export function ModelPicker({
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative shrink-0">
       <button
         type="button"
         disabled={disabled}
@@ -62,12 +62,12 @@ export function ModelPicker({
         className="flex h-10 items-center gap-1.5 rounded-xl border border-line bg-panel-2 px-3 text-sm text-ink hover:border-accent-b/60 disabled:opacity-50"
       >
         <span className="size-2 rounded-full bg-gradient-to-r from-accent-a to-accent-b" />
-        <span className="max-w-36 truncate">{selected?.label ?? "Model…"}</span>
+        <span className="max-w-24 truncate md:max-w-36">{selected?.label ?? "Model…"}</span>
         <span className="text-[10px] text-muted">▾</span>
       </button>
 
       {open && (
-        <div className="absolute bottom-12 left-0 z-20 max-h-96 w-80 overflow-y-auto rounded-2xl border border-line bg-panel p-2 shadow-2xl backdrop-blur-xl">
+        <div className="absolute right-0 top-12 z-30 max-h-[70vh] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-line bg-panel-solid p-2 shadow-2xl">
           {[...groups.entries()].map(([label, list]) => (
             <div key={label} className="mb-2 last:mb-0">
               <p className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted">

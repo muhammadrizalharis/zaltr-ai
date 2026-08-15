@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { ModelPicker, loadSavedModel, DEFAULT_MODEL } from "@/components/model-picker";
 import { notifyConversationsChanged } from "@/components/sidebar";
-import type { ChatMessage, StreamLine } from "@/lib/types";
+import type { ChatMessage, ModelDescriptor, StreamLine } from "@/lib/types";
+import { MODE_PARAFRASE, type ModeParafrase } from "@/server/paraphrase";
+
+/** Batas lampiran per pesan (server menolak lebih dari ini). */
+const MAX_FILES = 5;
 
 const SUGGESTIONS = [
   "Buatkan rencana belajar AI 30 hari untuk pemula",
@@ -29,7 +33,15 @@ export function ChatView({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [webSearch, setWebSearch] = useState(false);
+  const [parafrase, setParafrase] = useState<ModeParafrase | null>(null);
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [imageModelId, setImageModelId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const runIdRef = useRef<string | null>(null);
+  // Auto-scroll hanya saat pembaca memang sedang di bawah; kalau ia menggulir
+  // ke atas untuk membaca, jangan diseret balik walau jawaban masih mengalir.
+  const [stickToBottom, setStickToBottom] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -41,9 +53,7 @@ export function ChatView({
     void (async () => {
       const res = await fetch("/api/models", { cache: "no-store" });
       if (!res.ok) return;
-      const data = (await res.json()) as {
-        models: Array<{ id: string; available: boolean; locked?: boolean }>;
-      };
+      const data = (await res.json()) as { models: ModelDescriptor[] };
       const saved = loadSavedModel();
       const usable = (id: string) =>
         data.models.some((m) => m.id === id && m.available && !m.locked);
@@ -51,11 +61,71 @@ export function ChatView({
         const first = data.models.find((m) => m.available && !m.locked);
         if (first) setModel(first.id);
       }
+      const img = data.models.find(
+        (m) => m.capabilities.includes("image") && m.available && !m.locked,
+      );
+      setImageModelId(img?.id ?? null);
     })();
   }, []);
+
+  // Tutup menu "+" saat klik di luar / tekan Escape.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamText]);
+    if (!plusOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if ((e.target as HTMLElement | null)?.closest("[data-plus-root]")) return;
+      setPlusOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPlusOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [plusOpen]);
+
+  /** Sumber tunggal penambahan lampiran: tombol, tempel (Ctrl+V), & seret-lepas. */
+  function addFiles(incoming: File[]) {
+    if (incoming.length === 0) return;
+    setError(null);
+    setAttachments((prev) => {
+      if (prev.length >= MAX_FILES) {
+        setError(`Maksimal ${MAX_FILES} lampiran per pesan.`);
+        return prev;
+      }
+      const next = [...prev, ...incoming].slice(0, MAX_FILES);
+      if (prev.length + incoming.length > MAX_FILES) {
+        setError(`Maksimal ${MAX_FILES} lampiran per pesan — sisanya diabaikan.`);
+      }
+      return next;
+    });
+  }
+
+  // Tempel (Ctrl+V) gambar/berkas dari papan klip — berlaku di seluruh halaman
+  // chat, bukan hanya saat kursor berada di kolom pesan.
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const files = Array.from(e.clipboardData?.files ?? []);
+      if (files.length === 0) return;
+      e.preventDefault(); // jangan tempel nama berkas sebagai teks
+      addFiles(files);
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!stickToBottom) return;
+    // Saat streaming pakai lompatan instan: "smooth" tiap token bertabrakan
+    // dengan guliran manual pengguna.
+    bottomRef.current?.scrollIntoView({
+      behavior: streamText === null ? "smooth" : "auto",
+      block: "end",
+    });
+  }, [messages, streamText, stickToBottom]);
 
   const streaming = streamText !== null;
 
@@ -75,6 +145,7 @@ export function ChatView({
     if ((!text && attachments.length === 0 && !regenerate) || streaming || uploading) return;
     setDraft("");
     setError(null);
+    setStickToBottom(true); // kirim pesan = kembali mengikuti bagian bawah
 
     // Upload lampiran dulu -> jadikan markdown di isi pesan (gambar inline,
     // dokumen sebagai link; server mengekstrak isinya untuk model).
@@ -130,6 +201,7 @@ export function ChatView({
           modelId: model,
           web: webSearch,
           regenerate,
+          ...(parafrase ? { paraphrase: parafrase } : {}),
         }),
         signal: controller.signal,
       });
@@ -149,13 +221,19 @@ export function ChatView({
         for (const raw of lines) {
           if (!raw.trim()) continue;
           const line = JSON.parse(raw) as StreamLine;
-          if (line.type === "meta") notifyConversationsChanged();
+          if (line.type === "meta") {
+            runIdRef.current = line.runId;
+            notifyConversationsChanged();
+          }
           if (line.type === "delta") {
             acc += line.text;
             setStreamText(acc);
           }
           if (line.type === "error") setError(line.message);
           if (line.type === "done") {
+            notifyConversationsChanged(); // judul hasil AI biasanya siap di sini
+            // Jawaban kosong bukan jawaban — servernya pun tidak menyimpannya.
+            if (!line.content.trim()) continue;
             setMessages((prev) => [
               ...prev,
               {
@@ -189,10 +267,21 @@ export function ChatView({
     } finally {
       setStreamText(null);
       abortRef.current = null;
+      runIdRef.current = null;
     }
   }
 
   function stop() {
+    // Batalkan di server dulu — menutup koneksi saja tidak lagi menghentikan
+    // generasi (agar pindah halaman/tab tidak memotong jawaban).
+    const runId = runIdRef.current;
+    if (runId) {
+      void fetch("/api/chat/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId }),
+      });
+    }
     abortRef.current?.abort();
   }
 
@@ -204,8 +293,45 @@ export function ChatView({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto">
+    <div
+      className="relative flex h-full flex-col"
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDragging(false);
+        addFiles(Array.from(e.dataTransfer.files));
+      }}
+    >
+      {dragging && (
+        <div className="pointer-events-none absolute inset-3 z-40 flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-accent-a/70 bg-bg/80 backdrop-blur">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-accent-a">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+          </svg>
+          <p className="text-sm font-medium text-ink">Lepaskan berkas di sini</p>
+          <p className="text-xs text-muted">Gambar, PDF, Word, Excel, kode — maks {MAX_FILES} berkas</p>
+        </div>
+      )}
+      <div className="flex shrink-0 items-center justify-end border-b border-line/70 bg-panel/40 px-4 py-2 backdrop-blur">
+        <ModelPicker value={model} onChange={setModel} disabled={streaming} />
+      </div>
+
+      <div
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const sisa = el.scrollHeight - el.scrollTop - el.clientHeight;
+          setStickToBottom(sisa < 80);
+        }}
+        className="flex-1 overflow-y-auto"
+      >
         {messages.length === 0 && !streaming ? (
           <EmptyState onPick={(s) => void send(s)} />
         ) : (
@@ -249,9 +375,58 @@ export function ChatView({
         )}
       </div>
 
-      <div className="border-t border-line bg-panel/60 px-4 py-3 backdrop-blur">
-        {attachments.length > 0 && (
-          <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap gap-1.5">
+      <div className="relative border-t border-line bg-panel/60 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur">
+        {!stickToBottom && (
+          <button
+            onClick={() => {
+              setStickToBottom(true);
+              bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+            }}
+            className="absolute -top-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-line bg-panel-solid px-3 py-1.5 text-xs text-muted shadow-xl hover:border-accent-a/60 hover:text-ink"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M19 12l-7 7-7-7" />
+            </svg>
+            Ke pesan terbaru
+          </button>
+        )}
+        {(attachments.length > 0 || webSearch || parafrase) && (
+          <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap items-center gap-1.5">
+            {parafrase && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-accent-b/50 bg-accent-b/10 px-2 py-1 text-xs text-accent-b">
+                Parafrase
+                <select
+                  value={parafrase}
+                  onChange={(e) => setParafrase(e.target.value as ModeParafrase)}
+                  className="rounded border border-accent-b/40 bg-bg px-1 py-0.5 text-[11px] text-ink outline-none"
+                >
+                  {Object.entries(MODE_PARAFRASE).map(([nilai, label]) => (
+                    <option key={nilai} value={nilai}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setParafrase(null)}
+                  className="hover:text-ink"
+                  aria-label="Matikan parafrase"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {webSearch && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-accent-a/50 bg-accent-a/10 px-2 py-1 text-xs text-accent-a">
+                Cari web aktif
+                <button
+                  onClick={() => setWebSearch(false)}
+                  className="hover:text-ink"
+                  aria-label="Matikan cari web"
+                >
+                  ×
+                </button>
+              </span>
+            )}
             {attachments.map((f, i) => (
               <span
                 key={`${f.name}-${i}`}
@@ -271,47 +446,103 @@ export function ChatView({
           </div>
         )}
         <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
-          {/* Tombol model DI SAMPING kolom chat — fitur inti calyzr.ai */}
-          <ModelPicker value={model} onChange={setModel} disabled={streaming} />
           <input
             ref={fileInputRef}
             type="file"
             multiple
             hidden
             onChange={(e) => {
-              const picked = Array.from(e.target.files ?? []);
-              setAttachments((prev) => [...prev, ...picked].slice(0, 5));
+              addFiles(Array.from(e.target.files ?? []));
               e.target.value = "";
             }}
           />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={streaming || uploading}
-            title="Lampirkan file (maks 5, 25 MB per file)"
-            aria-label="Lampirkan file"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-panel-2 text-muted hover:border-accent-b/60 hover:text-ink disabled:opacity-40"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-            </svg>
-          </button>
-          <button
-            onClick={() => setWebSearch((v) => !v)}
-            disabled={streaming}
-            title={webSearch ? "Cari web: AKTIF — jawaban memakai hasil pencarian" : "Cari web: mati"}
-            aria-label="Toggle cari web"
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-sm disabled:opacity-40 ${
-              webSearch
-                ? "border-accent-a/70 bg-accent-a/10 text-accent-a"
-                : "border-line bg-panel-2 text-muted hover:border-accent-b/60 hover:text-ink"
-            }`}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-            </svg>
-          </button>
-          <div className="flex min-h-10 flex-1 items-end rounded-xl border border-line bg-panel-2 focus-within:border-accent-b/60">
+          <div className="relative shrink-0" data-plus-root>
+            <button
+              onClick={() => setPlusOpen((v) => !v)}
+              disabled={streaming || uploading}
+              title="Tambah berkas & alat"
+              aria-label="Tambah berkas & alat"
+              className={`flex h-10 w-10 items-center justify-center rounded-xl border text-muted disabled:opacity-40 ${
+                plusOpen || webSearch
+                  ? "border-accent-a/70 bg-accent-a/10 text-accent-a"
+                  : "border-line bg-panel-2 hover:border-accent-b/60 hover:text-ink"
+              }`}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+
+            {plusOpen && (
+              <div className="absolute bottom-12 left-0 z-30 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-panel-solid p-1.5 shadow-2xl">
+                <PlusItem
+                  title="Tambah foto & file"
+                  desc="Unggah dari perangkat, atau tempel & seret ke sini"
+                  onClick={() => {
+                    setPlusOpen(false);
+                    fileInputRef.current?.click();
+                  }}
+                  icon={
+                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  }
+                />
+                <PlusItem
+                  title="Buat gambar"
+                  desc={imageModelId ? "Ubah teks jadi gambar" : "Studio gambar tidak tersedia untuk akunmu"}
+                  disabled={!imageModelId}
+                  onClick={() => {
+                    if (!imageModelId) return;
+                    setModel(imageModelId);
+                    setPlusOpen(false);
+                    textareaRef.current?.focus();
+                  }}
+                  icon={
+                    <>
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <path d="m21 15-5-5L5 21" />
+                    </>
+                  }
+                />
+                <PlusItem
+                  title="Parafrase"
+                  desc={
+                    parafrase
+                      ? `Aktif — mode ${MODE_PARAFRASE[parafrase]}`
+                      : "Tulis ulang teks: alur & struktur dirombak"
+                  }
+                  active={parafrase !== null}
+                  onClick={() => {
+                    setParafrase((v) => (v ? null : "akademik"));
+                    setPlusOpen(false);
+                    textareaRef.current?.focus();
+                  }}
+                  icon={
+                    <>
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </>
+                  }
+                />
+                <PlusItem
+                  title="Cari web"
+                  desc={webSearch ? "Aktif — jawaban memakai hasil pencarian" : "Info & berita terkini"}
+                  active={webSearch}
+                  onClick={() => {
+                    setWebSearch((v) => !v);
+                    setPlusOpen(false);
+                  }}
+                  icon={
+                    <>
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </>
+                  }
+                />
+              </div>
+            )}
+          </div>
+          <div className="flex min-h-10 min-w-0 flex-1 items-end rounded-xl border border-line bg-panel-2 focus-within:border-accent-b/60">
             <textarea
               ref={textareaRef}
               value={draft}
@@ -324,13 +555,13 @@ export function ChatView({
               onKeyDown={onKeyDown}
               rows={1}
               placeholder="Tulis pesan… (Enter kirim, Shift+Enter baris baru)"
-              className="max-h-52 w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted"
+              className="max-h-52 w-full resize-none bg-transparent px-3 py-2.5 text-base outline-none placeholder:text-muted md:text-sm"
             />
           </div>
           {streaming ? (
             <button
               onClick={stop}
-              className="h-10 rounded-xl border border-red-500/50 bg-red-500/10 px-4 text-sm font-medium text-red-300 hover:bg-red-500/20"
+              className="h-10 shrink-0 rounded-xl border border-red-500/50 bg-red-500/10 px-4 text-sm font-medium text-red-300 hover:bg-red-500/20"
             >
               Stop
             </button>
@@ -338,7 +569,7 @@ export function ChatView({
             <button
               onClick={() => void send()}
               disabled={(!draft.trim() && attachments.length === 0) || uploading}
-              className="h-10 rounded-xl bg-gradient-to-r from-accent-a to-accent-b px-4 text-sm font-semibold text-black disabled:opacity-40"
+              className="h-10 shrink-0 rounded-xl bg-gradient-to-r from-accent-a to-accent-b px-4 text-sm font-semibold text-black disabled:opacity-40"
             >
               {uploading ? "Mengunggah…" : "Kirim"}
             </button>
@@ -352,6 +583,58 @@ export function ChatView({
   );
 }
 
+/** Satu baris di menu "+" (tambah berkas, buat gambar, cari web). */
+function PlusItem({
+  title,
+  desc,
+  icon,
+  onClick,
+  active,
+  disabled,
+}: {
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left ${
+        disabled ? "cursor-not-allowed opacity-45" : "hover:bg-panel-2"
+      }`}
+    >
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
+          active ? "border-accent-a/60 bg-accent-a/10 text-accent-a" : "border-line text-muted"
+        }`}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {icon}
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-ink">{title}</span>
+        <span className="block truncate text-[11px] text-muted">{desc}</span>
+      </span>
+      {active && <span className="text-accent-a">✓</span>}
+    </button>
+  );
+}
+
 function EmptyState({ onPick }: { onPick: (s: string) => void }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-4">
@@ -362,7 +645,7 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
       </h1>
       <p className="max-w-md text-center text-sm text-muted">
         Satu ruang kerja untuk semua AI terbaik — chat, gambar, video, dan musik.
-        Pilih model dari tombol di samping kolom pesan.
+        Pilih model dari tombol di pojok kanan atas.
       </p>
       <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
         {SUGGESTIONS.map((s) => (
@@ -423,23 +706,31 @@ function Bubble({
   }
 
   return (
-    <div className="group text-sm leading-relaxed">
+    <div
+      className={`group text-sm leading-relaxed ${
+        isUser ? "flex flex-col items-end" : ""
+      }`}
+    >
       <RoleTag role={message.role} />
       <div
         className={`mt-1 ${
           isUser
-            ? "rounded-2xl rounded-tl-sm border border-line bg-panel-2 px-4 py-3"
+            ? "max-w-[85%] rounded-2xl rounded-tr-sm border border-line bg-panel-2 px-4 py-3"
             : ""
         }`}
       >
         {isUser && !hasAttachment ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <p className="whitespace-pre-wrap break-words">{message.content}</p>
         ) : (
           <Markdown>{message.content}</Markdown>
         )}
       </div>
       {/* Aksi kecil ala ChatGPT: salin / regenerate / edit */}
-      <div className="mt-1 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+      <div
+        className={`mt-1 flex gap-3 opacity-0 transition-opacity group-hover:opacity-100 max-md:gap-4 max-md:py-1 max-md:opacity-100 ${
+          isUser ? "justify-end" : ""
+        }`}
+      >
         <button
           onClick={() => void copy()}
           className="text-[11px] text-muted hover:text-ink"

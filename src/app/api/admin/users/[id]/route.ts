@@ -68,6 +68,21 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
     if (body.data.role) {
       return NextResponse.json({ error: "Hanya superadmin yang bisa mengubah role" }, { status: 403 });
     }
+    // Anti self-escalation: pada akunnya sendiri admin hanya boleh mengubah
+    // catatan & password. Paket, model, limit, dan status wajib lewat superadmin.
+    if (target.id === actor.id) {
+      const bolehUntukDiriSendiri = new Set(["notes", "newPassword"]);
+      const terlarang = Object.keys(body.data).filter((k) => !bolehUntukDiriSendiri.has(k));
+      if (terlarang.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Admin hanya bisa mengubah catatan & password sendiri — paket, model, limit, dan status minta superadmin",
+          },
+          { status: 403 },
+        );
+      }
+    }
   }
 
   // Lindungi superadmin terakhir dari penurunan role/penonaktifan.

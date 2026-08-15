@@ -49,7 +49,7 @@ export default function TrashPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-10">
+    <div className="mx-auto w-full max-w-3xl px-6 py-10 max-md:px-4 max-md:py-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold">Trash</h1>
         <Link href="/chat" className="text-sm text-accent-a hover:underline">
@@ -73,9 +73,9 @@ export default function TrashPage() {
         {items.map((c) => (
           <li
             key={c.id}
-            className="flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-3"
+            className="flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-3 max-md:flex-wrap max-md:gap-2"
           >
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 max-md:w-full max-md:flex-none">
               <p className="truncate text-sm">{c.title}</p>
               <p className="text-[11px] text-muted">
                 Dihapus {new Date(c.trashedAt).toLocaleString("id-ID")}

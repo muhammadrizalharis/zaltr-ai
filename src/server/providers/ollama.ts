@@ -77,7 +77,9 @@ export async function* ollamaChat(req: ChatRequest): ProviderGenerator {
           role: m.role,
           content: m.content,
           // Model vision (mis. qwen2.5vl) menerima gambar base64 per pesan.
-          ...(m.images && m.images.length > 0 ? { images: m.images } : {}),
+          ...(m.images && m.images.length > 0
+            ? { images: m.images.map((i) => i.data) }
+            : {}),
         })),
       ],
     }),

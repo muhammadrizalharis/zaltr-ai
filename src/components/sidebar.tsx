@@ -34,6 +34,11 @@ export function Sidebar({
     setMini(v);
     localStorage.setItem("zaltr:sidebar", v ? "mini" : "full");
   }
+  // Drawer sidebar untuk mobile (<md): tertutup otomatis tiap pindah halaman.
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   const load = useCallback(async () => {
     const [cRes, pRes] = await Promise.all([
@@ -158,47 +163,93 @@ export function Sidebar({
     />
   );
 
-  // Sidebar bisa DICIUTKAN (tersimpan antar-kunjungan).
-  if (mini) {
-    return (
-      <aside className="flex w-14 shrink-0 flex-col items-center gap-3 border-r border-line bg-panel py-4 max-md:hidden">
-        <button onClick={() => setMiniPersist(false)} title="Bentangkan sidebar">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-192.png" alt="zaltr" className="h-8 w-8 rounded-lg" />
-        </button>
-        <Link
-          href="/chat"
-          title="Chat baru"
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-lg text-accent-a hover:border-accent-a/60"
-        >
-          +
-        </Link>
+  // Chrome mobile: bilah atas (buka drawer) + latar gelap saat drawer terbuka.
+  const mobileChrome = (
+    <>
+      <div className="fixed inset-x-0 top-0 z-30 flex h-[calc(3rem+env(safe-area-inset-top))] items-center gap-2 border-b border-line bg-bg/85 px-3 pt-[env(safe-area-inset-top)] backdrop-blur md:hidden">
         <button
-          onClick={() => setMiniPersist(false)}
-          title="Bentangkan sidebar"
-          className="mt-auto flex h-9 w-9 items-center justify-center rounded-xl border border-line text-muted hover:text-ink"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Buka menu"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink hover:border-accent-a/60"
         >
-          »
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
         </button>
-      </aside>
-    );
-  }
+        <Link href="/chat" className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-192.png" alt="" className="h-6 w-6 rounded-md" />
+          <span className="wordmark text-base font-bold">CALYZR.AI</span>
+        </Link>
+      </div>
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+        />
+      )}
+    </>
+  );
+
+  // Rail mini hanya untuk desktop; di mobile selalu memakai drawer penuh.
+  const rail = (
+    <aside className="hidden w-14 shrink-0 flex-col items-center gap-3 border-r border-line bg-panel py-4 md:flex">
+      <button onClick={() => setMiniPersist(false)} title="Bentangkan sidebar">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-192.png" alt="zaltr" className="h-8 w-8 rounded-lg" />
+      </button>
+      <Link
+        href="/chat"
+        title="Chat baru"
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-lg text-accent-a hover:border-accent-a/60"
+      >
+        +
+      </Link>
+      <button
+        onClick={() => setMiniPersist(false)}
+        title="Bentangkan sidebar"
+        className="mt-auto flex h-9 w-9 items-center justify-center rounded-xl border border-line text-muted hover:text-ink"
+      >
+        »
+      </button>
+    </aside>
+  );
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-line bg-panel max-md:hidden">
+    <>
+      {mobileChrome}
+      {mini && rail}
+      <aside
+        className={`flex w-72 shrink-0 flex-col border-r border-line bg-panel ${
+          mini ? "md:hidden" : ""
+        } max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:max-w-[85vw] max-md:bg-panel-solid max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)] max-md:shadow-2xl max-md:transition-transform max-md:duration-300 max-md:ease-out ${
+          mobileOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full"
+        }`}
+      >
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <Link href="/chat" className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-192.png" alt="" className="h-7 w-7 rounded-lg" />
           <span className="wordmark text-lg font-bold">CALYZR.AI</span>
         </Link>
-        <button
-          onClick={() => setMiniPersist(true)}
-          title="Ciutkan sidebar"
-          className="rounded-lg border border-line px-2 py-1 text-xs text-muted hover:text-ink"
-        >
-          «
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setMiniPersist(true)}
+            title="Ciutkan sidebar"
+            className="rounded-lg border border-line px-2 py-1 text-xs text-muted hover:text-ink max-md:hidden"
+          >
+            «
+          </button>
+          <button
+            onClick={() => setMobileOpen(false)}
+            title="Tutup menu"
+            aria-label="Tutup menu"
+            className="rounded-lg border border-line px-2 py-1 text-xs text-muted hover:text-ink md:hidden"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div className="px-3 pb-2">
@@ -215,7 +266,7 @@ export function Sidebar({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Cari chat…"
-          className="w-full rounded-lg border border-line bg-bg px-3 py-1.5 text-sm outline-none placeholder:text-muted focus:border-accent-b/60"
+          className="w-full rounded-lg border border-line bg-bg px-3 py-1.5 text-base outline-none placeholder:text-muted focus:border-accent-b/60 md:text-sm"
         />
       </div>
 
@@ -277,7 +328,7 @@ export function Sidebar({
                       <span className="truncate">{p.name}</span>
                       <span className="text-[10px] text-muted">{items.length}</span>
                     </button>
-                    <div className="hidden shrink-0 gap-0.5 group-hover:flex">
+                    <div className="flex shrink-0 gap-0.5 md:hidden md:group-hover:flex">
                       <button
                         onClick={() => void newChatInProject(p.id)}
                         title="Chat baru di project ini"
@@ -368,6 +419,7 @@ export function Sidebar({
         )}
       </footer>
     </aside>
+    </>
   );
 }
 
@@ -420,8 +472,8 @@ function Row({
           onMenu(!menuOpen);
         }}
         title="Menu chat"
-        className={`absolute right-1 top-1/2 -translate-y-1/2 rounded px-1 text-sm text-muted hover:text-ink ${
-          menuOpen ? "" : "hidden group-hover:block"
+        className={`absolute right-1 top-1/2 -translate-y-1/2 rounded px-1 text-sm text-muted hover:text-ink max-md:px-2 max-md:py-1 ${
+          menuOpen ? "" : "block md:hidden md:group-hover:block"
         }`}
       >
         ⋯
@@ -431,7 +483,7 @@ function Row({
         <div
           data-menu-root
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-0 top-8 z-30 w-56 rounded-xl border border-line bg-panel p-1.5 shadow-2xl backdrop-blur-xl"
+          className="absolute right-0 top-8 z-30 w-56 rounded-xl border border-line bg-panel-solid p-1.5 shadow-2xl"
         >
           <MenuBtn
             onClick={() => {

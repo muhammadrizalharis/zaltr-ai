@@ -63,7 +63,7 @@ export function SettingsView() {
           rows={6}
           maxLength={2000}
           placeholder="Tulis preferensimu di sini…"
-          className="w-full resize-y rounded-xl border border-line bg-panel-2 px-3 py-2.5 text-sm outline-none focus:border-accent-b/60"
+          className="w-full resize-y rounded-xl border border-line bg-panel-2 px-3 py-2.5 text-base outline-none focus:border-accent-b/60 md:text-sm"
         />
         <div className="flex items-center gap-3">
           <button
@@ -94,7 +94,7 @@ export function SettingsView() {
                 key={m.id}
                 className="flex items-start justify-between gap-3 rounded-xl border border-line bg-panel px-3 py-2 text-sm"
               >
-                <span>{m.content}</span>
+                <span className="min-w-0 break-words">{m.content}</span>
                 <button
                   onClick={() => void removeMemory(m.id)}
                   className="shrink-0 text-xs text-muted hover:text-red-400"

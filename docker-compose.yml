@@ -242,7 +242,8 @@ services:
     environment:
       TZ: ${TZ:-Asia/Makassar}
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:4321/ >/dev/null 2>&1 || exit 1"]
+      # Image runtime tidak punya wget/curl/nc — cek port langsung lewat bash.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/4321"]
       interval: 30s
       timeout: 10s
       retries: 5

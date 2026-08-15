@@ -42,7 +42,7 @@ export default async function WelcomePage() {
   const user = await getSessionUser();
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden">
+    <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* Scene landing: foto kota neon + aurora + orb + partikel */}
       <div className="scene-city" aria-hidden />
       <div className="scene-city-veil" aria-hidden />

@@ -12,7 +12,7 @@ export function Markdown({ children }: { children: string }) {
         h1: (p) => <h1 className="mb-2 mt-4 text-xl font-bold" {...p} />,
         h2: (p) => <h2 className="mb-2 mt-4 text-lg font-bold" {...p} />,
         h3: (p) => <h3 className="mb-1 mt-3 text-base font-semibold" {...p} />,
-        p: (p) => <p className="mb-3 leading-relaxed last:mb-0" {...p} />,
+        p: (p) => <p className="mb-3 break-words leading-relaxed last:mb-0" {...p} />,
         ul: (p) => <ul className="mb-3 list-disc space-y-1 pl-5" {...p} />,
         ol: (p) => <ol className="mb-3 list-decimal space-y-1 pl-5" {...p} />,
         blockquote: (p) => (
@@ -22,7 +22,11 @@ export function Markdown({ children }: { children: string }) {
           />
         ),
         a: (p) => (
-          <a className="text-accent-a underline underline-offset-2" target="_blank" {...p} />
+          <a
+            className="break-all text-accent-a underline underline-offset-2"
+            target="_blank"
+            {...p}
+          />
         ),
         img: ({ src, alt }) => {
           // Hasil ComfyUI / lampiran — dilayani dari MinIO via /api/files.
@@ -152,7 +156,7 @@ function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) 
 
   return (
     <div className="group relative mb-3">
-      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100">
         {python && (
           <button
             onClick={() => void run()}

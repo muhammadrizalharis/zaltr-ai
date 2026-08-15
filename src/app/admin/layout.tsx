@@ -10,10 +10,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (user.role !== "admin" && user.role !== "superadmin") redirect("/chat");
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh pb-[env(safe-area-inset-bottom)]">
       <div className="scene-app" aria-hidden />
-      <header className="flex items-center justify-between border-b border-line bg-panel px-6 py-3">
-        <div className="flex items-center gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-panel px-6 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] max-md:px-4">
+        <div className="flex items-center gap-4 max-md:gap-2">
           <Link href="/chat" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-192.png" alt="" className="h-7 w-7 rounded-lg" />
@@ -32,7 +32,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </Link>
         </nav>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-6 py-8 max-md:px-4 max-md:py-5">{children}</main>
     </div>
   );
 }

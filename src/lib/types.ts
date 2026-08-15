@@ -40,7 +40,7 @@ export interface ChatMessage {
 
 /** Baris protokol stream JSONL dari /api/chat */
 export type StreamLine =
-  | { type: "meta"; userMessageId: string; conversationTitle: string }
+  | { type: "meta"; userMessageId: string; conversationTitle: string; runId: string }
   | { type: "delta"; text: string }
   | { type: "done"; messageId: string; content: string; status: "completed" | "stopped" | "failed" }
   | { type: "error"; message: string };
