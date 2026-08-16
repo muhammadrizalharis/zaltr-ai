@@ -397,6 +397,9 @@ export function Sidebar({
           </button>
         </div>
         <div className="flex items-center gap-3">
+          <Link href="/chat/search" className="text-xs text-muted hover:text-accent-a">
+            🔍 Cari
+          </Link>
           <Link href="/chat/trash" className="text-xs text-muted hover:text-accent-a">
             🗑 Trash
           </Link>
