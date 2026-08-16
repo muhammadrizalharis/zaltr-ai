@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import { dispatch } from "@/server/providers";
 import type { HistoryItem } from "@/server/providers";
 import { webSearch, formatSearchContext } from "@/server/search";
+import { retrieve, formatKnowledge } from "@/server/knowledge";
 
 const RUNNER_URL = (process.env.ZALTR_RUNNER_URL ?? "").replace(/\/$/, "");
 
@@ -19,6 +20,7 @@ const TOOL_INSTRUCTIONS =
   "(tanpa teks lain):\n" +
   "AKSI: web <kata kunci>\n" +
   "AKSI: kode <python>\n" +
+  "AKSI: catatan <kata kunci>   (cari di dokumen/knowledge base milik pengguna)\n" +
   "Setelah menerima OBSERVASI, lanjutkan berpikir. Bila sudah cukup, tulis " +
   "JAWABAN final untuk pengguna secara normal (TANPA awalan AKSI) dan sebutkan " +
   "sumber bila memakai web.";
@@ -61,6 +63,8 @@ export async function* runAgent(opts: {
   history: HistoryItem[];
   conversationId: string;
   signal: AbortSignal;
+  userId: string;
+  projectId?: string | null;
   maxSteps?: number;
 }): AsyncGenerator<AgentChunk> {
   const maxSteps = opts.maxSteps ?? 4;
@@ -74,6 +78,22 @@ export async function* runAgent(opts: {
     const reply = await callModel(opts.modelId, history, `${base}-${step}`, opts.signal);
     const webM = reply.match(/^\s*AKSI:\s*web\s+(.+)$/im);
     const codeM = reply.match(/^\s*AKSI:\s*kode\s+([\s\S]+)$/im);
+    const kbM = reply.match(/^\s*AKSI:\s*catatan\s+(.+)$/im);
+
+    if (kbM) {
+      const q = kbM[1].trim().slice(0, 200);
+      yield { kind: "progress", text: `\n📚 Mencari di dokumenmu: “${q}”…\n` };
+      let obs: string;
+      try {
+        const hits = await retrieve({ userId: opts.userId, projectId: opts.projectId, query: q });
+        obs = formatKnowledge(hits) || "(tak ada dokumen relevan di knowledge base)";
+      } catch {
+        obs = "(pencarian dokumen gagal)";
+      }
+      history.push({ role: "assistant", content: reply });
+      history.push({ role: "user", content: `OBSERVASI:\n${obs}` });
+      continue;
+    }
 
     if (webM) {
       const q = webM[1].trim().slice(0, 200);

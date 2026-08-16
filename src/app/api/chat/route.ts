@@ -433,6 +433,8 @@ export const POST = guarded(async (req: Request) => {
             history: providerHistory,
             conversationId,
             signal,
+            userId: me.id,
+            projectId: conversation.projectId,
           })) {
             acc += chunk.text;
             send({ type: "delta", text: chunk.text });
