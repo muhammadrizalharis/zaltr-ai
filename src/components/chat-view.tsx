@@ -37,6 +37,7 @@ export function ChatView({
   const [plusOpen, setPlusOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [imageModelId, setImageModelId] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const runIdRef = useRef<string | null>(null);
   // Auto-scroll hanya saat pembaca memang sedang di bawah; kalau ia menggulir
@@ -145,6 +146,7 @@ export function ChatView({
     if ((!text && attachments.length === 0 && !regenerate) || streaming || uploading) return;
     setDraft("");
     setError(null);
+    setSuggestions([]);
     setStickToBottom(true); // kirim pesan = kembali mengikuti bagian bawah
 
     // Upload lampiran dulu -> jadikan markdown di isi pesan (gambar inline,
@@ -245,6 +247,7 @@ export function ChatView({
                 createdAt: new Date().toISOString(),
               },
             ]);
+            void loadSuggestions(convId);
           }
         }
       }
@@ -268,6 +271,20 @@ export function ChatView({
       setStreamText(null);
       abortRef.current = null;
       runIdRef.current = null;
+    }
+  }
+
+  async function loadSuggestions(convId: string) {
+    try {
+      const res = await fetch("/api/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: convId }),
+      });
+      const data = (await res.json()) as { suggestions?: string[] };
+      setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+    } catch {
+      /* saran opsional */
     }
   }
 
@@ -376,6 +393,19 @@ export function ChatView({
       </div>
 
       <div className="relative border-t border-line bg-panel/60 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur">
+        {!streaming && suggestions.length > 0 && (
+          <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap gap-1.5">
+            {suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => void send(s)}
+                className="rounded-full border border-line bg-panel-2 px-3 py-1.5 text-left text-xs text-muted hover:border-accent-a/60 hover:text-ink"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         {!stickToBottom && (
           <button
             onClick={() => {
