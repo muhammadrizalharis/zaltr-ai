@@ -111,6 +111,95 @@ function looksLikeText(buf: Buffer): boolean {
   return sample.length === 0 || printable / sample.length > 0.9;
 }
 
+function nbSource(src: unknown): string {
+  return Array.isArray(src) ? src.join("") : typeof src === "string" ? src : "";
+}
+
+/** Jupyter notebook: ambil sel kode + markdown + output teks ringkas (bukan JSON mentah). */
+function fromIpynb(raw: string): string {
+  let nb: unknown;
+  try {
+    nb = JSON.parse(raw);
+  } catch {
+    return raw; // bukan JSON valid -> kembalikan apa adanya
+  }
+  const cells = (nb as { cells?: unknown[] }).cells;
+  if (!Array.isArray(cells)) return raw;
+  const parts: string[] = [];
+  let n = 0;
+  for (const cell of cells) {
+    const c = cell as { cell_type?: string; source?: unknown; outputs?: unknown[] };
+    const src = nbSource(c.source).trim();
+    if (c.cell_type === "code") {
+      n++;
+      if (src) parts.push(`# ── Sel kode [${n}] ──\n${src}`);
+      const outText: string[] = [];
+      for (const o of Array.isArray(c.outputs) ? c.outputs : []) {
+        const oo = o as {
+          output_type?: string;
+          text?: unknown;
+          ename?: string;
+          evalue?: string;
+          data?: Record<string, unknown>;
+        };
+        if (oo.output_type === "stream") outText.push(nbSource(oo.text));
+        else if (oo.output_type === "error") outText.push(`${oo.ename}: ${oo.evalue}`);
+        else if (oo.data && "text/plain" in oo.data) outText.push(nbSource(oo.data["text/plain"]));
+      }
+      const joined = outText.join("").trim();
+      if (joined) parts.push(`# Output:\n${joined.slice(0, 800)}`);
+    } else if (c.cell_type === "markdown" && src) {
+      parts.push(src);
+    }
+  }
+  return parts.join("\n\n");
+}
+
+function detectSep(line: string): string {
+  let best = ",";
+  let bestCount = -1;
+  for (const s of [",", ";", "\t", "|"]) {
+    const c = line.split(s).length;
+    if (c > bestCount) {
+      bestCount = c;
+      best = s;
+    }
+  }
+  return best;
+}
+
+function inferColType(vals: string[]): string {
+  const nonEmpty = vals.filter((v) => v !== "");
+  if (nonEmpty.length === 0) return "kosong";
+  const num = nonEmpty.filter((v) => /^-?\d+([.,]\d+)?$/.test(v)).length;
+  if (num / nonEmpty.length > 0.8) return "angka";
+  const date = nonEmpty.filter((v) => /^\d{4}-\d{2}-\d{2}|^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(v)).length;
+  if (date / nonEmpty.length > 0.8) return "tanggal";
+  return "teks";
+}
+
+/** CSV/TSV: ringkasan (baris, kolom, tipe) + cuplikan 20 baris — hemat konteks. */
+function summarizeDelimited(raw: string, name: string): string {
+  const lines = raw.replace(/\r\n/g, "\n").split("\n");
+  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+  if (lines.length === 0) return raw;
+  const sep = name.toLowerCase().endsWith(".tsv") ? "\t" : detectSep(lines[0]);
+  const header = lines[0].split(sep).map((c) => c.trim());
+  const dataLines = lines.slice(1);
+  const sample = dataLines.slice(0, 200).map((l) => l.split(sep).map((c) => c.trim()));
+  const cols = header
+    .map((h, i) => `${h || `kolom${i + 1}`} (${inferColType(sample.map((r) => r[i] ?? ""))})`)
+    .join(", ");
+  const preview = [lines[0], ...dataLines.slice(0, 20)].join("\n");
+  return (
+    `Ringkasan tabel "${name}":\n` +
+    `- Perkiraan baris data: ${dataLines.length}\n` +
+    `- Jumlah kolom: ${header.length}\n` +
+    `- Kolom & tipe (perkiraan): ${cols}\n\n` +
+    `20 baris pertama (mentah):\n${preview}`
+  );
+}
+
 /**
  * Ekstrak teks dari buffer file. Return null bila jenis tidak didukung
  * (biner umum) — pemanggil cukup menyebut metadata file ke model.
@@ -130,6 +219,10 @@ export async function extractText(
     else if (ext === "doc" || ext === "ppt" || ext === "xls") {
       // Format Office lama (biner) tidak didukung tanpa lib berat.
       return null;
+    } else if (ext === "ipynb") {
+      text = fromIpynb(buf.toString("utf8"));
+    } else if (ext === "csv" || ext === "tsv") {
+      text = summarizeDelimited(buf.toString("utf8"), name);
     } else if (TEXT_EXT.has(ext) || looksLikeText(buf)) {
       text = buf.toString("utf8");
     }

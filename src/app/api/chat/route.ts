@@ -4,6 +4,15 @@ import { dispatch } from "@/server/providers";
 import { guarded, modelAllowed, requireUser } from "@/server/auth";
 import { getObjectBuffer } from "@/lib/storage";
 import { extractText, fileExt, imageMime, IMAGE_EXT, MAX_CHARS_PER_FILE } from "@/server/extract";
+import {
+  parseDriveLinks,
+  driveConfigured,
+  listFolderTree,
+  fetchDriveFile,
+  driveMeta,
+  formatTree,
+  scoreFile,
+} from "@/server/drive";
 import { webSearch, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
 import { describeImages, isNativeVisionModel } from "@/server/vision";
@@ -194,6 +203,73 @@ export const POST = guarded(async (req: Request) => {
         extras.push(`[Lampiran "${name}" gagal dibaca]`);
       }
     }
+
+    // Google Drive PUBLIK: bila pengguna menempel link folder/berkas, susun
+    // pohon folder + buka berkas yang relevan dgn pertanyaan (on-demand).
+    // Folder dipindai dari SELURUH percakapan (konteks bertahan antar giliran);
+    // link berkas langsung hanya dari pesan terakhir (sekali baca saat ditempel).
+    const convoText = providerHistory.map((m) => m.content).join("\n");
+    const folderRefs = parseDriveLinks(convoText).filter((r) => r.kind === "folder").slice(-2);
+    const fileRefs = parseDriveLinks(content).filter((r) => r.kind === "file").slice(0, 4);
+    if (folderRefs.length > 0 || fileRefs.length > 0) {
+      if (!driveConfigured()) {
+        extras.push(
+          "[Pengguna menempel link Google Drive, tetapi pembacaan Drive belum aktif " +
+            "(admin belum mengisi API key). Beri tahu pengguna dengan sopan.]",
+        );
+        peringatan =
+          "Link Google Drive terdeteksi, tapi fitur baca Drive belum diaktifkan admin.";
+      } else {
+        const MAX_DRIVE_BYTES = 40 * 1024 * 1024;
+        const qWords = content.toLowerCase().split(/[^a-z0-9_]+/).filter((w) => w.length >= 3);
+        const bacaBerkas = async (node: { id: string; name: string; mimeType: string; path: string; size?: number }) => {
+          if (sisaBudget <= 500) return;
+          if (node.size && node.size > MAX_DRIVE_BYTES) {
+            extras.push(`[Berkas Drive "${node.path}" dilewati: terlalu besar (${Math.round(node.size / 1024 / 1024)} MB)]`);
+            return;
+          }
+          try {
+            const { buf, name } = await fetchDriveFile(node);
+            const limit = Math.min(MAX_CHARS_PER_FILE, sisaBudget);
+            const text = await extractText(buf, name, limit);
+            if (text) {
+              sisaBudget -= text.length;
+              extras.push(`=== Isi berkas Drive "${node.path}" ===\n${text}\n=== Akhir berkas ===`);
+            } else {
+              extras.push(`[Berkas Drive "${node.path}" tidak bisa dibaca sebagai teks]`);
+            }
+          } catch {
+            extras.push(`[Berkas Drive "${node.path}" gagal diunduh]`);
+          }
+        };
+        for (const ref of folderRefs) {
+          try {
+            const { root, files, truncated } = await listFolderTree(ref.id, { maxFiles: 300 });
+            const tree = formatTree(root, files, truncated);
+            if (tree.length <= sisaBudget) {
+              extras.push(tree);
+              sisaBudget -= tree.length;
+            }
+            const ranked = files
+              .map((f) => ({ f, s: scoreFile(f, qWords) }))
+              .filter((x) => x.s > 0)
+              .sort((a, b) => b.s - a.s)
+              .slice(0, 6);
+            for (const { f } of ranked) await bacaBerkas(f);
+          } catch (e) {
+            extras.push(`[Gagal membaca folder Drive: ${(e as Error).message}]`);
+          }
+        }
+        for (const ref of fileRefs) {
+          try {
+            await bacaBerkas(await driveMeta(ref.id));
+          } catch (e) {
+            extras.push(`[Gagal membaca berkas Drive: ${(e as Error).message}]`);
+          }
+        }
+      }
+    }
+
     if (extras.length > 0) last.content = `${last.content}\n\n${extras.join("\n\n")}`;
     if (images.length > 0) last.images = images;
 
