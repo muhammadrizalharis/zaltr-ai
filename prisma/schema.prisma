@@ -40,6 +40,7 @@ model User {
   conversations Conversation[]
   memories      Memory[]
   knowledgeSources KnowledgeSource[]
+  assistants    Assistant[]
 }
 
 // Memori antar-percakapan (ala ChatGPT Memory): fakta personal yang diekstrak
@@ -89,6 +90,8 @@ model Conversation {
   trashedAt DateTime?
   projectId String?
   project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  assistantId String?
+  assistant Assistant? @relation(fields: [assistantId], references: [id], onDelete: SetNull)
   userId    String?
   user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime  @default(now())
@@ -97,6 +100,7 @@ model Conversation {
 
   @@index([updatedAt(sort: Desc)])
   @@index([projectId])
+  @@index([assistantId])
   @@index([userId])
 }
 
@@ -152,4 +156,20 @@ model KnowledgeChunk {
   @@index([sourceId])
   @@index([userId])
   @@index([projectId])
+}
+
+// ---- Custom assistant (ala ChatGPT GPTs): instruksi + model preset ----
+model Assistant {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  instructions String?
+  model        String? // id model preset (mis. copilot:claude-sonnet-4.6)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  conversations Conversation[]
+
+  @@index([userId])
 }

@@ -103,7 +103,7 @@ export const POST = guarded(async (req: Request) => {
 
   const conversation = await db.conversation.findFirst({
     where: { id: conversationId, userId: me.id, trashedAt: null },
-    select: { id: true, title: true, projectId: true },
+    select: { id: true, title: true, projectId: true, assistantId: true },
   });
   if (!conversation) {
     return Response.json({ error: "Conversation tidak ditemukan" }, { status: 404 });
@@ -340,6 +340,20 @@ export const POST = guarded(async (req: Request) => {
       });
       if (proj?.instructions?.trim()) {
         preamble.push(`Instruksi khusus untuk project ini (patuhi):\n${proj.instructions.trim().slice(0, 4_000)}`);
+      }
+    }
+    // Custom assistant (ala GPTs): instruksi khusus — DIBINGKAI sebagai instruksi
+    // pengguna yang harus dipatuhi (BUKAN "berperan sebagai persona lain", yang
+    // ditolak system prompt karena melindungi identitas).
+    if (!isFree && conversation.assistantId) {
+      const asst = await db.assistant.findUnique({
+        where: { id: conversation.assistantId },
+        select: { name: true, instructions: true },
+      });
+      if (asst?.instructions?.trim()) {
+        preamble.push(
+          `Instruksi khusus dari pengguna untuk asisten "${asst.name}" (patuhi):\n${asst.instructions.trim().slice(0, 8_000)}`,
+        );
       }
     }
     const mem = isFree ? null : await memoryContext(me.id);

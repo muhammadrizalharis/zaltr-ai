@@ -400,6 +400,9 @@ export function Sidebar({
           <Link href="/chat/search" className="text-xs text-muted hover:text-accent-a">
             🔍 Cari
           </Link>
+          <Link href="/chat/assistants" className="text-xs text-muted hover:text-accent-a">
+            🤖 Asisten
+          </Link>
           <Link href="/chat/trash" className="text-xs text-muted hover:text-accent-a">
             🗑 Trash
           </Link>

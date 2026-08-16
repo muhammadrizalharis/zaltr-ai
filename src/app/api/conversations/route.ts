@@ -17,6 +17,7 @@ export const GET = guarded(async () => {
 const createSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
   projectId: z.string().min(1).nullable().optional(),
+  assistantId: z.string().min(1).nullable().optional(),
 });
 
 export const POST = guarded(async (req: Request) => {
@@ -33,10 +34,20 @@ export const POST = guarded(async (req: Request) => {
       return NextResponse.json({ error: "Project tidak ditemukan" }, { status: 404 });
     }
   }
+  if (body.data.assistantId) {
+    const assistant = await db.assistant.findFirst({
+      where: { id: body.data.assistantId, userId: me.id },
+      select: { id: true },
+    });
+    if (!assistant) {
+      return NextResponse.json({ error: "Assistant tidak ditemukan" }, { status: 404 });
+    }
+  }
   const conversation = await db.conversation.create({
     data: {
       title: body.data.title ?? "Chat baru",
       projectId: body.data.projectId ?? null,
+      assistantId: body.data.assistantId ?? null,
       userId: me.id,
     },
     select: { id: true, title: true, pinned: true, projectId: true, updatedAt: true },
