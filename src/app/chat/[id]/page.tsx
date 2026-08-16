@@ -29,5 +29,5 @@ export default async function ConversationPage({
     createdAt: m.createdAt.toISOString(),
   }));
 
-  return <ChatView conversationId={conversation.id} initialMessages={initialMessages} />;
+  return <ChatView key={conversation.id} conversationId={conversation.id} initialMessages={initialMessages} />;
 }

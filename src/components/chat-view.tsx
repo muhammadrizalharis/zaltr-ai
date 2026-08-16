@@ -47,6 +47,8 @@ export function ChatView({
   const [canvasInstruction, setCanvasInstruction] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const runIdRef = useRef<string | null>(null);
+  // Naik tiap "chat baru" -> callback stream lama diabaikan (tak mengotori chat baru).
+  const sessionRef = useRef(0);
   // Auto-scroll hanya saat pembaca memang sedang di bawah; kalau ia menggulir
   // ke atas untuk membaca, jangan diseret balik walau jawaban masih mengalir.
   const [stickToBottom, setStickToBottom] = useState(true);
@@ -57,6 +59,28 @@ export function ChatView({
   useEffect(() => setModel(loadSavedModel()), []);
   useEffect(() => {
     setSttOk("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+  }, []);
+
+  // "+ Chat baru": reset tampilan ke chat kosong. Dipakai karena URL chat diubah
+  // via replaceState (router Next bisa mengira masih di /chat -> Link jadi no-op).
+  useEffect(() => {
+    function onNewChat() {
+      sessionRef.current += 1;
+      abortRef.current?.abort();
+      abortRef.current = null;
+      runIdRef.current = null;
+      setConversationId(null);
+      setMessages([]);
+      setStreamText(null);
+      setDraft("");
+      setError(null);
+      setSuggestions([]);
+      setAttachments([]);
+      window.history.replaceState(null, "", "/chat");
+      textareaRef.current?.focus();
+    }
+    window.addEventListener("zaltr:new-chat", onNewChat);
+    return () => window.removeEventListener("zaltr:new-chat", onNewChat);
   }, []);
   // Freemium: bila model tersimpan terkunci/tidak tersedia utk akun ini,
   // otomatis pindah ke model pertama yang bisa dipakai (mis. Calyzr Free).
@@ -158,6 +182,7 @@ export function ChatView({
     setError(null);
     setSuggestions([]);
     setStickToBottom(true); // kirim pesan = kembali mengikuti bagian bawah
+    const mySession = sessionRef.current;
 
     // Upload lampiran dulu -> jadikan markdown di isi pesan (gambar inline,
     // dokumen sebagai link; server mengekstrak isinya untuk model).
@@ -234,6 +259,7 @@ export function ChatView({
         for (const raw of lines) {
           if (!raw.trim()) continue;
           const line = JSON.parse(raw) as StreamLine;
+          if (sessionRef.current !== mySession) continue; // sesi lama (chat baru ditekan)
           if (line.type === "meta") {
             runIdRef.current = line.runId;
             notifyConversationsChanged();
@@ -263,7 +289,9 @@ export function ChatView({
         }
       }
     } catch (err) {
-      if (!controller.signal.aborted) {
+      if (sessionRef.current !== mySession) {
+        // Sesi lama (pengguna menekan "chat baru") — abaikan.
+      } else if (!controller.signal.aborted) {
         setError(err instanceof Error ? err.message : "Gagal menghubungi server");
       } else if (acc) {
         setMessages((prev) => [
@@ -279,9 +307,11 @@ export function ChatView({
         ]);
       }
     } finally {
-      setStreamText(null);
-      abortRef.current = null;
-      runIdRef.current = null;
+      if (sessionRef.current === mySession) {
+        setStreamText(null);
+        abortRef.current = null;
+        runIdRef.current = null;
+      }
     }
   }
 
@@ -683,8 +713,10 @@ export function ChatView({
           {streaming ? (
             <button
               onClick={stop}
-              className="h-10 shrink-0 rounded-xl border border-red-500/50 bg-red-500/10 px-4 text-sm font-medium text-red-300 hover:bg-red-500/20"
+              title="Batalkan jawaban"
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-red-500/50 bg-red-500/10 px-4 text-sm font-medium text-red-300 hover:bg-red-500/20"
             >
+              <span className="inline-block h-3 w-3 rounded-[2px] bg-red-400" />
               Stop
             </button>
           ) : (

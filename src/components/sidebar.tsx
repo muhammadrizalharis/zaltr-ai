@@ -204,6 +204,7 @@ export function Sidebar({
       <Link
         href="/chat"
         title="Chat baru"
+        onClick={() => window.dispatchEvent(new Event("zaltr:new-chat"))}
         className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-lg text-accent-a hover:border-accent-a/60"
       >
         +
@@ -257,6 +258,7 @@ export function Sidebar({
       <div className="px-3 pb-2">
         <Link
           href="/chat"
+          onClick={() => window.dispatchEvent(new Event("zaltr:new-chat"))}
           className="flex w-full items-center gap-2 rounded-xl border border-line bg-panel-2 px-3 py-2 text-sm font-medium hover:border-accent-a/60"
         >
           <span className="text-accent-a">+</span> Chat baru
