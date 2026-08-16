@@ -38,6 +38,9 @@ export function ChatView({
   const [dragging, setDragging] = useState(false);
   const [imageModelId, setImageModelId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [listening, setListening] = useState(false);
+  const [sttOk, setSttOk] = useState(false);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const runIdRef = useRef<string | null>(null);
   // Auto-scroll hanya saat pembaca memang sedang di bawah; kalau ia menggulir
@@ -48,6 +51,9 @@ export function ChatView({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setModel(loadSavedModel()), []);
+  useEffect(() => {
+    setSttOk("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+  }, []);
   // Freemium: bila model tersimpan terkunci/tidak tersedia utk akun ini,
   // otomatis pindah ke model pertama yang bisa dipakai (mis. Calyzr Free).
   useEffect(() => {
@@ -286,6 +292,41 @@ export function ChatView({
     } catch {
       /* saran opsional */
     }
+  }
+
+  function toggleMic() {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.lang = "id-ID";
+    rec.continuous = true;
+    rec.interimResults = true;
+    let base = draft;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      let interim = "";
+      let final = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript as string;
+        if (e.results[i].isFinal) final += t;
+        else interim += t;
+      }
+      if (final) base = `${base} ${final}`.trim();
+      setDraft(`${base} ${interim}`.trim());
+    };
+    rec.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setListening(true);
   }
 
   function stop() {
@@ -588,6 +629,19 @@ export function ChatView({
               className="max-h-52 w-full resize-none bg-transparent px-3 py-2.5 text-base outline-none placeholder:text-muted md:text-sm"
             />
           </div>
+          {sttOk && !streaming && (
+            <button
+              onClick={toggleMic}
+              title={listening ? "Berhenti merekam" : "Bicara (suara jadi teks)"}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                listening
+                  ? "animate-pulse border-accent-a/70 bg-accent-a/10 text-accent-a"
+                  : "border-line bg-panel-2 text-muted hover:text-ink"
+              }`}
+            >
+              🎤
+            </button>
+          )}
           {streaming ? (
             <button
               onClick={stop}
@@ -725,6 +779,8 @@ function Bubble({
 }) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [ttsOk, setTtsOk] = useState(false);
   // Pesan user dengan lampiran berisi markdown gambar/link -> render markdown
   // supaya lampiran tampil; teks murni tetap plain (tanpa formatting tak sengaja).
   const hasAttachment = isUser && message.content.includes("](/api/files/");
@@ -733,6 +789,31 @@ function Bubble({
     await navigator.clipboard.writeText(message.content).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  useEffect(() => setTtsOk("speechSynthesis" in window), []);
+
+  function speak() {
+    if (!("speechSynthesis" in window)) return;
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+    const plain = message.content
+      .replace(/```[\s\S]*?```/g, " (blok kode) ")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replace(/[#*_>|]/g, "")
+      .slice(0, 4000);
+    const u = new SpeechSynthesisUtterance(plain);
+    u.lang = "id-ID";
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+    setSpeaking(true);
   }
 
   return (
@@ -768,6 +849,15 @@ function Bubble({
         >
           {copied ? "Tersalin ✓" : "Salin"}
         </button>
+        {!isUser && ttsOk && (
+          <button
+            onClick={speak}
+            className="text-[11px] text-muted hover:text-accent-a"
+            title="Bacakan jawaban"
+          >
+            {speaking ? "■ Stop" : "🔊 Bacakan"}
+          </button>
+        )}
         {isLastAssistant && onRegenerate && (
           <button
             onClick={onRegenerate}
