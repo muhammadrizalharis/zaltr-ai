@@ -107,6 +107,15 @@ function isPythonBlock(node: React.ReactNode): boolean {
   return false;
 }
 
+/** Blok yang bisa dipratinjau langsung (artifact) di iframe ter-sandbox. */
+function isPreviewBlock(node: React.ReactNode): boolean {
+  if (node && typeof node === "object" && "props" in node) {
+    const cls = (node as { props: { className?: string } }).props.className ?? "";
+    return /language-(html|htm|svg|xml)\b/.test(cls);
+  }
+  return false;
+}
+
 /**
  * Blok kode dengan tombol Salin; khusus Python ada tombol Jalankan
  * (code interpreter — dieksekusi di container runner terisolasi).
@@ -114,6 +123,7 @@ function isPythonBlock(node: React.ReactNode): boolean {
 function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) {
   const [copied, setCopied] = useState(false);
   const [running, setRunning] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [result, setResult] = useState<{
     stdout: string;
     stderr: string;
@@ -123,6 +133,7 @@ function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) 
 
   const inner = children as React.ReactNode;
   const python = isPythonBlock(Array.isArray(inner) ? inner[0] : inner);
+  const previewable = isPreviewBlock(Array.isArray(inner) ? inner[0] : inner);
 
   async function copy() {
     await navigator.clipboard.writeText(extractText(inner)).catch(() => {});
@@ -166,6 +177,14 @@ function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) 
             {running ? "Menjalankan…" : "▶ Jalankan"}
           </button>
         )}
+        {previewable && (
+          <button
+            onClick={() => setShowPreview((v) => !v)}
+            className="rounded-md border border-line bg-panel px-2 py-0.5 text-[11px] text-muted hover:text-accent-a"
+          >
+            {showPreview ? "✕ Tutup pratinjau" : "▶ Pratinjau"}
+          </button>
+        )}
         <button
           onClick={() => void copy()}
           className="rounded-md border border-line bg-panel px-2 py-0.5 text-[11px] text-muted hover:text-ink"
@@ -179,6 +198,14 @@ function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) 
       >
         {children}
       </pre>
+      {previewable && showPreview && (
+        <iframe
+          title="Pratinjau artifact"
+          sandbox="allow-scripts allow-popups"
+          className="mt-1 h-96 w-full rounded-xl border border-line bg-white"
+          srcDoc={extractText(inner)}
+        />
+      )}
       {result && (
         <div className="mt-1 rounded-xl border border-line bg-panel-2 p-3 font-mono text-[12px]">
           <p className="mb-1 text-[10px] uppercase tracking-wider text-muted">
