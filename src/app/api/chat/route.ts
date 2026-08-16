@@ -25,6 +25,7 @@ import { retrieve, formatKnowledge, countIndexed } from "@/server/knowledge";
 import { runAgent } from "@/server/agent";
 import { webSearch, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
+import { embedMessage } from "@/server/msgsearch";
 import { describeImages, isNativeVisionModel } from "@/server/vision";
 import { copilotSupportsVision } from "@/server/providers/copilot";
 import type { AttachedImage, HistoryItem } from "@/server/providers/contract";
@@ -152,6 +153,7 @@ export const POST = guarded(async (req: Request) => {
     userMessageId = userMessage.id;
     // Memori antar-percakapan: ekstrak fakta personal (async, gratis via Ollama).
     void extractMemories(me.id, content);
+    void embedMessage(userMessageId, content);
     // Judul ringkas dibuat paralel dengan jawaban model; hasilnya dipastikan
     // tersimpan sebelum stream ditutup (judul potongan di atas jadi cadangan).
     if (conversation.title === "Chat baru") judulPromise = generateTitle(content);
@@ -504,6 +506,7 @@ export const POST = guarded(async (req: Request) => {
         },
         select: { id: true },
       });
+      if (status === "completed" && acc.trim()) void embedMessage(assistant.id, acc);
       await db.conversation.update({
         where: { id: conversationId },
         data: { updatedAt: new Date() },

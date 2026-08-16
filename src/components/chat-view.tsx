@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { ModelPicker, loadSavedModel, DEFAULT_MODEL } from "@/components/model-picker";
+import { CanvasEditor } from "@/components/canvas-editor";
 import { notifyConversationsChanged } from "@/components/sidebar";
 import type { ChatMessage, ModelDescriptor, StreamLine } from "@/lib/types";
 import { MODE_PARAFRASE, type ModeParafrase } from "@/server/paraphrase";
@@ -717,11 +718,9 @@ export function ChatView({
                 ✕
               </button>
             </div>
-            <textarea
+            <CanvasEditor
               value={canvas.content}
-              onChange={(e) => setCanvas((c) => ({ ...c, content: e.target.value }))}
-              spellCheck={false}
-              className="flex-1 resize-none bg-bg px-4 py-3 font-mono text-[13px] leading-relaxed outline-none"
+              onChange={(v) => setCanvas((c) => ({ ...c, content: v }))}
             />
             <div className="space-y-2 border-t border-line p-3">
               <input

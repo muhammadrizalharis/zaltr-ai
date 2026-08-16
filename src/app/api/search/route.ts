@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { guarded, requireUser } from "@/server/auth";
+import { semanticSearch } from "@/server/msgsearch";
 
 export const runtime = "nodejs";
 
@@ -12,15 +13,13 @@ function snippet(text: string, q: string): string {
   return (start > 0 ? "…" : "") + text.slice(start, end).trim() + (end < text.length ? "…" : "");
 }
 
-/** GET /api/search?q= : cari percakapan milik user berdasarkan judul + isi pesan. */
-export const GET = guarded(async (req: Request) => {
-  const me = await requireUser();
-  const q = (new URL(req.url).searchParams.get("q") ?? "").trim();
-  if (q.length < 2) return Response.json({ results: [] });
+type Result = { id: string; title: string; snippet: string };
 
+/** Pencarian keyword (judul + isi pesan) — juga menjangkau pesan lama tanpa embedding. */
+async function keywordSearch(userId: string, q: string): Promise<Result[]> {
   const convos = await db.conversation.findMany({
     where: {
-      userId: me.id,
+      userId,
       trashedAt: null,
       OR: [
         { title: { contains: q, mode: "insensitive" } },
@@ -30,10 +29,9 @@ export const GET = guarded(async (req: Request) => {
     select: {
       id: true,
       title: true,
-      updatedAt: true,
       messages: {
         where: { content: { contains: q, mode: "insensitive" } },
-        select: { content: true, role: true },
+        select: { content: true },
         take: 1,
         orderBy: { createdAt: "desc" },
       },
@@ -41,12 +39,35 @@ export const GET = guarded(async (req: Request) => {
     orderBy: { updatedAt: "desc" },
     take: 30,
   });
-
-  const results = convos.map((c) => ({
+  return convos.map((c) => ({
     id: c.id,
     title: c.title,
-    updatedAt: c.updatedAt,
     snippet: c.messages[0] ? snippet(c.messages[0].content, q) : "",
   }));
-  return Response.json({ results });
+}
+
+/** GET /api/search?q= : HYBRID — semantik (embedding) lalu keyword, dedupe. */
+export const GET = guarded(async (req: Request) => {
+  const me = await requireUser();
+  const q = (new URL(req.url).searchParams.get("q") ?? "").trim();
+  if (q.length < 2) return Response.json({ results: [] });
+
+  const [sem, kw] = await Promise.all([
+    semanticSearch(me.id, q).catch(() => []),
+    keywordSearch(me.id, q),
+  ]);
+
+  const seen = new Set<string>();
+  const results: Result[] = [];
+  for (const s of sem) {
+    if (seen.has(s.conversationId)) continue;
+    seen.add(s.conversationId);
+    results.push({ id: s.conversationId, title: s.title, snippet: s.snippet });
+  }
+  for (const k of kw) {
+    if (seen.has(k.id)) continue;
+    seen.add(k.id);
+    results.push(k);
+  }
+  return Response.json({ results: results.slice(0, 30) });
 });

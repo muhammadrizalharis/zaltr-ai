@@ -116,6 +116,8 @@ model Message {
   model          String?
   provider       String?
   status         String       @default("completed") // completed | stopped | failed
+  // Embedding utk pencarian semantik riwayat (nullable; diisi async pasca-simpan).
+  embedding      Unsupported("vector(1024)")?
   createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
