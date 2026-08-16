@@ -332,6 +332,16 @@ export const POST = guarded(async (req: Request) => {
     if (!isFree && me.customInstructions?.trim()) {
       preamble.push(`Instruksi pribadi dari pengguna (patuhi):\n${me.customInstructions.trim().slice(0, 2_000)}`);
     }
+    // Instruksi khusus project (ala Claude Projects) — hanya untuk chat di dalam project.
+    if (!isFree && conversation.projectId) {
+      const proj = await db.project.findUnique({
+        where: { id: conversation.projectId },
+        select: { instructions: true },
+      });
+      if (proj?.instructions?.trim()) {
+        preamble.push(`Instruksi khusus untuk project ini (patuhi):\n${proj.instructions.trim().slice(0, 4_000)}`);
+      }
+    }
     const mem = isFree ? null : await memoryContext(me.id);
     if (mem) preamble.push(mem);
 

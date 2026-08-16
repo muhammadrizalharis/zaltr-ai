@@ -11,6 +11,7 @@ export const GET = guarded(async () => {
     select: {
       id: true,
       name: true,
+      instructions: true,
       _count: { select: { conversations: { where: { trashedAt: null } } } },
     },
   });

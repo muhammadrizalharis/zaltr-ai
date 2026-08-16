@@ -68,6 +68,8 @@ model Session {
 model Project {
   id            String         @id @default(cuid())
   name          String
+  // Instruksi khusus project (ala Claude Projects) — disuntik ke chat dalam project ini.
+  instructions  String?
   userId        String?
   user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime       @default(now())
