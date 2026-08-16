@@ -129,6 +129,8 @@ model KnowledgeSource {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectId  String?
   project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assistantId String?
+  assistant  Assistant? @relation(fields: [assistantId], references: [id], onDelete: Cascade)
   kind       String // upload | drive | text
   name       String
   ref        String? // drive fileId / storage key / null
@@ -143,6 +145,7 @@ model KnowledgeSource {
 
   @@index([userId])
   @@index([projectId])
+  @@index([assistantId])
 }
 
 model KnowledgeChunk {
@@ -151,6 +154,7 @@ model KnowledgeChunk {
   source    KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   userId    String // denormalisasi utk filter cepat
   projectId String?
+  assistantId String?
   idx       Int
   content   String
   embedding Unsupported("vector(1024)")
@@ -159,6 +163,7 @@ model KnowledgeChunk {
   @@index([sourceId])
   @@index([userId])
   @@index([projectId])
+  @@index([assistantId])
 }
 
 // ---- Custom assistant (ala ChatGPT GPTs): instruksi + model preset ----
@@ -173,6 +178,7 @@ model Assistant {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   conversations Conversation[]
+  knowledgeSources KnowledgeSource[]
 
   @@index([userId])
 }

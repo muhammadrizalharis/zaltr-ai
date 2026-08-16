@@ -376,10 +376,11 @@ export const POST = guarded(async (req: Request) => {
     // Hanya jika user punya sumber terindeks (hindari embedding query sia-sia).
     if (!isFree) {
       try {
-        if (await countIndexed(me.id, conversation.projectId)) {
+        if (await countIndexed(me.id, conversation.projectId, conversation.assistantId)) {
           const kb = await retrieve({
             userId: me.id,
             projectId: conversation.projectId,
+            assistantId: conversation.assistantId,
             query: content,
             topK: 6,
           });

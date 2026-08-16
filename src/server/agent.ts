@@ -11,6 +11,15 @@ import { dispatch } from "@/server/providers";
 import type { HistoryItem } from "@/server/providers";
 import { webSearch, formatSearchContext } from "@/server/search";
 import { retrieve, formatKnowledge } from "@/server/knowledge";
+import {
+  parseDriveLinks,
+  driveConfigured,
+  listFolderTree,
+  fetchDriveFile,
+  driveMeta,
+  formatTree,
+} from "@/server/drive";
+import { extractText, fileExt, IMAGE_EXT, isBinarySkip, needsFullDownload } from "@/server/extract";
 
 const RUNNER_URL = (process.env.ZALTR_RUNNER_URL ?? "").replace(/\/$/, "");
 
@@ -21,6 +30,7 @@ const TOOL_INSTRUCTIONS =
   "AKSI: web <kata kunci>\n" +
   "AKSI: kode <python>\n" +
   "AKSI: catatan <kata kunci>   (cari di dokumen/knowledge base milik pengguna)\n" +
+  "AKSI: drive <link>           (baca folder/berkas Google Drive publik)\n" +
   "Setelah menerima OBSERVASI, lanjutkan berpikir. Bila sudah cukup, tulis " +
   "JAWABAN final untuk pengguna secara normal (TANPA awalan AKSI) dan sebutkan " +
   "sumber bila memakai web.";
@@ -56,6 +66,44 @@ async function runCode(code: string): Promise<string> {
   }
 }
 
+/** Baca folder/berkas Google Drive publik -> teks ringkas untuk observasi agen. */
+async function readDrive(link: string): Promise<string> {
+  if (!driveConfigured()) return "(baca Drive belum aktif)";
+  const refs = parseDriveLinks(link);
+  if (refs.length === 0) return "(bukan link Google Drive yang valid)";
+  const parts: string[] = [];
+  const ref = refs[0];
+  try {
+    if (ref.kind === "folder") {
+      const { root, files, truncated } = await listFolderTree(ref.id, { maxFiles: 200 });
+      parts.push(formatTree(root, files, truncated));
+      let read = 0;
+      for (const f of files) {
+        if (read >= 3) break;
+        if (isBinarySkip(f.name) || IMAGE_EXT.has(fileExt(f.name)) || needsFullDownload(f.name)) continue;
+        try {
+          const { buf, name, partial } = await fetchDriveFile(f, 2 * 1024 * 1024);
+          const text = await extractText(buf, name, 8_000, { partial, sourceBytes: f.size });
+          if (text) {
+            parts.push(`=== ${f.path} ===\n${text}`);
+            read++;
+          }
+        } catch {
+          /* lewati berkas gagal */
+        }
+      }
+    } else {
+      const meta = await driveMeta(ref.id);
+      const { buf, name, partial } = await fetchDriveFile(meta, 4 * 1024 * 1024);
+      const text = await extractText(buf, name, 12_000, { partial, sourceBytes: meta.size });
+      parts.push(text ? `=== ${name} ===\n${text}` : "(berkas tak terbaca sebagai teks)");
+    }
+  } catch (e) {
+    return `(gagal baca Drive: ${(e as Error).message.slice(0, 120)})`;
+  }
+  return parts.join("\n\n").slice(0, 12_000) || "(kosong)";
+}
+
 export type AgentChunk = { kind: "progress" | "final"; text: string };
 
 export async function* runAgent(opts: {
@@ -79,6 +127,16 @@ export async function* runAgent(opts: {
     const webM = reply.match(/^\s*AKSI:\s*web\s+(.+)$/im);
     const codeM = reply.match(/^\s*AKSI:\s*kode\s+([\s\S]+)$/im);
     const kbM = reply.match(/^\s*AKSI:\s*catatan\s+(.+)$/im);
+    const driveM = reply.match(/^\s*AKSI:\s*drive\s+(.+)$/im);
+
+    if (driveM) {
+      const link = driveM[1].trim();
+      yield { kind: "progress", text: `\n📁 Membaca Google Drive…\n` };
+      const obs = await readDrive(link);
+      history.push({ role: "assistant", content: reply });
+      history.push({ role: "user", content: `OBSERVASI:\n${obs}` });
+      continue;
+    }
 
     if (kbM) {
       const q = kbM[1].trim().slice(0, 200);

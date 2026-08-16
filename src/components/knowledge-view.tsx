@@ -10,10 +10,12 @@ type Source = {
   chunkCount: number;
   bytes: number;
   projectId: string | null;
+  assistantId: string | null;
   error: string | null;
   createdAt: string;
 };
 type Project = { id: string; name: string; instructions: string | null };
+type Assistant = { id: string; name: string };
 
 type Mode = "text" | "drive" | "upload";
 
@@ -23,8 +25,9 @@ type Mode = "text" | "drive" | "upload";
  */
 export function KnowledgeView() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
-  const [scope, setScope] = useState<string>("global"); // "global" | projectId
+  const [scope, setScope] = useState<string>("global"); // "global" | "p:<id>" | "a:<id>"
   const [mode, setMode] = useState<Mode>("text");
   const [name, setName] = useState("");
   const [text, setText] = useState("");
@@ -35,14 +38,17 @@ export function KnowledgeView() {
   const [instr, setInstr] = useState("");
   const [savingInstr, setSavingInstr] = useState(false);
 
-  const projectId = scope === "global" ? null : scope;
+  const projectId = scope.startsWith("p:") ? scope.slice(2) : null;
+  const assistantId = scope.startsWith("a:") ? scope.slice(2) : null;
 
   async function loadAll() {
-    const [p, k] = await Promise.all([
+    const [p, a, k] = await Promise.all([
       fetch("/api/projects").then((r) => r.json()),
+      fetch("/api/assistants").then((r) => r.json()),
       fetch("/api/knowledge").then((r) => r.json()),
     ]);
     setProjects(p.projects ?? []);
+    setAssistants(a.assistants ?? []);
     setSources(k.sources ?? []);
   }
 
@@ -56,8 +62,15 @@ export function KnowledgeView() {
   }, [projectId, projects]);
 
   const visible = useMemo(
-    () => sources.filter((s) => (projectId ? s.projectId === projectId : s.projectId === null)),
-    [sources, projectId],
+    () =>
+      sources.filter((s) =>
+        projectId
+          ? s.projectId === projectId
+          : assistantId
+            ? s.assistantId === assistantId
+            : s.projectId === null && s.assistantId === null,
+      ),
+    [sources, projectId, assistantId],
   );
 
   async function add() {
@@ -67,10 +80,10 @@ export function KnowledgeView() {
       let body: Record<string, unknown>;
       if (mode === "text") {
         if (!text.trim()) throw new Error("Teks kosong");
-        body = { kind: "text", name: name.trim() || "Catatan", content: text, projectId };
+        body = { kind: "text", name: name.trim() || "Catatan", content: text, projectId, assistantId };
       } else if (mode === "drive") {
         if (!link.trim()) throw new Error("Tempel link Google Drive");
-        body = { kind: "drive", link: link.trim(), projectId };
+        body = { kind: "drive", link: link.trim(), projectId, assistantId };
       } else {
         if (!file) throw new Error("Pilih berkas");
         const fd = new FormData();
@@ -78,7 +91,7 @@ export function KnowledgeView() {
         const up = await fetch("/api/uploads", { method: "POST", body: fd }).then((r) => r.json());
         const key = up.files?.[0]?.key;
         if (!key) throw new Error("Unggah gagal");
-        body = { kind: "upload", key, projectId };
+        body = { kind: "upload", key, projectId, assistantId };
       }
       const res = await fetch("/api/knowledge", {
         method: "POST",
@@ -140,8 +153,13 @@ export function KnowledgeView() {
         >
           <option value="global">🌐 Global (semua chat)</option>
           {projects.map((p) => (
-            <option key={p.id} value={p.id}>
+            <option key={p.id} value={`p:${p.id}`}>
               🗂️ {p.name}
+            </option>
+          ))}
+          {assistants.map((a) => (
+            <option key={a.id} value={`a:${a.id}`}>
+              🤖 {a.name}
             </option>
           ))}
         </select>
@@ -239,7 +257,7 @@ export function KnowledgeView() {
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">
-          Sumber {projectId ? "project ini" : "global"} ({visible.length})
+          Sumber {projectId ? "project ini" : assistantId ? "asisten ini" : "global"} ({visible.length})
         </h2>
         {visible.length === 0 ? (
           <p className="rounded-xl border border-line bg-panel px-3 py-3 text-sm text-muted">

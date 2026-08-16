@@ -18,17 +18,17 @@ export const runtime = "nodejs";
 const MAX_INGEST_CHARS = 2_000_000;
 const MAX_DRIVE_FILES = 50;
 
-/** GET: daftar sumber knowledge milik user (opsional filter ?projectId=). */
-export const GET = guarded(async (req: Request) => {
+/** GET: daftar sumber knowledge milik user (semua cakupan). */
+export const GET = guarded(async () => {
   const me = await requireUser();
-  const pid = new URL(req.url).searchParams.get("projectId");
-  const sources = await listSources(me.id, pid ?? undefined);
+  const sources = await listSources(me.id);
   return Response.json({ sources });
 });
 
 const schema = z.object({
   kind: z.enum(["text", "upload", "drive"]),
   projectId: z.string().min(1).nullable().optional(),
+  assistantId: z.string().min(1).nullable().optional(),
   name: z.string().trim().max(200).optional(),
   content: z.string().optional(),
   key: z.string().optional(),
@@ -40,17 +40,21 @@ export const POST = guarded(async (req: Request) => {
   const me = await requireUser();
   const body = schema.safeParse(await req.json().catch(() => ({})));
   if (!body.success) return Response.json({ error: "Payload tidak valid" }, { status: 400 });
-  const { kind, projectId } = body.data;
+  const { kind, projectId, assistantId } = body.data;
 
   if (projectId) {
     const p = await db.project.findFirst({ where: { id: projectId, userId: me.id }, select: { id: true } });
     if (!p) return Response.json({ error: "Project tidak ditemukan" }, { status: 404 });
   }
+  if (assistantId) {
+    const a = await db.assistant.findFirst({ where: { id: assistantId, userId: me.id }, select: { id: true } });
+    if (!a) return Response.json({ error: "Assistant tidak ditemukan" }, { status: 404 });
+  }
 
   if (kind === "text") {
     const text = (body.data.content ?? "").slice(0, MAX_INGEST_CHARS);
     if (!text.trim()) return Response.json({ error: "Teks kosong" }, { status: 400 });
-    const r = await ingestSource({ userId: me.id, projectId, kind: "text", name: body.data.name || "Catatan", text });
+    const r = await ingestSource({ userId: me.id, projectId, assistantId, kind: "text", name: body.data.name || "Catatan", text });
     return Response.json({ sources: [{ name: body.data.name || "Catatan", chunkCount: r.chunkCount }] }, { status: 201 });
   }
 
@@ -61,7 +65,7 @@ export const POST = guarded(async (req: Request) => {
     const buf = await getObjectBuffer(key);
     const text = await extractText(buf, name, MAX_INGEST_CHARS);
     if (!text) return Response.json({ error: "Berkas tidak bisa dibaca sebagai teks" }, { status: 422 });
-    const r = await ingestSource({ userId: me.id, projectId, kind: "upload", name, ref: key, text, bytes: buf.length });
+    const r = await ingestSource({ userId: me.id, projectId, assistantId, kind: "upload", name, ref: key, text, bytes: buf.length });
     return Response.json({ sources: [{ name, chunkCount: r.chunkCount }] }, { status: 201 });
   }
 
@@ -95,7 +99,7 @@ export const POST = guarded(async (req: Request) => {
       const { buf, name, partial } = await fetchDriveFile(node, fullOnly ? undefined : 4 * 1024 * 1024);
       const text = await extractText(buf, name, MAX_INGEST_CHARS, { partial, sourceBytes: node.size });
       if (!text) continue;
-      const r = await ingestSource({ userId: me.id, projectId, kind: "drive", name: node.path, ref: node.id, text, bytes: node.size });
+      const r = await ingestSource({ userId: me.id, projectId, assistantId, kind: "drive", name: node.path, ref: node.id, text, bytes: node.size });
       results.push({ name: node.path, chunkCount: r.chunkCount });
     } catch {
       /* lewati berkas yang gagal diindeks */

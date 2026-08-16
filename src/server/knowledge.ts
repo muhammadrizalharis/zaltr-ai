@@ -34,6 +34,7 @@ export function chunkText(text: string, size = 1200, overlap = 200): string[] {
 export type IngestInput = {
   userId: string;
   projectId?: string | null;
+  assistantId?: string | null;
   kind: "upload" | "drive" | "text";
   name: string;
   ref?: string | null;
@@ -47,6 +48,7 @@ export async function ingestSource(input: IngestInput): Promise<{ sourceId: stri
     data: {
       userId: input.userId,
       projectId: input.projectId ?? null,
+      assistantId: input.assistantId ?? null,
       kind: input.kind,
       name: input.name.slice(0, 200),
       ref: input.ref ?? null,
@@ -66,8 +68,8 @@ export async function ingestSource(input: IngestInput): Promise<{ sourceId: stri
       for (let j = 0; j < batch.length; j++) {
         const vecStr = `[${vecs[j].join(",")}]`;
         await db.$executeRaw`
-          INSERT INTO "KnowledgeChunk" ("id", "sourceId", "userId", "projectId", "idx", "content", "embedding", "createdAt")
-          VALUES (${randomUUID()}, ${source.id}, ${input.userId}, ${input.projectId ?? null}, ${idx}, ${batch[j]}, ${vecStr}::vector, now())
+          INSERT INTO "KnowledgeChunk" ("id", "sourceId", "userId", "projectId", "assistantId", "idx", "content", "embedding", "createdAt")
+          VALUES (${randomUUID()}, ${source.id}, ${input.userId}, ${input.projectId ?? null}, ${input.assistantId ?? null}, ${idx}, ${batch[j]}, ${vecStr}::vector, now())
         `;
         idx++;
       }
@@ -95,6 +97,7 @@ export type KnowledgeHit = { content: string; name: string; sourceId: string; di
 export async function retrieve(opts: {
   userId: string;
   projectId?: string | null;
+  assistantId?: string | null;
   query: string;
   topK?: number;
 }): Promise<KnowledgeHit[]> {
@@ -104,6 +107,7 @@ export async function retrieve(opts: {
   const vec = await embedOne(q.slice(0, 2_000));
   const vecStr = `[${vec.join(",")}]`;
   const pid = opts.projectId ?? null;
+  const aid = opts.assistantId ?? null;
   const rows = await db.$queryRaw<KnowledgeHit[]>`
     SELECT c."content" AS content, s."name" AS name, c."sourceId" AS "sourceId",
            (c."embedding" <=> ${vecStr}::vector) AS dist
@@ -111,7 +115,11 @@ export async function retrieve(opts: {
     JOIN "KnowledgeSource" s ON s."id" = c."sourceId"
     WHERE c."userId" = ${opts.userId}
       AND s."status" = 'indexed'
-      AND (c."projectId" IS NULL OR (${pid}::text IS NOT NULL AND c."projectId" = ${pid}))
+      AND (
+        (c."projectId" IS NULL AND c."assistantId" IS NULL)
+        OR (${pid}::text IS NOT NULL AND c."projectId" = ${pid})
+        OR (${aid}::text IS NOT NULL AND c."assistantId" = ${aid})
+      )
     ORDER BY dist ASC
     LIMIT ${topK}
   `;
@@ -131,20 +139,33 @@ export function formatKnowledge(hits: KnowledgeHit[]): string {
   );
 }
 
-export async function countIndexed(userId: string, projectId?: string | null): Promise<number> {
+export async function countIndexed(
+  userId: string,
+  projectId?: string | null,
+  assistantId?: string | null,
+): Promise<number> {
   const pid = projectId ?? null;
+  const aid = assistantId ?? null;
   return db.knowledgeSource.count({
     where: {
       userId,
       status: "indexed",
-      OR: [{ projectId: null }, ...(pid ? [{ projectId: pid }] : [])],
+      OR: [
+        { projectId: null, assistantId: null },
+        ...(pid ? [{ projectId: pid }] : []),
+        ...(aid ? [{ assistantId: aid }] : []),
+      ],
     },
   });
 }
 
-export async function listSources(userId: string, projectId?: string | null) {
+export async function listSources(userId: string, opts?: { projectId?: string | null; assistantId?: string | null }) {
   return db.knowledgeSource.findMany({
-    where: { userId, ...(projectId !== undefined ? { projectId } : {}) },
+    where: {
+      userId,
+      ...(opts?.projectId !== undefined ? { projectId: opts.projectId } : {}),
+      ...(opts?.assistantId !== undefined ? { assistantId: opts.assistantId } : {}),
+    },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -154,6 +175,7 @@ export async function listSources(userId: string, projectId?: string | null) {
       chunkCount: true,
       bytes: true,
       projectId: true,
+      assistantId: true,
       error: true,
       createdAt: true,
     },
