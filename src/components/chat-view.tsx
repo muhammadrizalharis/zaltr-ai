@@ -33,6 +33,7 @@ export function ChatView({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [webSearch, setWebSearch] = useState(false);
+  const [agentMode, setAgentMode] = useState(false);
   const [parafrase, setParafrase] = useState<ModeParafrase | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -211,6 +212,7 @@ export function ChatView({
           modelId: model,
           web: webSearch,
           regenerate,
+          ...(agentMode ? { agent: true } : {}),
           ...(parafrase ? { paraphrase: parafrase } : {}),
         }),
         signal: controller.signal,
@@ -469,7 +471,7 @@ export function ChatView({
             Ke pesan terbaru
           </button>
         )}
-        {(attachments.length > 0 || webSearch || parafrase) && (
+        {(attachments.length > 0 || webSearch || parafrase || agentMode) && (
           <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap items-center gap-1.5">
             {parafrase && (
               <span className="inline-flex items-center gap-1.5 rounded-lg border border-accent-b/50 bg-accent-b/10 px-2 py-1 text-xs text-accent-b">
@@ -501,6 +503,18 @@ export function ChatView({
                   onClick={() => setWebSearch(false)}
                   className="hover:text-ink"
                   aria-label="Matikan cari web"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {agentMode && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-accent-b/50 bg-accent-b/10 px-2 py-1 text-xs text-accent-b">
+                Agent aktif
+                <button
+                  onClick={() => setAgentMode(false)}
+                  className="hover:text-ink"
+                  aria-label="Matikan agent"
                 >
                   ×
                 </button>
@@ -580,6 +594,21 @@ export function ChatView({
                       <rect x="3" y="3" width="18" height="18" rx="2" />
                       <circle cx="8.5" cy="8.5" r="1.5" />
                       <path d="m21 15-5-5L5 21" />
+                    </>
+                  }
+                />
+                <PlusItem
+                  title="Agent"
+                  desc={agentMode ? "Aktif — model pakai web/kode beruntun" : "Model memilih alat (web/kode) sendiri"}
+                  active={agentMode}
+                  onClick={() => {
+                    setAgentMode((v) => !v);
+                    setPlusOpen(false);
+                  }}
+                  icon={
+                    <>
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                      <circle cx="12" cy="12" r="3" />
                     </>
                   }
                 />

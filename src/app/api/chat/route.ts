@@ -22,6 +22,7 @@ import {
   scoreFile,
 } from "@/server/drive";
 import { retrieve, formatKnowledge, countIndexed } from "@/server/knowledge";
+import { runAgent } from "@/server/agent";
 import { webSearch, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
 import { describeImages, isNativeVisionModel } from "@/server/vision";
@@ -50,6 +51,8 @@ const bodySchema = z.object({
   paraphrase: z.string().max(20).optional(),
   /** Regenerate: buat ulang jawaban untuk pesan user TERAKHIR (tanpa pesan baru). */
   regenerate: z.boolean().optional(),
+  /** Mode agen: model boleh memakai alat (web/kode) beruntun. */
+  agent: z.boolean().optional(),
 });
 
 export const POST = guarded(async (req: Request) => {
@@ -58,7 +61,7 @@ export const POST = guarded(async (req: Request) => {
   if (!parsed.success) {
     return Response.json({ error: "Payload tidak valid" }, { status: 400 });
   }
-  const { conversationId, modelId, web, regenerate } = parsed.data;
+  const { conversationId, modelId, web, regenerate, agent } = parsed.data;
   let content = parsed.data.content;
   if (!regenerate && !content) {
     return Response.json({ error: "Pesan kosong" }, { status: 400 });
@@ -423,21 +426,34 @@ export const POST = guarded(async (req: Request) => {
       let status: "completed" | "stopped" | "failed" = "completed";
       let errorMessage = "";
       try {
-        const gen = dispatch(modelId, {
-          history: providerHistory,
-          conversationId,
-          signal,
-        });
-        for await (const part of gen) {
-          if (part.kind === "text") {
-            acc += part.text;
-            send({ type: "delta", text: part.text });
-          } else {
-            // Gambar sudah dipersistenkan ke MinIO oleh provider;
-            // simpan sebagai markdown agar ikut kontrak "chat = markdown".
-            const md = `\n\n![${part.alt}](${part.url})\n`;
-            acc += md;
-            send({ type: "delta", text: md });
+        if (agent && modelId !== "zaltr-core") {
+          // Mode agen: loop ReAct (web/kode) terisolasi; chat biasa tak terpengaruh.
+          for await (const chunk of runAgent({
+            modelId,
+            history: providerHistory,
+            conversationId,
+            signal,
+          })) {
+            acc += chunk.text;
+            send({ type: "delta", text: chunk.text });
+          }
+        } else {
+          const gen = dispatch(modelId, {
+            history: providerHistory,
+            conversationId,
+            signal,
+          });
+          for await (const part of gen) {
+            if (part.kind === "text") {
+              acc += part.text;
+              send({ type: "delta", text: part.text });
+            } else {
+              // Gambar sudah dipersistenkan ke MinIO oleh provider;
+              // simpan sebagai markdown agar ikut kontrak "chat = markdown".
+              const md = `\n\n![${part.alt}](${part.url})\n`;
+              acc += md;
+              send({ type: "delta", text: md });
+            }
           }
         }
       } catch (err) {
