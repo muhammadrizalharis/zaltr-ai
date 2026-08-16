@@ -185,6 +185,9 @@ services:
       ZALTR_SEARXNG_URL: http://searxng:8080
       ZALTR_RUNNER_URL: http://runner:8484
       ZALTR_WA_ADMIN: ${ZALTR_WA_ADMIN:-}
+      # Batas teks lampiran yang dibaca model (kosong = default 200rb/file, 300rb total)
+      ZALTR_MAX_FILE_CHARS: ${ZALTR_MAX_FILE_CHARS:-}
+      ZALTR_MAX_TOTAL_CHARS: ${ZALTR_MAX_TOTAL_CHARS:-}
 
   # ------------------------------------------------------------------
   # Web search self-hosted (fitur "Cari web" di chat). Internal-only.

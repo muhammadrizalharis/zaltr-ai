@@ -7,7 +7,13 @@ import JSZip from "jszip";
  * Selain itu (arsip, biner, dsb) -> null (hanya metadata yang dikirim ke model).
  */
 
-const MAX_CHARS_PER_FILE = 15_000;
+// Batas teks per lampiran yang dikirim ke MODEL. Bisa diubah via env
+// ZALTR_MAX_FILE_CHARS. 200rb karakter ≈ 50rb token — muat di model konteks besar
+// (Claude Sonnet/Opus); model konteks kecil bisa menolak bila jauh lebih besar.
+export const MAX_CHARS_PER_FILE = Math.max(
+  2_000,
+  Number(process.env.ZALTR_MAX_FILE_CHARS) || 200_000,
+);
 
 const TEXT_EXT = new Set([
   "txt", "md", "markdown", "csv", "tsv", "json", "jsonl", "xml", "yaml", "yml",
@@ -109,7 +115,11 @@ function looksLikeText(buf: Buffer): boolean {
  * Ekstrak teks dari buffer file. Return null bila jenis tidak didukung
  * (biner umum) — pemanggil cukup menyebut metadata file ke model.
  */
-export async function extractText(buf: Buffer, name: string): Promise<string | null> {
+export async function extractText(
+  buf: Buffer,
+  name: string,
+  limit: number = MAX_CHARS_PER_FILE,
+): Promise<string | null> {
   const ext = fileExt(name);
   try {
     let text: string | null = null;
@@ -126,8 +136,8 @@ export async function extractText(buf: Buffer, name: string): Promise<string | n
     if (text == null) return null;
     const clean = text.replace(/\u0000/g, "").trim();
     if (!clean) return null;
-    return clean.length > MAX_CHARS_PER_FILE
-      ? `${clean.slice(0, MAX_CHARS_PER_FILE)}\n…(terpotong, total ${clean.length} karakter)`
+    return clean.length > limit
+      ? `${clean.slice(0, limit)}\n…(terpotong, total ${clean.length} karakter)`
       : clean;
   } catch {
     return null;

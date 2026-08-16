@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { dispatch } from "@/server/providers";
 import { guarded, modelAllowed, requireUser } from "@/server/auth";
 import { getObjectBuffer } from "@/lib/storage";
-import { extractText, fileExt, imageMime, IMAGE_EXT } from "@/server/extract";
+import { extractText, fileExt, imageMime, IMAGE_EXT, MAX_CHARS_PER_FILE } from "@/server/extract";
 import { webSearch, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
 import { describeImages, isNativeVisionModel } from "@/server/vision";
@@ -163,6 +163,9 @@ export const POST = guarded(async (req: Request) => {
     );
     const extras: string[] = [];
     const images: AttachedImage[] = [];
+    // Pagu total teks semua lampiran (jaga context window model). Bisa diubah
+    // via env ZALTR_MAX_TOTAL_CHARS. 300rb karakter ≈ 75rb token.
+    let sisaBudget = Math.max(4_000, Number(process.env.ZALTR_MAX_TOTAL_CHARS) || 300_000);
     for (const key of keys.slice(0, 5)) {
       if (!key.startsWith(`uploads/${me.id}/`)) continue; // hanya file miliknya
       const name = key.split("/").pop() ?? key;
@@ -176,11 +179,15 @@ export const POST = guarded(async (req: Request) => {
           });
           extras.push(`[Lampiran gambar: ${name}]`);
         } else {
-          const text = await extractText(buf, name);
+          const limit = Math.min(MAX_CHARS_PER_FILE, sisaBudget);
+          const text = limit > 0 ? await extractText(buf, name, limit) : null;
+          if (text) sisaBudget -= text.length;
           extras.push(
             text
               ? `=== Isi lampiran "${name}" ===\n${text}\n=== Akhir lampiran ===`
-              : `[Lampiran "${name}" tidak bisa dibaca sebagai teks]`,
+              : sisaBudget <= 0
+                ? `[Lampiran "${name}" tidak dibaca: total teks lampiran sudah mencapai batas]`
+                : `[Lampiran "${name}" tidak bisa dibaca sebagai teks]`,
           );
         }
       } catch {
