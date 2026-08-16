@@ -41,6 +41,8 @@ export function ChatView({
   const [listening, setListening] = useState(false);
   const [sttOk, setSttOk] = useState(false);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const [canvas, setCanvas] = useState<{ open: boolean; content: string }>({ open: false, content: "" });
+  const [canvasInstruction, setCanvasInstruction] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const runIdRef = useRef<string | null>(null);
   // Auto-scroll hanya saat pembaca memang sedang di bawah; kalau ia menggulir
@@ -329,6 +331,11 @@ export function ChatView({
     setListening(true);
   }
 
+  function openCanvas(raw: string) {
+    setCanvas({ open: true, content: extractArtifact(raw) });
+    setCanvasInstruction("");
+  }
+
   function stop() {
     // Batalkan di server dulu — menutup koneksi saja tidak lagi menghentikan
     // generasi (agar pindah halaman/tab tidak memotong jawaban).
@@ -413,6 +420,7 @@ export function ChatView({
                   setDraft(text);
                   textareaRef.current?.focus();
                 }}
+                onCanvas={openCanvas}
               />
             ))}
             {streaming && (
@@ -663,6 +671,72 @@ export function ChatView({
           Setiap pesan tersimpan permanen sebelum model dijalankan (write-first).
         </p>
       </div>
+      {canvas.open && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40 md:hidden"
+            onClick={() => setCanvas((c) => ({ ...c, open: false }))}
+          />
+          <aside className="fixed right-0 top-0 z-50 flex h-full w-full max-w-xl flex-col border-l border-line bg-panel-solid shadow-2xl">
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+              <h2 className="text-sm font-semibold">Canvas</h2>
+              <button
+                onClick={() => setCanvas((c) => ({ ...c, open: false }))}
+                className="text-muted hover:text-ink"
+                aria-label="Tutup Canvas"
+              >
+                ✕
+              </button>
+            </div>
+            <textarea
+              value={canvas.content}
+              onChange={(e) => setCanvas((c) => ({ ...c, content: e.target.value }))}
+              spellCheck={false}
+              className="flex-1 resize-none bg-bg px-4 py-3 font-mono text-[13px] leading-relaxed outline-none"
+            />
+            <div className="space-y-2 border-t border-line p-3">
+              <input
+                value={canvasInstruction}
+                onChange={(e) => setCanvasInstruction(e.target.value)}
+                placeholder="Minta AI merevisi (mis. tambahkan komentar, perbaiki bug)…"
+                className="w-full rounded-xl border border-line bg-panel-2 px-3 py-2 text-sm outline-none focus:border-accent-b/60"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const instr = canvasInstruction.trim() || "Perbaiki/lanjutkan dokumen berikut.";
+                    void send(`${instr}\n\n\`\`\`\n${canvas.content}\n\`\`\``);
+                    setCanvas((c) => ({ ...c, open: false }));
+                  }}
+                  disabled={streaming}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-accent-a to-accent-b px-3 py-2 text-sm font-semibold text-black disabled:opacity-40"
+                >
+                  Kirim revisi ke AI
+                </button>
+                <button
+                  onClick={() => void navigator.clipboard?.writeText(canvas.content).catch(() => {})}
+                  className="rounded-xl border border-line px-3 py-2 text-sm text-muted hover:text-ink"
+                >
+                  Salin
+                </button>
+                <button
+                  onClick={() => {
+                    const blob = new Blob([canvas.content], { type: "text/plain" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = "canvas.txt";
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                  }}
+                  className="rounded-xl border border-line px-3 py-2 text-sm text-muted hover:text-ink"
+                >
+                  Unduh
+                </button>
+              </div>
+            </div>
+          </aside>
+        </>
+      )}
     </div>
   );
 }
@@ -752,6 +826,12 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Ambil artifact (blok kode pertama) dari pesan; bila tak ada, pakai seluruh teks. */
+function extractArtifact(md: string): string {
+  const m = md.match(/```[\w-]*\n([\s\S]*?)```/);
+  return (m ? m[1] : md).trim();
+}
+
 function RoleTag({ role }: { role: string }) {
   return role === "user" ? (
     <span className="text-[11px] font-semibold uppercase tracking-wider text-accent-b">
@@ -770,12 +850,14 @@ function Bubble({
   isLastUser,
   onRegenerate,
   onEdit,
+  onCanvas,
 }: {
   message: ChatMessage;
   isLastAssistant?: boolean;
   isLastUser?: boolean;
   onRegenerate?: () => void;
   onEdit?: (text: string) => void;
+  onCanvas?: (content: string) => void;
 }) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
@@ -856,6 +938,15 @@ function Bubble({
             title="Bacakan jawaban"
           >
             {speaking ? "■ Stop" : "🔊 Bacakan"}
+          </button>
+        )}
+        {!isUser && onCanvas && (
+          <button
+            onClick={() => onCanvas(message.content)}
+            className="text-[11px] text-muted hover:text-accent-a"
+            title="Buka di Canvas untuk diedit"
+          >
+            ✎ Canvas
           </button>
         )}
         {isLastAssistant && onRegenerate && (
