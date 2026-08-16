@@ -41,6 +41,7 @@ model User {
   memories      Memory[]
   knowledgeSources KnowledgeSource[]
   assistants    Assistant[]
+  scheduledTasks ScheduledTask[]
 }
 
 // Memori antar-percakapan (ala ChatGPT Memory): fakta personal yang diekstrak
@@ -173,5 +174,25 @@ model Assistant {
   updatedAt    DateTime @updatedAt
   conversations Conversation[]
 
+  @@index([userId])
+}
+
+// ---- Tugas terjadwal (ala ChatGPT Tasks): prompt dijalankan otomatis berkala ----
+model ScheduledTask {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  prompt          String
+  model           String
+  intervalMinutes Int // jeda antar-eksekusi (mis. 1440 = harian)
+  active          Boolean   @default(true)
+  nextRunAt       DateTime
+  lastRunAt       DateTime?
+  lastResult      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([active, nextRunAt])
   @@index([userId])
 }
