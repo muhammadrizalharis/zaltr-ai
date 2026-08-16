@@ -21,6 +21,7 @@ import {
   formatTree,
   scoreFile,
 } from "@/server/drive";
+import { retrieve, formatKnowledge, countIndexed } from "@/server/knowledge";
 import { webSearch, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
 import { describeImages, isNativeVisionModel } from "@/server/vision";
@@ -102,7 +103,7 @@ export const POST = guarded(async (req: Request) => {
 
   const conversation = await db.conversation.findFirst({
     where: { id: conversationId, userId: me.id, trashedAt: null },
-    select: { id: true, title: true },
+    select: { id: true, title: true, projectId: true },
   });
   if (!conversation) {
     return Response.json({ error: "Conversation tidak ditemukan" }, { status: 404 });
@@ -341,6 +342,25 @@ export const POST = guarded(async (req: Request) => {
         preamble.push(formatSearchContext(content.split("\n")[0] || content, hits));
       } catch {
         preamble.push("[Pencarian web gagal — jawab dari pengetahuanmu dan katakan itu.]");
+      }
+    }
+
+    // Basis pengetahuan (RAG): ambil potongan relevan dari dokumen user/project.
+    // Hanya jika user punya sumber terindeks (hindari embedding query sia-sia).
+    if (!isFree) {
+      try {
+        if (await countIndexed(me.id, conversation.projectId)) {
+          const kb = await retrieve({
+            userId: me.id,
+            projectId: conversation.projectId,
+            query: content,
+            topK: 6,
+          });
+          const block = formatKnowledge(kb);
+          if (block) preamble.push(block);
+        }
+      } catch {
+        /* KB opsional — abaikan bila gagal */
       }
     }
     if (preamble.length > 0) {

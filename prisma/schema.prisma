@@ -39,6 +39,7 @@ model User {
   projects      Project[]
   conversations Conversation[]
   memories      Memory[]
+  knowledgeSources KnowledgeSource[]
 }
 
 // Memori antar-percakapan (ala ChatGPT Memory): fakta personal yang diekstrak
@@ -72,6 +73,7 @@ model Project {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   conversations Conversation[]
+  knowledgeSources KnowledgeSource[]
 
   @@index([updatedAt(sort: Desc)])
   @@index([userId])
@@ -108,4 +110,44 @@ model Message {
   createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+// ---- Basis pengetahuan (RAG): sumber + potongan ber-embedding (pgvector) ----
+// Sumber bisa milik user (global) atau terikat Project (knowledge per-project).
+model KnowledgeSource {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId  String?
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind       String // upload | drive | text
+  name       String
+  ref        String? // drive fileId / storage key / null
+  bytes      Int      @default(0)
+  status     String   @default("pending") // pending | indexed | failed
+  chunkCount Int      @default(0)
+  embedModel String
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  chunks     KnowledgeChunk[]
+
+  @@index([userId])
+  @@index([projectId])
+}
+
+model KnowledgeChunk {
+  id        String   @id @default(cuid())
+  sourceId  String
+  source    KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  userId    String // denormalisasi utk filter cepat
+  projectId String?
+  idx       Int
+  content   String
+  embedding Unsupported("vector(1024)")
+  createdAt DateTime @default(now())
+
+  @@index([sourceId])
+  @@index([userId])
+  @@index([projectId])
 }
