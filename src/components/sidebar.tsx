@@ -24,6 +24,7 @@ export function Sidebar({
   const [creatingProject, setCreatingProject] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [q, setQ] = useState("");
   // Sidebar ciut (rail mini) — pilihan tersimpan di localStorage.
   const [mini, setMini] = useState(false);
@@ -63,6 +64,7 @@ export function Sidebar({
     function close(e: MouseEvent) {
       if ((e.target as HTMLElement | null)?.closest("[data-menu-root]")) return;
       setMenuFor(null);
+      setMoreOpen(false);
     }
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
@@ -396,29 +398,49 @@ export function Sidebar({
             Keluar
           </button>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/chat/search" className="text-xs text-muted hover:text-accent-a">
-            🔍 Cari
-          </Link>
-          <Link href="/chat/assistants" className="text-xs text-muted hover:text-accent-a">
-            🤖 Asisten
-          </Link>
-          <Link href="/chat/tasks" className="text-xs text-muted hover:text-accent-a">
-            ⏰ Tugas
-          </Link>
-          <Link href="/chat/trash" className="text-xs text-muted hover:text-accent-a">
-            🗑 Trash
-          </Link>
-          <Link href="/chat/knowledge" className="text-xs text-muted hover:text-accent-a">
-            📚 Pengetahuan
-          </Link>
-          <Link href="/chat/settings" className="text-xs text-muted hover:text-accent-a">
-            ⚙ Pengaturan
-          </Link>
-          {(user.role === "admin" || user.role === "superadmin") && (
-            <Link href="/admin" className="text-xs text-muted hover:text-accent-b">
-              ⚙ Admin
-            </Link>
+        <div className="relative" data-menu-root>
+          <button
+            onClick={() => setMoreOpen((v) => !v)}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs ${
+              moreOpen
+                ? "border-accent-b/60 text-ink"
+                : "border-line text-muted hover:border-accent-b/60 hover:text-ink"
+            }`}
+          >
+            ☰ Menu
+          </button>
+          {moreOpen && (
+            <div className="absolute bottom-9 left-0 z-30 w-52 rounded-xl border border-line bg-panel-solid p-1.5 shadow-2xl">
+              {[
+                { href: "/chat/knowledge", label: "📚 Pengetahuan" },
+                { href: "/chat/assistants", label: "🤖 Asisten" },
+                { href: "/chat/tasks", label: "⏰ Tugas" },
+                { href: "/chat/search", label: "🔍 Cari" },
+                { href: "/chat/trash", label: "🗑 Trash" },
+                { href: "/chat/settings", label: "⚙ Pengaturan" },
+              ].map((it) => (
+                <Link
+                  key={it.href}
+                  href={it.href}
+                  onClick={() => setMoreOpen(false)}
+                  className="block rounded-lg px-2.5 py-1.5 text-xs text-muted hover:bg-panel-2 hover:text-ink"
+                >
+                  {it.label}
+                </Link>
+              ))}
+              {(user.role === "admin" || user.role === "superadmin") && (
+                <>
+                  <div className="my-1 border-t border-line" />
+                  <Link
+                    href="/admin"
+                    onClick={() => setMoreOpen(false)}
+                    className="block rounded-lg px-2.5 py-1.5 text-xs text-muted hover:bg-panel-2 hover:text-accent-b"
+                  >
+                    ⚙ Admin
+                  </Link>
+                </>
+              )}
+            </div>
           )}
         </div>
         {user.role === "user" && (
