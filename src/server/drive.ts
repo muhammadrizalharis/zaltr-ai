@@ -65,13 +65,18 @@ export function parseDriveLinks(text: string): DriveRef[] {
   return refs;
 }
 
-async function driveFetch(path: string, params: Record<string, string>): Promise<Response> {
+async function driveFetch(
+  path: string,
+  params: Record<string, string>,
+  init?: { headers?: Record<string, string>; timeoutMs?: number },
+): Promise<Response> {
   const key = apiKey();
   if (!key) throw new Error("ZALTR_GOOGLE_API_KEY belum diset");
   const qs = new URLSearchParams({ ...params, key });
   const res = await fetch(`${API}${path}?${qs}`, {
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(init?.timeoutMs ?? 20_000),
     cache: "no-store",
+    headers: init?.headers,
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -163,22 +168,52 @@ const GOOGLE_EXPORT: Record<string, { mime: string; ext: string }> = {
   "application/vnd.google-apps.presentation": { mime: "text/plain", ext: "txt" },
 };
 
+/** Ceiling mutlak agar unduhan tak pernah membanjiri RAM container. */
+const ABS_MAX_BYTES = 64 * 1024 * 1024;
+
+/** Baca body respons TERBATAS: berhenti setelah `maxBytes` walau server abaikan Range. */
+async function readLimited(res: Response, maxBytes: number): Promise<Buffer> {
+  const cap = Math.min(maxBytes, ABS_MAX_BYTES);
+  const reader = res.body?.getReader();
+  if (!reader) return Buffer.from(await res.arrayBuffer()).subarray(0, cap);
+  const chunks: Buffer[] = [];
+  let total = 0;
+  while (total < cap) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(Buffer.from(value));
+    total += value.length;
+  }
+  await reader.cancel().catch(() => {});
+  return Buffer.concat(chunks).subarray(0, cap);
+}
+
 /**
- * Unduh isi berkas Drive sebagai Buffer. Berkas Google-native (Docs/Sheets/
- * Slides) diekspor ke format yang bisa diekstrak (teks/csv).
+ * Unduh isi berkas Drive sebagai Buffer. Google-native (Docs/Sheets/Slides)
+ * diekspor ke format teks/csv. Bila `maxBytes` diberikan dan berkas lebih besar,
+ * hanya bagian AWAL yang diunduh (Range) -> aman untuk berkas GB (partial=true).
  */
-export async function fetchDriveFile(node: DriveNode): Promise<{ buf: Buffer; name: string }> {
+export async function fetchDriveFile(
+  node: DriveNode,
+  maxBytes?: number,
+): Promise<{ buf: Buffer; name: string; partial: boolean }> {
   let name = node.name;
   const g = GOOGLE_EXPORT[node.mimeType];
-  let res: Response;
   if (g) {
-    res = await driveFetch(`/files/${node.id}/export`, { mimeType: g.mime });
+    const res = await driveFetch(`/files/${node.id}/export`, { mimeType: g.mime }, { timeoutMs: 60_000 });
     if (!/\.\w+$/.test(name)) name = `${name}.${g.ext}`;
-  } else {
-    res = await driveFetch(`/files/${node.id}`, { alt: "media", supportsAllDrives: "true" });
+    return { buf: await readLimited(res, maxBytes ?? ABS_MAX_BYTES), name, partial: false };
   }
-  const ab = await res.arrayBuffer();
-  return { buf: Buffer.from(ab), name };
+  const useRange = !!(maxBytes && node.size && node.size > maxBytes);
+  const res = await driveFetch(
+    `/files/${node.id}`,
+    { alt: "media", supportsAllDrives: "true" },
+    {
+      headers: useRange ? { Range: `bytes=0-${maxBytes! - 1}` } : undefined,
+      timeoutMs: 60_000,
+    },
+  );
+  return { buf: await readLimited(res, maxBytes ?? ABS_MAX_BYTES), name, partial: useRange };
 }
 
 function humanSize(n: number): string {

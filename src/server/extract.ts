@@ -35,6 +35,23 @@ export function fileExt(name: string): string {
   return (name.split(".").pop() ?? "").toLowerCase();
 }
 
+const FULL_DOWNLOAD_EXT = new Set(["pdf", "docx", "pptx", "xlsx", "doc", "ppt", "xls"]);
+/** Format terstruktur yang HARUS diunduh utuh untuk diparse (tak bisa dibaca sebagian). */
+export function needsFullDownload(name: string): boolean {
+  return FULL_DOWNLOAD_EXT.has(fileExt(name));
+}
+
+const BINARY_SKIP_EXT = new Set([
+  "joblib", "pkl", "pickle", "npy", "npz", "parquet", "feather", "h5", "hdf5",
+  "pt", "pth", "ckpt", "onnx", "safetensors", "bin", "model", "zip", "gz", "bz2",
+  "tar", "tgz", "rar", "7z", "exe", "dll", "so", "dylib", "class", "jar", "war",
+  "wav", "mp3", "flac", "ogg", "mp4", "mov", "avi", "mkv", "webm",
+]);
+/** Biner berat (model/arsip/media) yang tak perlu diunduh untuk dibaca sebagai teks. */
+export function isBinarySkip(name: string): boolean {
+  return BINARY_SKIP_EXT.has(fileExt(name));
+}
+
 function decodeXmlEntities(s: string): string {
   return s
     .replace(/&lt;/g, "<")
@@ -179,7 +196,11 @@ function inferColType(vals: string[]): string {
 }
 
 /** CSV/TSV: ringkasan (baris, kolom, tipe) + cuplikan 20 baris — hemat konteks. */
-function summarizeDelimited(raw: string, name: string): string {
+function summarizeDelimited(
+  raw: string,
+  name: string,
+  opts?: { partial?: boolean; sourceBytes?: number },
+): string {
   const lines = raw.replace(/\r\n/g, "\n").split("\n");
   while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
   if (lines.length === 0) return raw;
@@ -191,9 +212,17 @@ function summarizeDelimited(raw: string, name: string): string {
     .map((h, i) => `${h || `kolom${i + 1}`} (${inferColType(sample.map((r) => r[i] ?? ""))})`)
     .join(", ");
   const preview = [lines[0], ...dataLines.slice(0, 20)].join("\n");
+  let rowsLine: string;
+  const readBytes = Buffer.byteLength(raw, "utf8");
+  if (opts?.partial && opts.sourceBytes && readBytes > 0) {
+    const est = Math.round((opts.sourceBytes / readBytes) * dataLines.length);
+    rowsLine = `- Perkiraan TOTAL baris: ~${est.toLocaleString("id-ID")} (berkas besar; hanya bagian awal dibaca)`;
+  } else {
+    rowsLine = `- Perkiraan baris data: ${dataLines.length}`;
+  }
   return (
     `Ringkasan tabel "${name}":\n` +
-    `- Perkiraan baris data: ${dataLines.length}\n` +
+    `${rowsLine}\n` +
     `- Jumlah kolom: ${header.length}\n` +
     `- Kolom & tipe (perkiraan): ${cols}\n\n` +
     `20 baris pertama (mentah):\n${preview}`
@@ -208,6 +237,7 @@ export async function extractText(
   buf: Buffer,
   name: string,
   limit: number = MAX_CHARS_PER_FILE,
+  opts?: { partial?: boolean; sourceBytes?: number },
 ): Promise<string | null> {
   const ext = fileExt(name);
   try {
@@ -222,7 +252,7 @@ export async function extractText(
     } else if (ext === "ipynb") {
       text = fromIpynb(buf.toString("utf8"));
     } else if (ext === "csv" || ext === "tsv") {
-      text = summarizeDelimited(buf.toString("utf8"), name);
+      text = summarizeDelimited(buf.toString("utf8"), name, opts);
     } else if (TEXT_EXT.has(ext) || looksLikeText(buf)) {
       text = buf.toString("utf8");
     }

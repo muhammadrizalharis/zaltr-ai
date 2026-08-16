@@ -3,7 +3,15 @@ import { db } from "@/lib/db";
 import { dispatch } from "@/server/providers";
 import { guarded, modelAllowed, requireUser } from "@/server/auth";
 import { getObjectBuffer } from "@/lib/storage";
-import { extractText, fileExt, imageMime, IMAGE_EXT, MAX_CHARS_PER_FILE } from "@/server/extract";
+import {
+  extractText,
+  fileExt,
+  imageMime,
+  IMAGE_EXT,
+  MAX_CHARS_PER_FILE,
+  needsFullDownload,
+  isBinarySkip,
+} from "@/server/extract";
 import {
   parseDriveLinks,
   driveConfigured,
@@ -220,21 +228,42 @@ export const POST = guarded(async (req: Request) => {
         peringatan =
           "Link Google Drive terdeteksi, tapi fitur baca Drive belum diaktifkan admin.";
       } else {
-        const MAX_DRIVE_BYTES = 40 * 1024 * 1024;
+        // Teks besar (CSV/txt/jsonl) dibaca SEBAGIAN (byte awal) agar berkas GB
+        // tetap terbaca tanpa membanjiri RAM; terstruktur (pdf/docx/xlsx) perlu utuh.
+        const DRIVE_PARTIAL_BYTES = Math.max(
+          Number(process.env.ZALTR_DRIVE_MAX_BYTES) || 0,
+          MAX_CHARS_PER_FILE * 4,
+          1024 * 1024,
+        );
+        const DRIVE_FULL_MAX = 50 * 1024 * 1024;
         const qWords = content.toLowerCase().split(/[^a-z0-9_]+/).filter((w) => w.length >= 3);
         const bacaBerkas = async (node: { id: string; name: string; mimeType: string; path: string; size?: number }) => {
           if (sisaBudget <= 500) return;
-          if (node.size && node.size > MAX_DRIVE_BYTES) {
-            extras.push(`[Berkas Drive "${node.path}" dilewati: terlalu besar (${Math.round(node.size / 1024 / 1024)} MB)]`);
+          const ext = fileExt(node.name);
+          if (isBinarySkip(node.name) || IMAGE_EXT.has(ext)) {
+            extras.push(
+              `[Berkas Drive "${node.path}" dilewati: ${IMAGE_EXT.has(ext) ? "gambar" : "biner"}, bukan teks/dokumen]`,
+            );
+            return;
+          }
+          const fullOnly = needsFullDownload(node.name);
+          if (fullOnly && node.size && node.size > DRIVE_FULL_MAX) {
+            extras.push(
+              `[Berkas Drive "${node.path}" dilewati: format ${ext} harus utuh tapi terlalu besar (${Math.round(node.size / 1024 / 1024)} MB)]`,
+            );
             return;
           }
           try {
-            const { buf, name } = await fetchDriveFile(node);
+            const { buf, name, partial } = await fetchDriveFile(
+              node,
+              fullOnly ? undefined : DRIVE_PARTIAL_BYTES,
+            );
             const limit = Math.min(MAX_CHARS_PER_FILE, sisaBudget);
-            const text = await extractText(buf, name, limit);
+            const text = await extractText(buf, name, limit, { partial, sourceBytes: node.size });
             if (text) {
               sisaBudget -= text.length;
-              extras.push(`=== Isi berkas Drive "${node.path}" ===\n${text}\n=== Akhir berkas ===`);
+              const catatan = partial ? " (berkas besar — hanya bagian awal dibaca)" : "";
+              extras.push(`=== Isi berkas Drive "${node.path}"${catatan} ===\n${text}\n=== Akhir berkas ===`);
             } else {
               extras.push(`[Berkas Drive "${node.path}" tidak bisa dibaca sebagai teks]`);
             }

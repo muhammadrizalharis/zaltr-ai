@@ -183,6 +183,8 @@ services:
       ZALTR_GOOGLE_CLIENT_ID: ${ZALTR_GOOGLE_CLIENT_ID:-}
       ZALTR_GOOGLE_CLIENT_SECRET: ${ZALTR_GOOGLE_CLIENT_SECRET:-}
       ZALTR_GOOGLE_API_KEY: ${ZALTR_GOOGLE_API_KEY:-}
+      # Batas byte unduhan per berkas Drive teks besar (kosong = default ~ pagu karakter, min 1MB)
+      ZALTR_DRIVE_MAX_BYTES: ${ZALTR_DRIVE_MAX_BYTES:-}
       ZALTR_SEARXNG_URL: http://searxng:8080
       ZALTR_RUNNER_URL: http://runner:8484
       ZALTR_WA_ADMIN: ${ZALTR_WA_ADMIN:-}
