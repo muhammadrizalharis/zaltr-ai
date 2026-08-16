@@ -88,6 +88,8 @@ model Conversation {
   pinned    Boolean   @default(false)
   archived  Boolean   @default(false)
   trashedAt DateTime?
+  // Token berbagi read-only (null = tidak dibagikan). Unik utk halaman /share.
+  shareToken String?  @unique
   projectId String?
   project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   assistantId String?

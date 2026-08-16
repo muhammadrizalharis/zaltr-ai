@@ -510,6 +510,32 @@ function Row({
           >
             {c.pinned ? "Lepas sematan" : "Sematkan"}
           </MenuBtn>
+          <MenuBtn
+            onClick={() => {
+              onMenu(false);
+              const a = document.createElement("a");
+              a.href = `/api/conversations/${c.id}/export`;
+              a.download = "";
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+            }}
+          >
+            ⬇ Ekspor .md
+          </MenuBtn>
+          <MenuBtn
+            onClick={async () => {
+              onMenu(false);
+              const res = await fetch(`/api/conversations/${c.id}/share`, { method: "POST" });
+              const d = (await res.json().catch(() => ({}))) as { url?: string };
+              if (d.url) {
+                await navigator.clipboard?.writeText(d.url).catch(() => {});
+                alert("Link berbagi (read-only) disalin:\n" + d.url);
+              }
+            }}
+          >
+            🔗 Bagikan
+          </MenuBtn>
 
           <p className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
             Pindahkan ke project
