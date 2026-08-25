@@ -60,10 +60,32 @@ export async function createSession(userId: string): Promise<void> {
   });
 }
 
+/** Id sesi (Session.id) dari cookie saat ini; null bila tak login. */
+export async function currentSessionId(): Promise<string | null> {
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const s = await db.session.findUnique({
+    where: { tokenHash: hashToken(token) },
+    select: { id: true },
+  });
+  return s?.id ?? null;
+}
+
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) {
+    const s = await db.session.findUnique({
+      where: { tokenHash: hashToken(token) },
+      select: { id: true },
+    });
+    if (s) {
+      // Hapus lampiran sementara milik sesi ini. Dynamic import agar auth tak
+      // menyeret klien MinIO ke graf modul (mis. middleware edge).
+      const { deleteEphemeralForSession } = await import("./uploads");
+      await deleteEphemeralForSession(s.id).catch(() => {});
+    }
     await db.session.deleteMany({ where: { tokenHash: hashToken(token) } });
   }
   jar.delete(SESSION_COOKIE);

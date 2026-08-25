@@ -1,3 +1,4 @@
+import type { Readable } from "node:stream";
 import { Client } from "minio";
 
 /**
@@ -30,6 +31,28 @@ export async function putObject(
   await minio.putObject(FILES_BUCKET, key, data, data.length, {
     "Content-Type": contentType,
   });
+}
+
+/** Simpan objek dari stream (hemat RAM untuk berkas besar). */
+export async function putObjectStream(
+  key: string,
+  body: Readable,
+  size: number,
+  contentType: string,
+): Promise<void> {
+  await minio.putObject(FILES_BUCKET, key, body, size, {
+    "Content-Type": contentType,
+  });
+}
+
+/** Hapus satu objek. */
+export async function removeObject(key: string): Promise<void> {
+  await minio.removeObject(FILES_BUCKET, key);
+}
+
+/** Hapus banyak objek sekaligus. */
+export async function removeObjects(keys: string[]): Promise<void> {
+  if (keys.length) await minio.removeObjects(FILES_BUCKET, keys);
 }
 
 export async function getObjectStream(key: string) {

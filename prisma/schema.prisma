@@ -42,6 +42,7 @@ model User {
   knowledgeSources KnowledgeSource[]
   assistants    Assistant[]
   scheduledTasks ScheduledTask[]
+  uploads       Upload[]
 }
 
 // Memori antar-percakapan (ala ChatGPT Memory): fakta personal yang diekstrak
@@ -203,4 +204,26 @@ model ScheduledTask {
 
   @@index([active, nextRunAt])
   @@index([userId])
+}
+
+// ---- Lampiran chat: pelacak kuota + siklus hidup (permanen vs sementara) ----
+// File permanen dihitung ke kuota per-user & ikut backup. Bila kuota penuh,
+// upload berikut jadi "ephemeral": tetap bisa dipakai AI selama sesi, tidak
+// masuk kuota/backup, dan dihapus saat logout / tab ditutup / TTL menganggur.
+model Upload {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key          String   @unique // MinIO object key
+  name         String
+  contentType  String
+  size         Int // bytes (maks per file < 2^31)
+  ephemeral    Boolean  @default(false)
+  sessionId    String? // sesi pemilik (utk file ephemeral)
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([userId, ephemeral])
+  @@index([sessionId])
+  @@index([ephemeral, lastActiveAt])
 }
