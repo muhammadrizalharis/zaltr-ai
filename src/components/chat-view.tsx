@@ -10,6 +10,42 @@ import { MODE_PARAFRASE, type ModeParafrase } from "@/server/paraphrase";
 
 /** Batas lampiran per pesan (server menolak lebih dari ini). */
 const MAX_FILES = 5;
+/** Batas ukuran per berkas di sisi klien (samakan dgn server ZALTR_MAX_UPLOAD_MB). */
+const MAX_UPLOAD_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB) || 500;
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+
+type UploadResp = {
+  files?: Array<{ url: string; name: string; type: string; size: number; ephemeral: boolean }>;
+  quota?: { usedBytes: number; limitBytes: number };
+  ephemeralCount?: number;
+  error?: string;
+};
+
+/** Upload via XHR agar dapat progres unggah (fetch tidak memberi progres). */
+function uploadFiles(files: File[], onProgress: (pct: number) => void): Promise<UploadResp> {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    for (const f of files) fd.append("file", f);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/uploads");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      let data: UploadResp = {};
+      try {
+        data = JSON.parse(xhr.responseText) as UploadResp;
+      } catch {
+        reject(new Error("Respons upload tidak valid"));
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && data.files) resolve(data);
+      else reject(new Error(data.error ?? "Upload gagal"));
+    };
+    xhr.onerror = () => reject(new Error("Koneksi upload gagal"));
+    xhr.send(fd);
+  });
+}
 
 const SUGGESTIONS = [
   "Buatkan rencana belajar AI 30 hari untuk pemula",
@@ -33,6 +69,9 @@ export function ChatView({
   const [error, setError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [ephemeralActive, setEphemeralActive] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [webSearch, setWebSearch] = useState(false);
   const [agentMode, setAgentMode] = useState(false);
   const [parafrase, setParafrase] = useState<ModeParafrase | null>(null);
@@ -125,13 +164,21 @@ export function ChatView({
   function addFiles(incoming: File[]) {
     if (incoming.length === 0) return;
     setError(null);
+    const tooBig = incoming.filter((f) => f.size > MAX_UPLOAD_BYTES);
+    const ok = incoming.filter((f) => f.size <= MAX_UPLOAD_BYTES);
+    if (tooBig.length) {
+      setError(
+        `${tooBig.map((f) => f.name).join(", ")} melebihi ${MAX_UPLOAD_MB} MB — dilewati.`,
+      );
+    }
+    if (ok.length === 0) return;
     setAttachments((prev) => {
       if (prev.length >= MAX_FILES) {
         setError(`Maksimal ${MAX_FILES} lampiran per pesan.`);
         return prev;
       }
-      const next = [...prev, ...incoming].slice(0, MAX_FILES);
-      if (prev.length + incoming.length > MAX_FILES) {
+      const next = [...prev, ...ok].slice(0, MAX_FILES);
+      if (prev.length + ok.length > MAX_FILES) {
         setError(`Maksimal ${MAX_FILES} lampiran per pesan — sisanya diabaikan.`);
       }
       return next;
@@ -151,6 +198,16 @@ export function ChatView({
     return () => document.removeEventListener("paste", onPaste);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Denyut selama sesi memiliki lampiran sementara: jaga file dari pembersih TTL
+  // (berhenti saat aplikasi ditutup -> file dibersihkan setelah masa tenggang).
+  useEffect(() => {
+    if (!ephemeralActive) return;
+    const ping = () => void fetch("/api/uploads/heartbeat", { method: "POST" });
+    ping();
+    const id = setInterval(ping, 4 * 60_000);
+    return () => clearInterval(id);
+  }, [ephemeralActive]);
 
   useEffect(() => {
     if (!stickToBottom) return;
@@ -189,27 +246,33 @@ export function ChatView({
     let content = text;
     if (!regenerate && attachments.length > 0) {
       setUploading(true);
+      setUploadPct(0);
       try {
-        const fd = new FormData();
-        for (const f of attachments) fd.append("file", f);
-        const up = await fetch("/api/uploads", { method: "POST", body: fd });
-        const data = (await up.json()) as {
-          files?: Array<{ url: string; name: string; type: string }>;
-          error?: string;
-        };
-        if (!up.ok || !data.files) throw new Error(data.error ?? "Upload gagal");
-        const lines = data.files.map((f) =>
-          f.type.startsWith("image/") ? `![${f.name}](${f.url})` : `[\u{1F4CE} ${f.name}](${f.url})`,
+        const data = await uploadFiles(attachments, setUploadPct);
+        const files = data.files ?? [];
+        const lines = files.map((f) =>
+          f.type.startsWith("image/")
+            ? `![${f.name}](${f.url})`
+            : `[\u{1F4CE} ${f.name}${f.ephemeral ? " (sementara)" : ""}](${f.url})`,
         );
         content = [text, ...lines].filter(Boolean).join("\n\n");
+        if ((data.ephemeralCount ?? 0) > 0) {
+          const gb = Math.round((data.quota?.limitBytes ?? 5 * 1024 ** 3) / 1024 ** 3);
+          setEphemeralActive(true);
+          setNotice(
+            `Kuota ${gb} GB penuh — berkas ini disimpan sementara: tetap bisa diproses AI sekarang, tapi hilang saat kamu keluar/logout (bukan sekadar pindah tab).`,
+          );
+        }
         setAttachments([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Upload gagal");
         setDraft(text);
         setUploading(false);
+        setUploadPct(null);
         return;
       }
       setUploading(false);
+      setUploadPct(null);
     }
 
     const convId = await ensureConversation();
@@ -415,7 +478,7 @@ export function ChatView({
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
           </svg>
           <p className="text-sm font-medium text-ink">Lepaskan berkas di sini</p>
-          <p className="text-xs text-muted">Gambar, PDF, Word, Excel, kode — maks {MAX_FILES} berkas</p>
+          <p className="text-xs text-muted">Gambar, PDF, Word, Excel, kode — maks {MAX_FILES} berkas · {MAX_UPLOAD_MB} MB/berkas</p>
         </div>
       )}
       <div className="flex shrink-0 items-center justify-end border-b border-line/70 bg-panel/40 px-4 py-2 backdrop-blur">
@@ -501,6 +564,33 @@ export function ChatView({
             </svg>
             Ke pesan terbaru
           </button>
+        )}
+        {notice && (
+          <div className="mx-auto mb-2 flex w-full max-w-3xl items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            <span className="mt-0.5">⚠️</span>
+            <span className="flex-1">{notice}</span>
+            <button
+              onClick={() => setNotice(null)}
+              className="text-amber-200/70 hover:text-amber-100"
+              aria-label="Tutup peringatan"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {uploading && uploadPct !== null && (
+          <div className="mx-auto mb-2 w-full max-w-3xl">
+            <div className="mb-1 flex justify-between text-[11px] text-muted">
+              <span>Mengunggah…</span>
+              <span>{uploadPct}%</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-panel-2">
+              <div
+                className="h-full rounded-full bg-accent-a transition-all"
+                style={{ width: `${uploadPct}%` }}
+              />
+            </div>
+          </div>
         )}
         {(attachments.length > 0 || webSearch || parafrase || agentMode) && (
           <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap items-center gap-1.5">

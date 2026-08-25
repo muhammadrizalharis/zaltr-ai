@@ -7,6 +7,7 @@
 import { db } from "@/lib/db";
 import { dispatch } from "@/server/providers";
 import type { HistoryItem } from "@/server/providers";
+import { cleanupStaleEphemeral } from "@/server/uploads";
 
 function creditCost(modelId: string): number {
   return modelId.startsWith("copilot:") ? 1 : 0;
@@ -110,4 +111,16 @@ export function startScheduler(): void {
   console.log("[scheduler] tugas terjadwal aktif (cek tiap 60 detik)");
   void runDueTasks(); // tick awal: jalankan yang tertunggak saat server mati
   setInterval(() => void runDueTasks(), 60_000);
+  // Bersihkan lampiran sementara yang menganggur (sesi ditutup tanpa logout).
+  void sweepEphemeral();
+  setInterval(() => void sweepEphemeral(), 10 * 60_000);
+}
+
+async function sweepEphemeral(): Promise<void> {
+  try {
+    const n = await cleanupStaleEphemeral();
+    if (n) console.log(`[scheduler] hapus ${n} lampiran sementara kedaluwarsa`);
+  } catch (e) {
+    console.error("[scheduler] cleanup upload:", (e as Error).message);
+  }
 }
