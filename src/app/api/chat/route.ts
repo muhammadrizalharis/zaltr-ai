@@ -333,12 +333,16 @@ export const POST = guarded(async (req: Request) => {
     // Konteks personal: custom instructions + memori antar-percakapan.
     // Paket FREE (zaltr-core): tanpa memori/instruksi/web — konteks pendek.
     const isFree = modelId === "zaltr-core";
+    // Model generasi gambar (ComfyUI) hanya butuh prompt mentah pengguna —
+    // JANGAN suntikkan memori/instruksi/RAG/web (mengotori prompt & alt gambar).
+    const isImageGen = modelId.startsWith("comfyui:");
+    const noContext = isFree || isImageGen;
     const preamble: string[] = [];
-    if (!isFree && me.customInstructions?.trim()) {
+    if (!noContext && me.customInstructions?.trim()) {
       preamble.push(`Instruksi pribadi dari pengguna (patuhi):\n${me.customInstructions.trim().slice(0, 2_000)}`);
     }
     // Instruksi khusus project (ala Claude Projects) — hanya untuk chat di dalam project.
-    if (!isFree && conversation.projectId) {
+    if (!noContext && conversation.projectId) {
       const proj = await db.project.findUnique({
         where: { id: conversation.projectId },
         select: { instructions: true },
@@ -350,7 +354,7 @@ export const POST = guarded(async (req: Request) => {
     // Custom assistant (ala GPTs): instruksi khusus — DIBINGKAI sebagai instruksi
     // pengguna yang harus dipatuhi (BUKAN "berperan sebagai persona lain", yang
     // ditolak system prompt karena melindungi identitas).
-    if (!isFree && conversation.assistantId) {
+    if (!noContext && conversation.assistantId) {
       const asst = await db.assistant.findUnique({
         where: { id: conversation.assistantId },
         select: { name: true, instructions: true },
@@ -361,11 +365,11 @@ export const POST = guarded(async (req: Request) => {
         );
       }
     }
-    const mem = isFree ? null : await memoryContext(me.id);
+    const mem = noContext ? null : await memoryContext(me.id);
     if (mem) preamble.push(mem);
 
     // Web search (toggle "Cari web" di composer).
-    if (web && !isFree) {
+    if (web && !noContext) {
       try {
         const hits = await webSearch(content.split("\n")[0] || content);
         preamble.push(formatSearchContext(content.split("\n")[0] || content, hits));
@@ -376,7 +380,7 @@ export const POST = guarded(async (req: Request) => {
 
     // Basis pengetahuan (RAG): ambil potongan relevan dari dokumen user/project.
     // Hanya jika user punya sumber terindeks (hindari embedding query sia-sia).
-    if (!isFree) {
+    if (!noContext) {
       try {
         if (await countIndexed(me.id, conversation.projectId, conversation.assistantId)) {
           const kb = await retrieve({
@@ -400,7 +404,7 @@ export const POST = guarded(async (req: Request) => {
     // Parafrase berlaku untuk semua paket: teks pengguna dibungkus instruksi
     // penyuntingan, sedangkan yang tersimpan di riwayat tetap teks aslinya.
     const mode = parsed.data.paraphrase;
-    if (mode && isModeParafrase(mode)) {
+    if (!isImageGen && mode && isModeParafrase(mode)) {
       last.content = promptParafrase(mode, last.content);
     }
   }
@@ -455,7 +459,9 @@ export const POST = guarded(async (req: Request) => {
             } else {
               // Gambar sudah dipersistenkan ke MinIO oleh provider;
               // simpan sebagai markdown agar ikut kontrak "chat = markdown".
-              const md = `\n\n![${part.alt}](${part.url})\n`;
+              // Sanitasi alt: buang []/baris-baru agar tak memecah sintaks gambar.
+              const alt = (part.alt ?? "").replace(/[\r\n[\]]+/g, " ").trim().slice(0, 120);
+              const md = `\n\n![${alt}](${part.url})\n`;
               acc += md;
               send({ type: "delta", text: md });
             }

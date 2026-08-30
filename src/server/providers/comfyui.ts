@@ -338,6 +338,6 @@ export async function* comfyGenerate(req: ChatRequest): ProviderGenerator {
     await putObject(key, buf, MIME[ext] ?? "application/octet-stream");
     // Semua jenis media dikirim sebagai part image; renderer web mendeteksi
     // ekstensi url dan menampilkan <video>/<audio> bila perlu.
-    yield { kind: "image", url: `/api/files/${key}`, alt: prompt.slice(0, 120) };
+    yield { kind: "image", url: `/api/files/${key}`, alt: curated.label };
   }
 }

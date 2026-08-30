@@ -54,6 +54,8 @@ export async function extractMemories(userId: string, userText: string): Promise
       .split("\n")
       .map((l) => l.replace(/^[-*\d.\s]+/, "").trim())
       .filter((l) => l.length >= 8 && l.length <= 200)
+      // Tolak fragmen markdown/tautan/berkas yang bocor (mis. "…](…png)").
+      .filter((l) => !/\]\(|!\[|https?:\/\/|\/api\/|\.(png|jpe?g|webp|gif|mp4|mp3|pdf)\b/i.test(l))
       .slice(0, 3);
     for (const line of lines) {
       if (known.has(line.toLowerCase())) continue;
