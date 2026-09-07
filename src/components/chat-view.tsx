@@ -527,6 +527,19 @@ export function ChatView({
                 </div>
               </div>
             )}
+            {!streaming && suggestions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => void send(s)}
+                    className="rounded-full border border-line bg-panel-2 px-3 py-1.5 text-left text-xs text-muted hover:border-accent-a/60 hover:text-ink"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
             {error && (
               <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
                 {error}
@@ -538,19 +551,6 @@ export function ChatView({
       </div>
 
       <div className="relative border-t border-line bg-panel/60 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur">
-        {!streaming && suggestions.length > 0 && (
-          <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap gap-1.5">
-            {suggestions.map((s, i) => (
-              <button
-                key={i}
-                onClick={() => void send(s)}
-                className="rounded-full border border-line bg-panel-2 px-3 py-1.5 text-left text-xs text-muted hover:border-accent-a/60 hover:text-ink"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
         {!stickToBottom && (
           <button
             onClick={() => {
