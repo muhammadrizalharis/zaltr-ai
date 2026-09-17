@@ -4,7 +4,7 @@
 # (profile "ai" di docker-compose.yml).
 FROM debian:bookworm-slim
 
-ARG COPILOT_CLI_VERSION=1.0.75
+ARG COPILOT_CLI_VERSION=1.0.85
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates wget \
