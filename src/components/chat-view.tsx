@@ -14,6 +14,13 @@ const MAX_FILES = 5;
 const MAX_UPLOAD_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB) || 500;
 const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
+/** Unggah folder: lewati direktori & berkas yang tak berguna untuk analisa teks. */
+const FOLDER_IGNORE_DIR =
+  /(^|\/)(node_modules|\.git|\.next|\.nuxt|dist|build|out|\.cache|venv|\.venv|env|__pycache__|\.idea|\.vscode|coverage|\.turbo|target|bin|obj)(\/|$)/i;
+const FOLDER_IGNORE_EXT =
+  /\.(png|jpe?g|gif|webp|bmp|ico|icns|svg|mp3|mp4|mov|avi|mkv|webm|wav|flac|ogg|zip|gz|bz2|tar|tgz|rar|7z|exe|dll|so|dylib|bin|safetensors|pt|pth|ckpt|onnx|pkl|pickle|joblib|npy|npz|parquet|feather|h5|hdf5|woff2?|ttf|eot|otf|lock|map)$/i;
+const FOLDER_MAX_FILE_BYTES = 25 * 1024 * 1024;
+
 type UploadResp = {
   files?: Array<{ url: string; name: string; type: string; size: number; ephemeral: boolean }>;
   quota?: { usedBytes: number; limitBytes: number };
@@ -70,6 +77,7 @@ export function ChatView({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [folderBusy, setFolderBusy] = useState(false);
   const [ephemeralActive, setEphemeralActive] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [webSearch, setWebSearch] = useState(false);
@@ -94,6 +102,7 @@ export function ChatView({
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setModel(loadSavedModel()), []);
   useEffect(() => {
@@ -183,6 +192,57 @@ export function ChatView({
       }
       return next;
     });
+  }
+
+  // Unggah SATU folder untuk dianalisa: saring berkas sampah (node_modules/.git/
+  // biner), kirim tiap file + path relatifnya ke /api/uploads/folder yang meng-
+  // ekstrak & meng-embed ke basis pengetahuan (RAG). Model lalu bisa menganalisa
+  // seluruh isi folder di chat, tanpa batas jumlah file.
+  async function uploadFolder(all: File[]) {
+    if (all.length === 0) return;
+    setError(null);
+    const picked = all.filter((f) => {
+      const rel = f.webkitRelativePath || f.name;
+      return (
+        !FOLDER_IGNORE_DIR.test(rel) &&
+        !FOLDER_IGNORE_EXT.test(rel) &&
+        f.size > 0 &&
+        f.size <= FOLDER_MAX_FILE_BYTES
+      );
+    });
+    if (picked.length === 0) {
+      setError("Folder itu tak berisi berkas teks/dokumen yang bisa dianalisa.");
+      return;
+    }
+    const folderName = (picked[0].webkitRelativePath || "folder").split("/")[0] || "folder";
+    const fd = new FormData();
+    fd.append("folder", folderName);
+    for (const f of picked) {
+      fd.append("file", f);
+      fd.append("path", f.webkitRelativePath || f.name);
+    }
+    setFolderBusy(true);
+    setNotice(`Mengindeks folder "${folderName}" (${picked.length} berkas)… bisa beberapa saat.`);
+    try {
+      const res = await fetch("/api/uploads/folder", { method: "POST", body: fd });
+      const data = (await res.json()) as {
+        folder?: string;
+        indexedCount?: number;
+        skippedCount?: number;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "Gagal mengindeks folder");
+      setNotice(
+        `📁 Folder "${data.folder}" siap dianalisa — ${data.indexedCount} berkas terindeks` +
+          (data.skippedCount ? `, ${data.skippedCount} dilewati` : "") +
+          `. Sekarang tanyakan apa saja tentang isinya.`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal mengindeks folder");
+      setNotice(null);
+    } finally {
+      setFolderBusy(false);
+    }
   }
 
   // Tempel (Ctrl+V) gambar/berkas dari papan klip — berlaku di seluruh halaman
@@ -670,6 +730,17 @@ export function ChatView({
               e.target.value = "";
             }}
           />
+          <input
+            ref={folderInputRef}
+            type="file"
+            hidden
+            multiple
+            {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+            onChange={(e) => {
+              void uploadFolder(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
+          />
           <div className="relative shrink-0" data-plus-root>
             <button
               onClick={() => setPlusOpen((v) => !v)}
@@ -698,6 +769,18 @@ export function ChatView({
                   }}
                   icon={
                     <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  }
+                />
+                <PlusItem
+                  title="Unggah folder"
+                  desc={folderBusy ? "Mengindeks folder…" : "Baca & analisa seluruh isi folder (RAG)"}
+                  disabled={folderBusy}
+                  onClick={() => {
+                    setPlusOpen(false);
+                    folderInputRef.current?.click();
+                  }}
+                  icon={
+                    <path d="M4 5a1 1 0 0 1 1-1h4l2 2.5h8a1 1 0 0 1 1 1V18a2 2 0 0 1-2 2H5a1 1 0 0 1-1-1z" />
                   }
                 />
                 <PlusItem
