@@ -203,6 +203,27 @@ export function SettingsView() {
               dropdown → mulai chat.
             </li>
           </ol>
+
+          <div className="mt-3 space-y-1">
+            <p className="text-xs text-muted">
+              Contoh isi{" "}
+              <code className="rounded bg-panel-2 px-1">config.yaml</code> — ganti{" "}
+              <code className="rounded bg-panel-2 px-1">apiKey</code> dengan key dari tombol{" "}
+              <b>Buat API key</b> di bawah (atau langsung <b>Salin config</b> yang sudah terisi
+              setelah key dibuat):
+            </p>
+            <pre className="max-h-56 overflow-auto whitespace-pre rounded bg-bg px-2 py-2 text-[11px] leading-relaxed">{continueConfig(base || "https://calyzr-ai.my.id", "sk-calyzr-XXXXXXXXXXXXXXXX")}</pre>
+            <button
+              onClick={() =>
+                void navigator.clipboard?.writeText(
+                  continueConfig(base || "https://calyzr-ai.my.id", "sk-calyzr-XXXXXXXXXXXXXXXX"),
+                )
+              }
+              className="rounded-lg border border-line bg-panel-2 px-2 py-1 text-xs hover:text-ink"
+            >
+              Salin contoh
+            </button>
+          </div>
         </details>
 
         {createdKey && (
