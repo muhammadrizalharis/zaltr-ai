@@ -11,6 +11,24 @@ type ApiKeyItem = {
   createdAt: string;
 };
 
+/** Config Continue (VS Code) siap-tempel untuk gateway OpenAI-compatible calyzr. */
+function continueConfig(base: string, key: string): string {
+  const apiBase = `${base}/v1`;
+  const model = (name: string, id: string) =>
+    `  - name: ${name}\n    provider: openai\n    model: ${id}\n    apiBase: ${apiBase}\n    apiKey: ${key}`;
+  return [
+    "name: Calyzr",
+    "version: 1.0.0",
+    "schema: v1",
+    "models:",
+    model("Calyzr Sonnet 5", "copilot:claude-sonnet-5"),
+    model("Calyzr Opus 5", "copilot:claude-opus-5"),
+    model("Calyzr Haiku 4.5 (cepat)", "copilot:claude-haiku-4.5"),
+    `# Model lain yang tersedia untukmu: buka ${apiBase}/models`,
+    "",
+  ].join("\n");
+}
+
 /**
  * Pengaturan pribadi: custom instructions (disuntik ke semua chat)
  * + kelola memori antar-percakapan (lihat & hapus).
@@ -161,8 +179,34 @@ export function SettingsView() {
           yang diizinkan, kredit, dan limit akunmu.
         </p>
 
+        <details className="rounded-xl border border-line bg-panel px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium">
+            Cara sambungkan VS Code (tanpa SSH) — 4 langkah
+          </summary>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-muted">
+            <li>
+              Buka <b>Extensions</b> (Ctrl+Shift+X) → cari <b>Continue</b> →{" "}
+              <b>Install</b> (di komputermu sendiri, tidak perlu SSH ke server).
+            </li>
+            <li>
+              Klik <b>Buat API key</b> di bawah, lalu <b>Salin config</b>.
+            </li>
+            <li>
+              Buat file{" "}
+              <code className="rounded bg-panel-2 px-1">~/.continue/config.yaml</code>{" "}
+              (Windows:{" "}
+              <code className="rounded bg-panel-2 px-1">%USERPROFILE%\.continue\config.yaml</code>
+              ), tempel config tadi, lalu simpan.
+            </li>
+            <li>
+              Klik ikon <b>Continue</b> di sidebar → pilih model <b>Calyzr</b> pada
+              dropdown → mulai chat.
+            </li>
+          </ol>
+        </details>
+
         {createdKey && (
-          <div className="space-y-1 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+          <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2">
             <p className="text-xs text-amber-200">
               Salin sekarang — key ini <b>tidak ditampilkan lagi</b>:
             </p>
@@ -172,7 +216,20 @@ export function SettingsView() {
                 onClick={() => void navigator.clipboard?.writeText(createdKey)}
                 className="shrink-0 rounded-lg border border-line bg-panel-2 px-2 py-1 text-xs hover:text-ink"
               >
-                Salin
+                Salin key
+              </button>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-amber-200">
+                Config Continue siap‑tempel (ke{" "}
+                <code className="rounded bg-bg px-1">~/.continue/config.yaml</code>):
+              </p>
+              <pre className="max-h-48 overflow-auto whitespace-pre rounded bg-bg px-2 py-2 text-[11px] leading-relaxed">{continueConfig(base, createdKey)}</pre>
+              <button
+                onClick={() => void navigator.clipboard?.writeText(continueConfig(base, createdKey))}
+                className="rounded-lg border border-line bg-panel-2 px-2 py-1 text-xs hover:text-ink"
+              >
+                Salin config
               </button>
             </div>
           </div>
