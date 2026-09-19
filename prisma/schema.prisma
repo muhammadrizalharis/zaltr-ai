@@ -43,6 +43,7 @@ model User {
   assistants    Assistant[]
   scheduledTasks ScheduledTask[]
   uploads       Upload[]
+  apiKeys       ApiKey[]
 }
 
 // Memori antar-percakapan (ala ChatGPT Memory): fakta personal yang diekstrak
@@ -226,4 +227,20 @@ model Upload {
   @@index([userId, ephemeral])
   @@index([sessionId])
   @@index([ephemeral, lastActiveAt])
+}
+
+// ---- API key: akses gateway OpenAI-compatible (/v1) dari luar (mis. VS Code) ----
+// Tetap tunduk allowedModels + kredit + limit harian user (kendali super admin).
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  keyHash    String    @unique // sha256(raw); raw hanya ditampilkan sekali saat dibuat
+  prefix     String // beberapa char awal utk ditampilkan (sk-calyzr-xxxx)
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
 }
