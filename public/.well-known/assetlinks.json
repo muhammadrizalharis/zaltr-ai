@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "id.my.calyzr_ai",
+      "sha256_cert_fingerprints": [
+        "A4:B1:A8:F2:5E:97:B1:D9:90:66:EF:0A:4A:9A:D2:78:4C:0C:B1:62:FE:E3:66:7C:05:9B:7D:6F:60:97:C2:5C"
+      ]
+    }
+  }
+]
