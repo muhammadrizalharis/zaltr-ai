@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { modelAllowed } from "@/server/auth";
 import { userFromApiKey } from "@/server/apikeys";
 import { effectiveDailyLimit } from "@/server/plans";
+import { rateLimit } from "@/server/ratelimit";
 import { dispatch } from "@/server/providers";
 import type { HistoryItem } from "@/server/providers";
 
@@ -35,6 +36,20 @@ function textOf(content: unknown): string {
 export async function POST(req: Request) {
   const me = await userFromApiKey(req);
   if (!me) return err("API key tidak valid atau dicabut", 401, "authentication_error");
+
+  // Rate limit: cegah spam yang menghabiskan kredit/kuota (60 permintaan/menit/user).
+  const rl = rateLimit(`v1:${me.id}`, 60, 60_000);
+  if (!rl.ok) {
+    return Response.json(
+      {
+        error: {
+          message: `Terlalu banyak permintaan — coba lagi dalam ${rl.retryAfter} detik.`,
+          type: "rate_limit_error",
+        },
+      },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
 
   const body = (await req.json().catch(() => null)) as {
     model?: string;

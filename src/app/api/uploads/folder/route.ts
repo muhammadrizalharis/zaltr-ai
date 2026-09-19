@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { guarded, requireUser } from "@/server/auth";
 import { extractText, isBinarySkip } from "@/server/extract";
 import { ingestSource } from "@/server/knowledge";
+import { rateLimit } from "@/server/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,13 @@ type SkipResult = { path: string; reason: string };
 
 export const POST = guarded(async (req: Request) => {
   const me = await requireUser();
+  const rl = rateLimit(`upf:${me.id}`, 6, 60_000);
+  if (!rl.ok) {
+    return Response.json(
+      { error: `Terlalu banyak pengindeksan folder — coba lagi dalam ${rl.retryAfter} detik.` },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
   const form = await req.formData().catch(() => null);
   if (!form) {
     return Response.json({ error: "Kirim sebagai multipart/form-data" }, { status: 400 });

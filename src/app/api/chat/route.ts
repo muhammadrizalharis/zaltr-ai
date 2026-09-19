@@ -21,7 +21,7 @@ import {
   formatTree,
   scoreFile,
 } from "@/server/drive";
-import { retrieve, formatKnowledge, countIndexed } from "@/server/knowledge";
+import { retrieve, formatKnowledge, countIndexed, ingestUploadOnce } from "@/server/knowledge";
 import { runAgent } from "@/server/agent";
 import { webSearch, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
@@ -204,7 +204,14 @@ export const POST = guarded(async (req: Request) => {
         } else {
           const limit = Math.min(MAX_CHARS_PER_FILE, sisaBudget);
           const text = limit > 0 ? await extractText(buf, name, limit) : null;
-          if (text) sisaBudget -= text.length;
+          if (text) {
+            sisaBudget -= text.length;
+            // Ingest ke RAG sekali (dedupe via key) supaya dokumen ini tetap bisa
+            // dirujuk di giliran berikutnya. Async — tak memblok jawaban.
+            void ingestUploadOnce({ userId: me.id, key, name, text, bytes: buf.length }).catch(
+              () => {},
+            );
+          }
           extras.push(
             text
               ? `=== Isi lampiran "${name}" ===\n${text}\n=== Akhir lampiran ===`

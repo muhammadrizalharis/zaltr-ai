@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { putObjectStream, removeObjects } from "@/lib/storage";
 import { currentSessionId, guarded, requireUser } from "@/server/auth";
 import { MAX_UPLOAD_BYTES, UPLOAD_QUOTA_BYTES, permanentUsage } from "@/server/uploads";
+import { rateLimit } from "@/server/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,13 @@ const MAX_MB = Math.round(MAX_UPLOAD_BYTES / 1024 / 1024);
  */
 export const POST = guarded(async (req: Request) => {
   const me = await requireUser();
+  const rl = rateLimit(`up:${me.id}`, 30, 60_000);
+  if (!rl.ok) {
+    return Response.json(
+      { error: `Terlalu banyak unggahan — coba lagi dalam ${rl.retryAfter} detik.` },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
   const form = await req.formData().catch(() => null);
   if (!form) {
     return Response.json({ error: "Kirim sebagai multipart/form-data" }, { status: 400 });

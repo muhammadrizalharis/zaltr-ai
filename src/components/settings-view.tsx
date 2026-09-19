@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { InstallApp } from "@/components/install-app";
 
 type MemoryItem = { id: string; content: string; createdAt: string };
 type ApiKeyItem = {
@@ -167,6 +168,8 @@ export function SettingsView() {
           </ul>
         )}
       </section>
+
+      <InstallApp />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">API key — pakai di VS Code / aplikasi lain</h2>

@@ -88,6 +88,38 @@ export async function ingestSource(input: IngestInput): Promise<{ sourceId: stri
   }
 }
 
+/**
+ * Ingest SATU lampiran unggahan ke basis pengetahuan, TEPAT SEKALI (dedupe via
+ * ref = key MinIO). Dipakai chat route agar dokumen yang diunggah bisa dirujuk
+ * ulang di giliran berikutnya tanpa unggah ulang. Aman dipanggil berkali-kali.
+ */
+export async function ingestUploadOnce(input: {
+  userId: string;
+  key: string;
+  name: string;
+  text: string;
+  bytes?: number;
+  projectId?: string | null;
+  assistantId?: string | null;
+}): Promise<void> {
+  if (!input.text || input.text.trim().length < 3) return;
+  const exists = await db.knowledgeSource.findFirst({
+    where: { userId: input.userId, ref: input.key },
+    select: { id: true },
+  });
+  if (exists) return;
+  await ingestSource({
+    userId: input.userId,
+    projectId: input.projectId ?? null,
+    assistantId: input.assistantId ?? null,
+    kind: "upload",
+    name: input.name,
+    ref: input.key,
+    text: input.text,
+    bytes: input.bytes,
+  });
+}
+
 export type KnowledgeHit = { content: string; name: string; sourceId: string; dist: number };
 
 /**
@@ -104,12 +136,17 @@ export async function retrieve(opts: {
   const topK = opts.topK ?? 6;
   const q = opts.query.trim();
   if (!q) return [];
-  const vec = await embedOne(q.slice(0, 2_000));
-  const vecStr = `[${vec.join(",")}]`;
   const pid = opts.projectId ?? null;
   const aid = opts.assistantId ?? null;
-  const rows = await db.$queryRaw<KnowledgeHit[]>`
-    SELECT c."content" AS content, s."name" AS name, c."sourceId" AS "sourceId",
+  const pool = Math.max(topK * 4, 24); // ambil kandidat lebih banyak untuk fusion
+
+  type Row = { chunkId: string; content: string; name: string; sourceId: string; dist: number };
+
+  // 1) Kandidat SEMANTIK (vektor / cosine).
+  const vec = await embedOne(q.slice(0, 2_000));
+  const vecStr = `[${vec.join(",")}]`;
+  const vecRows = await db.$queryRaw<Row[]>`
+    SELECT c."id" AS "chunkId", c."content" AS content, s."name" AS name, c."sourceId" AS "sourceId",
            (c."embedding" <=> ${vecStr}::vector) AS dist
     FROM "KnowledgeChunk" c
     JOIN "KnowledgeSource" s ON s."id" = c."sourceId"
@@ -121,10 +158,53 @@ export async function retrieve(opts: {
         OR (${aid}::text IS NOT NULL AND c."assistantId" = ${aid})
       )
     ORDER BY dist ASC
-    LIMIT ${topK}
+    LIMIT ${pool}
   `;
-  // Buang yang terlalu jauh (cosine distance > 0.75 = nyaris tak relevan).
-  return rows.filter((r) => r.dist <= 0.75);
+
+  // 2) Kandidat KEYWORD (leksikal, full-text 'simple' — cocok lintas ID/EN & kode).
+  let kwRows: Row[] = [];
+  try {
+    kwRows = await db.$queryRaw<Row[]>`
+      SELECT c."id" AS "chunkId", c."content" AS content, s."name" AS name, c."sourceId" AS "sourceId", 0::float8 AS dist
+      FROM "KnowledgeChunk" c
+      JOIN "KnowledgeSource" s ON s."id" = c."sourceId"
+      WHERE c."userId" = ${opts.userId}
+        AND s."status" = 'indexed'
+        AND (
+          (c."projectId" IS NULL AND c."assistantId" IS NULL)
+          OR (${pid}::text IS NOT NULL AND c."projectId" = ${pid})
+          OR (${aid}::text IS NOT NULL AND c."assistantId" = ${aid})
+        )
+        AND to_tsvector('simple', c."content") @@ websearch_to_tsquery('simple', ${q})
+      ORDER BY ts_rank(to_tsvector('simple', c."content"), websearch_to_tsquery('simple', ${q})) DESC
+      LIMIT ${pool}
+    `;
+  } catch {
+    kwRows = []; // query kata-kunci kosong/aneh -> cukup pakai vektor
+  }
+
+  // 3) Reciprocal Rank Fusion: gabung kedua peringkat. Kandidat vektor yang
+  //    terlalu jauh (dist > 0.8) tak diikutkan agar konteks tetap relevan.
+  const RRF_K = 60;
+  const fused = new Map<string, { hit: KnowledgeHit; score: number }>();
+  const bump = (r: Row, rank: number) => {
+    const add = 1 / (RRF_K + rank + 1);
+    const prev = fused.get(r.chunkId);
+    if (prev) prev.score += add;
+    else
+      fused.set(r.chunkId, {
+        hit: { content: r.content, name: r.name, sourceId: r.sourceId, dist: r.dist },
+        score: add,
+      });
+  };
+  vecRows.forEach((r, i) => {
+    if (r.dist <= 0.8) bump(r, i);
+  });
+  kwRows.forEach((r, i) => bump(r, i));
+  return [...fused.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK)
+    .map((x) => x.hit);
 }
 
 /** Format hasil retrieval jadi blok konteks ber-sitasi untuk prompt. */
