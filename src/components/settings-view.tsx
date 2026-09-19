@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 
 type MemoryItem = { id: string; content: string; createdAt: string };
+type ApiKeyItem = {
+  id: string;
+  name: string;
+  prefix: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+};
 
 /**
  * Pengaturan pribadi: custom instructions (disuntik ke semua chat)
@@ -13,15 +20,24 @@ export function SettingsView() {
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [base, setBase] = useState("");
+  const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([]);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyErr, setKeyErr] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const [p, m] = await Promise.all([
+      setBase(window.location.origin);
+      const [p, m, k] = await Promise.all([
         fetch("/api/profile").then((r) => r.json()),
         fetch("/api/memories").then((r) => r.json()),
+        fetch("/api/apikeys").then((r) => r.json()),
       ]);
       setInstructions(p.profile?.customInstructions ?? "");
       setMemories(m.memories ?? []);
+      setApiKeys(k.keys ?? []);
     })();
   }, []);
 
@@ -40,6 +56,32 @@ export function SettingsView() {
   async function removeMemory(id: string) {
     const res = await fetch(`/api/memories/${id}`, { method: "DELETE" });
     if (res.ok) setMemories((prev) => prev.filter((m) => m.id !== id));
+  }
+
+  async function createKey() {
+    setKeyBusy(true);
+    setKeyErr(null);
+    setCreatedKey(null);
+    const res = await fetch("/api/apikeys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newKeyName }),
+    });
+    const data = await res.json();
+    setKeyBusy(false);
+    if (!res.ok) {
+      setKeyErr(data.error ?? "Gagal membuat key");
+      return;
+    }
+    setCreatedKey(data.key.raw);
+    setNewKeyName("");
+    const k = await fetch("/api/apikeys").then((r) => r.json());
+    setApiKeys(k.keys ?? []);
+  }
+
+  async function revokeKey(id: string) {
+    const res = await fetch(`/api/apikeys/${id}`, { method: "DELETE" });
+    if (res.ok) setApiKeys((prev) => prev.filter((k) => k.id !== id));
   }
 
   return (
@@ -101,6 +143,81 @@ export function SettingsView() {
                   title="Hapus memori ini"
                 >
                   Hapus
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">API key — pakai di VS Code / aplikasi lain</h2>
+        <p className="text-xs text-muted">
+          Sambungkan model &amp; kredit calyzr ke editor (VS Code, Continue, Cline) lewat API
+          kompatibel OpenAI. Base URL:{" "}
+          <code className="rounded bg-panel-2 px-1">{base}/v1</code> · endpoint{" "}
+          <code className="rounded bg-panel-2 px-1">/chat/completions</code> &amp;{" "}
+          <code className="rounded bg-panel-2 px-1">/models</code>. Pemakaian tetap ikut model
+          yang diizinkan, kredit, dan limit akunmu.
+        </p>
+
+        {createdKey && (
+          <div className="space-y-1 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+            <p className="text-xs text-amber-200">
+              Salin sekarang — key ini <b>tidak ditampilkan lagi</b>:
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded bg-bg px-2 py-1 text-xs">{createdKey}</code>
+              <button
+                onClick={() => void navigator.clipboard?.writeText(createdKey)}
+                className="shrink-0 rounded-lg border border-line bg-panel-2 px-2 py-1 text-xs hover:text-ink"
+              >
+                Salin
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          <input
+            value={newKeyName}
+            onChange={(e) => setNewKeyName(e.target.value)}
+            maxLength={60}
+            placeholder="Nama key (mis. Laptop VS Code)"
+            className="min-w-0 flex-1 rounded-xl border border-line bg-panel-2 px-3 py-2 text-sm outline-none focus:border-accent-b/60"
+          />
+          <button
+            onClick={() => void createKey()}
+            disabled={keyBusy}
+            className="shrink-0 rounded-xl bg-gradient-to-r from-accent-a to-accent-b px-3 py-2 text-sm font-semibold text-black disabled:opacity-40"
+          >
+            {keyBusy ? "Membuat…" : "Buat API key"}
+          </button>
+        </div>
+        {keyErr && <p className="text-xs text-red-400">{keyErr}</p>}
+
+        {apiKeys.length > 0 && (
+          <ul className="space-y-1.5">
+            {apiKeys.map((k) => (
+              <li
+                key={k.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel px-3 py-2 text-sm"
+              >
+                <span className="min-w-0">
+                  <span className="font-medium">{k.name}</span>{" "}
+                  <code className="text-xs text-muted">{k.prefix}…</code>
+                  <span className="block text-xs text-muted">
+                    {k.lastUsedAt
+                      ? `terakhir dipakai ${new Date(k.lastUsedAt).toLocaleDateString("id-ID")}`
+                      : "belum pernah dipakai"}
+                  </span>
+                </span>
+                <button
+                  onClick={() => void revokeKey(k.id)}
+                  className="shrink-0 text-xs text-muted hover:text-red-400"
+                  title="Cabut key ini"
+                >
+                  Cabut
                 </button>
               </li>
             ))}
