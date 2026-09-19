@@ -305,8 +305,49 @@ export const POST = guarded(async (req: Request) => {
       }
     }
 
+    // RECALL gambar dari pesan SEBELUMNYA: sertakan lagi gambar yang diunggah
+    // lebih awal agar pengguna bisa merujuknya (mis. "seperti di gambar X")
+    // TANPA unggah ulang. Model vision menerima gambarnya langsung lagi; untuk
+    // non-vision, deskripsi lamanya tetap ada di riwayat. Dibatasi beberapa
+    // gambar terbaru (env ZALTR_MAX_CTX_IMAGES, default 6) demi context window.
+    const MAX_CTX_IMAGES = Math.max(1, Number(process.env.ZALTR_MAX_CTX_IMAGES) || 6);
+    const recalledImages: AttachedImage[] = [];
+    if (images.length < MAX_CTX_IMAGES) {
+      const seen = new Set(keys);
+      const olderKeys: string[] = [];
+      // Telusuri riwayat (tanpa pesan terakhir) dari yang TERBARU ke terlama.
+      for (let i = history.length - 2; i >= 0 && olderKeys.length < MAX_CTX_IMAGES; i--) {
+        for (const k of [
+          ...history[i].content.matchAll(/\]\(\/api\/files\/(uploads\/[\w./-]+)\)/g),
+        ].map((m) => m[1])) {
+          const nm = k.split("/").pop() ?? k;
+          if (!k.startsWith(`uploads/${me.id}/`) || !IMAGE_EXT.has(fileExt(nm)) || seen.has(k)) continue;
+          seen.add(k);
+          olderKeys.push(k);
+        }
+      }
+      for (const k of olderKeys.slice(0, MAX_CTX_IMAGES - images.length)) {
+        const nm = k.split("/").pop() ?? k;
+        try {
+          const buf = await getObjectBuffer(k);
+          recalledImages.push({ data: buf.toString("base64"), mimeType: imageMime(nm), name: nm });
+        } catch {
+          /* berkas mungkin sudah dihapus (mis. sementara/ephemeral) — abaikan */
+        }
+      }
+      if (recalledImages.length > 0) {
+        recalledImages.reverse(); // urutan kronologis: lama -> baru
+        extras.push(
+          `[Gambar dari pesan sebelumnya ikut disertakan agar bisa dirujuk kembali: ` +
+            `${recalledImages.map((r) => r.name).join(", ")}. ` +
+            `Kamu masih bisa melihatnya — JANGAN minta pengguna mengunggah ulang.]`,
+        );
+      }
+    }
+
     if (extras.length > 0) last.content = `${last.content}\n\n${extras.join("\n\n")}`;
-    if (images.length > 0) last.images = images;
+    const ctxImages = recalledImages.concat(images);
+    if (ctxImages.length > 0) last.images = ctxImages;
 
     // Model yang bisa melihat gambar sendiri (Copilot vision & Ollama VL)
     // menerima gambar langsung. Sisanya dibantu model vision lokal.
