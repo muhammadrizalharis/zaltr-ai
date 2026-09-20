@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ConversationSummary, ProjectSummary } from "@/lib/types";
+import { InstallAppButton } from "@/components/install-app";
 
 export const CONVERSATIONS_CHANGED = "zaltr:conversations-changed";
 
@@ -445,6 +446,7 @@ export function Sidebar({
             </div>
           )}
         </div>
+        <InstallAppButton />
         {user.role === "user" && (
           <Link
             href="/chat/upgrade"

@@ -86,3 +86,67 @@ export function InstallApp() {
     </section>
   );
 }
+
+/**
+ * Versi RINGKAS untuk ditaruh di sidebar: satu tombol pintar. Android/desktop →
+ * pasang PWA (bila tersedia) atau unduh APK; iPhone → petunjuk Add to Home Screen.
+ * Tersembunyi otomatis bila sudah berjalan sebagai aplikasi terpasang.
+ */
+export function InstallAppButton() {
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+
+  useEffect(() => {
+    const onBIP = (e: Event) => {
+      e.preventDefault();
+      setDeferred(e as BeforeInstallPromptEvent);
+    };
+    const onInstalled = () => setInstalled(true);
+    window.addEventListener("beforeinstallprompt", onBIP);
+    window.addEventListener("appinstalled", onInstalled);
+    const ua = navigator.userAgent || "";
+    setIsIOS(/iphone|ipad|ipod/i.test(ua));
+    const nav = navigator as Navigator & { standalone?: boolean };
+    if (window.matchMedia?.("(display-mode: standalone)")?.matches || nav.standalone === true) {
+      setInstalled(true);
+    }
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBIP);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  if (installed) return null;
+
+  async function onClick() {
+    if (deferred) {
+      await deferred.prompt();
+      await deferred.userChoice.catch(() => {});
+      setDeferred(null);
+      return;
+    }
+    if (isIOS) {
+      setShowHint((v) => !v);
+      return;
+    }
+    window.location.href = "/calyzr.apk"; // Android/desktop: unduh APK
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => void onClick()}
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-accent-a/40 bg-accent-a/10 px-3 py-2 text-xs font-semibold text-accent-a hover:bg-accent-a/20"
+      >
+        📥 {deferred ? "Pasang Aplikasi" : isIOS ? "Pasang di iPhone" : "Unduh Aplikasi"}
+      </button>
+      {showHint && isIOS && (
+        <p className="mt-1 text-[10px] leading-relaxed text-muted">
+          Di Safari: ketuk <b>Bagikan</b> (kotak panah) → <b>Add to Home Screen</b>.
+        </p>
+      )}
+    </div>
+  );
+}
