@@ -9,6 +9,8 @@ import { dispatch } from "@/server/providers";
 import type { HistoryItem } from "@/server/providers";
 import { cleanupStaleEphemeral } from "@/server/uploads";
 import { sendToUser } from "@/server/push";
+import { sendEmail, expiryReminderEmail } from "@/server/email";
+import { PLAN_LABELS, isPlan, EXPIRY_REMIND_DAYS } from "@/server/plans";
 
 function creditCost(modelId: string): number {
   return modelId.startsWith("copilot:") ? 1 : 0;
@@ -125,6 +127,9 @@ export function startScheduler(): void {
   // Hanguskan kredit user yang masa aktif paketnya sudah lewat (cek tiap jam).
   void expireCredits();
   setInterval(() => void expireCredits(), 60 * 60_000);
+  // Pengingat masa aktif segera berakhir (H-3) via email + push (cek tiap 6 jam).
+  void remindExpiring();
+  setInterval(() => void remindExpiring(), 6 * 60 * 60_000);
 }
 
 /** Set kredit -> 0 untuk user yang masa aktif (creditsExpireAt) sudah lewat. */
@@ -137,6 +142,49 @@ async function expireCredits(): Promise<void> {
     if (r.count) console.log(`[scheduler] ${r.count} user: kredit hangus (masa aktif habis)`);
   } catch (e) {
     console.error("[scheduler] expireCredits:", (e as Error).message);
+  }
+}
+
+/** Kirim pengingat (email + push) ke user yang masa aktifnya tinggal <= EXPIRY_REMIND_DAYS hari. */
+async function remindExpiring(): Promise<void> {
+  try {
+    const now = new Date();
+    const soon = new Date(now.getTime() + EXPIRY_REMIND_DAYS * 86_400_000);
+    const users = await db.user.findMany({
+      where: {
+        status: "active",
+        creditBalance: { gt: 0 },
+        creditsExpireAt: { gt: now, lte: soon },
+        expiryRemindedAt: null,
+      },
+      select: { id: true, email: true, name: true, plan: true, creditBalance: true, creditsExpireAt: true },
+    });
+    const appUrl = process.env.ZALTR_PUBLIC_URL || "https://calyzr-ai.my.id";
+    for (const u of users) {
+      if (!u.creditsExpireAt) continue;
+      const daysLeft = Math.max(1, Math.ceil((u.creditsExpireAt.getTime() - now.getTime()) / 86_400_000));
+      const planLabel = PLAN_LABELS[isPlan(u.plan) ? u.plan : "free"];
+      if (u.email) {
+        const mail = expiryReminderEmail({
+          name: u.name,
+          planLabel,
+          daysLeft,
+          expiresAt: u.creditsExpireAt,
+          balance: u.creditBalance,
+          appUrl,
+        });
+        void sendEmail({ to: u.email, subject: mail.subject, html: mail.html, text: mail.text });
+      }
+      void sendToUser(u.id, {
+        title: "Paket calyzr.ai segera berakhir",
+        body: `Paket ${planLabel} berakhir ${daysLeft} hari lagi. Perpanjang agar tetap akses model premium.`,
+        url: "/chat/upgrade",
+      });
+      await db.user.update({ where: { id: u.id }, data: { expiryRemindedAt: now } });
+    }
+    if (users.length) console.log(`[scheduler] ${users.length} pengingat masa aktif dikirim`);
+  } catch (e) {
+    console.error("[scheduler] remindExpiring:", (e as Error).message);
   }
 }
 

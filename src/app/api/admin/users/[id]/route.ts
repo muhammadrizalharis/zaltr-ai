@@ -115,6 +115,7 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
   // Pembayaran = saat saldo kredit NAIK -> perbarui masa aktif paket (30 hari).
   if (body.data.creditBalance !== undefined && body.data.creditBalance > target.creditBalance) {
     data.creditsExpireAt = new Date(Date.now() + PLAN_PERIOD_DAYS * 86_400_000);
+    data.expiryRemindedAt = null; // reset agar pengingat H-3 dikirim lagi siklus ini
   }
 
   const user = await db.user.update({

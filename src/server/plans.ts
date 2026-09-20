@@ -30,6 +30,9 @@ export const FREE_MODELS: string[] = [
 /** Masa aktif paket (hari) sejak pembayaran; lewat ini kredit hangus jadi 0. */
 export const PLAN_PERIOD_DAYS = 30;
 
+/** Kirim pengingat bila masa aktif tinggal <= sekian hari. */
+export const EXPIRY_REMIND_DAYS = 3;
+
 /** Model efektif: bila kredit <= 0 (habis/hangus) hanya FREE_MODELS; selain itu ikut paket. */
 export function gatedModels(allowedModels: string[], effectiveCredit: number): string[] {
   return effectiveCredit > 0 ? allowedModels : [...FREE_MODELS];

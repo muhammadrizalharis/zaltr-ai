@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { paymentReceiptEmail } from "@/server/email";
+import { paymentReceiptEmail, expiryReminderEmail } from "@/server/email";
 
 describe("paymentReceiptEmail", () => {
   it("mencantumkan paket, jumlah, kredit, dan saldo", () => {
@@ -31,5 +31,23 @@ describe("paymentReceiptEmail", () => {
     });
     expect(r.html).not.toContain("Jumlah dibayar");
     expect(r.html).toContain("+100");
+  });
+});
+
+describe("expiryReminderEmail", () => {
+  it("menyebut paket, sisa hari, dan tautan perpanjang", () => {
+    const r = expiryReminderEmail({
+      name: "Sinta",
+      planLabel: "Plus",
+      daysLeft: 3,
+      expiresAt: new Date("2026-10-01T00:00:00Z"),
+      balance: 250,
+      appUrl: "https://calyzr-ai.my.id",
+    });
+    expect(r.subject).toContain("Plus");
+    expect(r.subject).toContain("3 hari");
+    expect(r.html).toContain("Sinta");
+    expect(r.html).toContain("/chat/upgrade");
+    expect(r.text).toContain("Perpanjang");
   });
 });
