@@ -21,7 +21,7 @@ import {
   formatTree,
   scoreFile,
 } from "@/server/drive";
-import { retrieve, formatKnowledge, countIndexed, ingestUploadOnce } from "@/server/knowledge";
+import { retrieve, formatKnowledge, countIndexed, ingestUploadOnce, listSourceNames } from "@/server/knowledge";
 import { runAgent } from "@/server/agent";
 import { webSearch, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
@@ -440,6 +440,20 @@ export const POST = guarded(async (req: Request) => {
           });
           const block = formatKnowledge(kb);
           if (block) preamble.push(block);
+          // Inventaris dokumen: beri model daftar berkas terindeks agar bisa
+          // menjawab pertanyaan overview / merangkum seluruh folder.
+          const names = await listSourceNames({
+            userId: me.id,
+            projectId: conversation.projectId,
+            assistantId: conversation.assistantId,
+            limit: 40,
+          });
+          if (names.length > 0) {
+            preamble.push(
+              `Berkas/dokumen milik pengguna yang sudah terindeks (bisa kamu rujuk & rangkum): ` +
+                `${names.join("; ")}.`,
+            );
+          }
         }
       } catch {
         /* KB opsional — abaikan bila gagal */

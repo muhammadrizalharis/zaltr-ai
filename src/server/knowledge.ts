@@ -219,6 +219,36 @@ export function formatKnowledge(hits: KnowledgeHit[]): string {
   );
 }
 
+/**
+ * Daftar nama sumber terindeks (mis. "folder/path/file.ts") untuk memberi model
+ * gambaran INVENTARIS dokumen milik pengguna — memungkinkan pertanyaan overview
+ * ("file apa saja / ringkas folder ini") walau retrieval hanya ambil sebagian.
+ */
+export async function listSourceNames(opts: {
+  userId: string;
+  projectId?: string | null;
+  assistantId?: string | null;
+  limit?: number;
+}): Promise<string[]> {
+  const pid = opts.projectId ?? null;
+  const aid = opts.assistantId ?? null;
+  const rows = await db.knowledgeSource.findMany({
+    where: {
+      userId: opts.userId,
+      status: "indexed",
+      OR: [
+        { projectId: null, assistantId: null },
+        ...(pid ? [{ projectId: pid }] : []),
+        ...(aid ? [{ assistantId: aid }] : []),
+      ],
+    },
+    select: { name: true },
+    orderBy: { createdAt: "desc" },
+    take: opts.limit ?? 50,
+  });
+  return rows.map((r) => r.name);
+}
+
 export async function countIndexed(
   userId: string,
   projectId?: string | null,

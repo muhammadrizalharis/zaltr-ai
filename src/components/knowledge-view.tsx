@@ -73,6 +73,25 @@ export function KnowledgeView() {
     [sources, projectId, assistantId],
   );
 
+  // Sumber dari unggah folder bernama "folder/path/file" -> kelompokkan jadi
+  // pohon per-folder. Sumber tanpa "/" (catatan/berkas tunggal) tetap datar.
+  const grouped = useMemo(() => {
+    const folders = new Map<string, Source[]>();
+    const flat: Source[] = [];
+    for (const s of visible) {
+      const slash = s.name.indexOf("/");
+      if (slash > 0) {
+        const folder = s.name.slice(0, slash);
+        const arr = folders.get(folder);
+        if (arr) arr.push(s);
+        else folders.set(folder, [s]);
+      } else {
+        flat.push(s);
+      }
+    }
+    return { folders: [...folders.entries()], flat };
+  }, [visible]);
+
   async function add() {
     setBusy(true);
     setNotice(null);
@@ -117,6 +136,14 @@ export function KnowledgeView() {
   async function remove(id: string) {
     const res = await fetch(`/api/knowledge/${id}`, { method: "DELETE" });
     if (res.ok) setSources((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  async function removeGroup(items: Source[]) {
+    await Promise.all(
+      items.map((s) => fetch(`/api/knowledge/${s.id}`, { method: "DELETE" }).catch(() => {})),
+    );
+    const ids = new Set(items.map((i) => i.id));
+    setSources((prev) => prev.filter((s) => !ids.has(s.id)));
   }
 
   async function saveInstr() {
@@ -265,7 +292,51 @@ export function KnowledgeView() {
           </p>
         ) : (
           <ul className="space-y-1.5">
-            {visible.map((s) => (
+            {grouped.folders.map(([folder, items]) => (
+              <li key={`folder:${folder}`} className="rounded-xl border border-line bg-panel">
+                <details>
+                  <summary className="flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm">
+                    <span className="min-w-0 truncate font-medium">📁 {folder}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="text-xs text-muted">
+                        {items.length} berkas · {items.reduce((a, b) => a + b.chunkCount, 0)} potongan
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          void removeGroup(items);
+                        }}
+                        className="text-xs text-muted hover:text-red-400"
+                        title="Hapus seluruh folder"
+                      >
+                        Hapus folder
+                      </button>
+                    </span>
+                  </summary>
+                  <ul className="space-y-1 border-t border-line px-3 py-2">
+                    {items.map((s) => (
+                      <li key={s.id} className="flex items-start justify-between gap-3 text-xs">
+                        <span className="min-w-0">
+                          <span className="block truncate">{s.name.slice(folder.length + 1)}</span>
+                          <span className="text-muted">
+                            {s.status === "indexed" ? `${s.chunkCount} potongan` : s.status}
+                            {s.error ? ` · ${s.error}` : ""}
+                          </span>
+                        </span>
+                        <button
+                          onClick={() => void remove(s.id)}
+                          className="shrink-0 text-muted hover:text-red-400"
+                          title="Hapus berkas ini"
+                        >
+                          Hapus
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            ))}
+            {grouped.flat.map((s) => (
               <li
                 key={s.id}
                 className="flex items-start justify-between gap-3 rounded-xl border border-line bg-panel px-3 py-2 text-sm"

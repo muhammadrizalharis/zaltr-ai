@@ -59,6 +59,9 @@ export const POST = guarded(async (req: Request) => {
   let totalBytes = 0;
   let totalChunks = 0;
 
+  // Saring dulu (murah, urut) lalu proses ekstrak+embed dengan konkurensi
+  // terbatas agar folder besar terindeks jauh lebih cepat (I/O + Ollama paralel).
+  const toProcess: { file: File; rel: string }[] = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const rel = (paths[i] || file.name).replace(/^[/\\]+/, "").slice(0, 300);
@@ -75,12 +78,16 @@ export const POST = guarded(async (req: Request) => {
       skipped.push({ path: rel, reason: "file > 25 MB" });
       continue;
     }
+    toProcess.push({ file, rel });
+  }
+
+  const ingestOne = async ({ file, rel }: { file: File; rel: string }) => {
     try {
       const buf = Buffer.from(await file.arrayBuffer());
       const text = await extractText(buf, rel, PER_FILE_TEXT_CHARS);
       if (!text || text.trim().length < 3) {
         skipped.push({ path: rel, reason: "tak ada teks terbaca" });
-        continue;
+        return;
       }
       const { chunkCount } = await ingestSource({
         userId: me.id,
@@ -97,7 +104,15 @@ export const POST = guarded(async (req: Request) => {
     } catch {
       skipped.push({ path: rel, reason: "gagal diproses" });
     }
-  }
+  };
+
+  const CONCURRENCY = 4;
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, toProcess.length) }, async () => {
+      while (next < toProcess.length) await ingestOne(toProcess[next++]);
+    }),
+  );
 
   if (indexed.length === 0) {
     return Response.json(
