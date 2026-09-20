@@ -122,6 +122,22 @@ export function startScheduler(): void {
   // Bersihkan lampiran sementara yang menganggur (sesi ditutup tanpa logout).
   void sweepEphemeral();
   setInterval(() => void sweepEphemeral(), 10 * 60_000);
+  // Hanguskan kredit user yang masa aktif paketnya sudah lewat (cek tiap jam).
+  void expireCredits();
+  setInterval(() => void expireCredits(), 60 * 60_000);
+}
+
+/** Set kredit -> 0 untuk user yang masa aktif (creditsExpireAt) sudah lewat. */
+async function expireCredits(): Promise<void> {
+  try {
+    const r = await db.user.updateMany({
+      where: { creditsExpireAt: { lte: new Date() }, creditBalance: { gt: 0 } },
+      data: { creditBalance: 0 },
+    });
+    if (r.count) console.log(`[scheduler] ${r.count} user: kredit hangus (masa aktif habis)`);
+  } catch (e) {
+    console.error("[scheduler] expireCredits:", (e as Error).message);
+  }
 }
 
 async function sweepEphemeral(): Promise<void> {

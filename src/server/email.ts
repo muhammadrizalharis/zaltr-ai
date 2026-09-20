@@ -56,6 +56,7 @@ export function paymentReceiptEmail(p: {
   newBalance: number;
   amount?: number | null;
   dailyLimitLabel: string;
+  expiresAt?: Date | null;
   appUrl: string;
 }): { subject: string; html: string; text: string } {
   const halo = p.name ? `Halo ${p.name},` : "Halo,";
@@ -70,6 +71,12 @@ export function paymentReceiptEmail(p: {
       : []),
     ["Saldo kredit sekarang", `${p.newBalance.toLocaleString("id-ID")} kredit`],
     ["Limit harian", p.dailyLimitLabel],
+    ...(p.expiresAt
+      ? ([[
+          "Berlaku sampai",
+          p.expiresAt.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+        ]] as Array<[string, string]>)
+      : []),
   ];
   const trs = rows
     .map(

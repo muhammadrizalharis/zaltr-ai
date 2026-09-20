@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guarded, hashPassword, requireAdmin } from "@/server/auth";
-import { PLAN_MODELS, PLAN_LABELS, PLAN_PRICES, isPlan, effectiveDailyLimit } from "@/server/plans";
+import { PLAN_MODELS, PLAN_LABELS, PLAN_PRICES, PLAN_PERIOD_DAYS, isPlan, effectiveDailyLimit } from "@/server/plans";
 import { sendEmail, paymentReceiptEmail } from "@/server/email";
 
 type Params = { params: Promise<{ id: string }> };
@@ -112,6 +112,10 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
       data.dailyMsgLimit = null;
     }
   }
+  // Pembayaran = saat saldo kredit NAIK -> perbarui masa aktif paket (30 hari).
+  if (body.data.creditBalance !== undefined && body.data.creditBalance > target.creditBalance) {
+    data.creditsExpireAt = new Date(Date.now() + PLAN_PERIOD_DAYS * 86_400_000);
+  }
 
   const user = await db.user.update({
     where: { id },
@@ -130,6 +134,7 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
       notes: true,
       lastLoginAt: true,
       createdAt: true,
+      creditsExpireAt: true,
     },
   });
   // Paksa logout target bila di-suspend.
@@ -150,6 +155,7 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
       newBalance: user.creditBalance,
       amount: amountPaid ?? (planId !== "free" ? PLAN_PRICES[planId] : null),
       dailyLimitLabel: dl == null ? "Tanpa batas" : `${dl.toLocaleString("id-ID")} pesan/hari`,
+      expiresAt: user.creditsExpireAt,
       appUrl: process.env.ZALTR_PUBLIC_URL || "https://calyzr-ai.my.id",
     });
     void sendEmail({ to: user.email, subject: receipt.subject, html: receipt.html, text: receipt.text });

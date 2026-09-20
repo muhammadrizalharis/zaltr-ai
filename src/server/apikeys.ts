@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
-import type { SessionUser } from "@/server/auth";
+import { applyAccessPolicy, type SessionUser } from "@/server/auth";
 
 /**
  * API key untuk gateway OpenAI-compatible (/v1). Format: sk-calyzr-<48 hex>.
@@ -69,6 +69,7 @@ export async function userFromApiKey(req: Request): Promise<ApiUser | null> {
           plan: true,
           dailyMsgLimit: true,
           customInstructions: true,
+          creditsExpireAt: true,
         },
       },
     },
@@ -77,5 +78,5 @@ export async function userFromApiKey(req: Request): Promise<ApiUser | null> {
   void db.apiKey
     .update({ where: { id: key.id }, data: { lastUsedAt: new Date() } })
     .catch(() => {});
-  return { ...key.user, apiKeyId: key.id };
+  return { ...applyAccessPolicy(key.user), apiKeyId: key.id };
 }

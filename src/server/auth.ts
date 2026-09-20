@@ -2,6 +2,7 @@ import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from "no
 import { promisify } from "node:util";
 import { cookies, headers } from "next/headers";
 import { db } from "@/lib/db";
+import { FREE_MODELS } from "@/server/plans";
 
 const scrypt = promisify(scryptCb);
 
@@ -103,6 +104,23 @@ export interface SessionUser {
   plan: string;
   dailyMsgLimit: number | null;
   customInstructions: string | null;
+  creditsExpireAt: Date | null;
+}
+
+/**
+ * Terapkan kebijakan akses: (1) bila masa aktif paket habis -> kredit hangus jadi 0,
+ * (2) bila kredit <= 0 (habis/hangus) -> hanya model gratis (FREE_MODELS) yang terbuka.
+ */
+export function applyAccessPolicy<
+  T extends { id: string; creditBalance: number; creditsExpireAt: Date | null; allowedModels: string[] },
+>(u: T): T {
+  if (u.creditsExpireAt && u.creditsExpireAt.getTime() <= Date.now() && u.creditBalance > 0) {
+    // Masa aktif habis -> hangus. Persist best-effort (tak memblok request).
+    void db.user.update({ where: { id: u.id }, data: { creditBalance: 0 } }).catch(() => {});
+    u.creditBalance = 0;
+  }
+  if (u.creditBalance <= 0) u.allowedModels = [...FREE_MODELS];
+  return u;
 }
 
 /** Ambil user dari cookie session; null bila tidak login/kedaluwarsa. */
@@ -127,6 +145,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
           plan: true,
           dailyMsgLimit: true,
           customInstructions: true,
+          creditsExpireAt: true,
         },
       },
     },
@@ -137,7 +156,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     return null;
   }
   if (session.user.status !== "active") return null;
-  return session.user;
+  return applyAccessPolicy(session.user);
 }
 
 /** Guard API: user login aktif; lempar Response 401 bila tidak. */

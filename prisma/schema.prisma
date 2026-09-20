@@ -23,6 +23,8 @@ model User {
   // Kredit internal zaltr (dipotong oleh provider berbayar, mis. Copilot).
   creditBalance Int       @default(0)
   creditUsed    Int       @default(0)
+  // Masa aktif paket: kredit hangus jadi 0 setelah tanggal ini (diisi saat admin beri kredit).
+  creditsExpireAt DateTime?
   // Pola model yang diizinkan: "*", "copilot:*", "ollama:*", id spesifik, dst.
   allowedModels String[]  @default(["zaltr-core"])
   // Paket langganan: free | starter | plus | power (menentukan limit harian default).

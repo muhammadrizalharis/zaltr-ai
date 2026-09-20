@@ -13,6 +13,7 @@ interface AdminUser {
   creditUsed: number;
   allowedModels: string[];
   plan?: string;
+  creditsExpireAt?: string | null;
   dailyMsgLimit: number | null;
   notes: string | null;
   lastLoginAt: string | null;
@@ -185,6 +186,11 @@ function UserCard({
           <span className="text-sm tabular-nums text-muted">
             {u.creditBalance.toLocaleString("id-ID")} kr
           </span>
+          {u.creditsExpireAt && u.creditBalance > 0 && (
+            <span className="text-[11px] text-muted">
+              s/d {new Date(u.creditsExpireAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
+          )}
           <span className="text-muted max-md:ml-auto">{open ? "▾" : "▸"}</span>
         </div>
       </button>

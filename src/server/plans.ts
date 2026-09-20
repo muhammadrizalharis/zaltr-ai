@@ -20,6 +20,26 @@ export const PLAN_PRICES: Record<PlanId, number> = {
   power: 150_000,
 };
 
+/** Model yang SELALU terbuka: paket free + fallback saat kredit habis/hangus. */
+export const FREE_MODELS: string[] = [
+  "zaltr-core",
+  "ollama:qwen2.5:7b-instruct",
+  "ollama:gemma4:latest",
+];
+
+/** Masa aktif paket (hari) sejak pembayaran; lewat ini kredit hangus jadi 0. */
+export const PLAN_PERIOD_DAYS = 30;
+
+/** Model efektif: bila kredit <= 0 (habis/hangus) hanya FREE_MODELS; selain itu ikut paket. */
+export function gatedModels(allowedModels: string[], effectiveCredit: number): string[] {
+  return effectiveCredit > 0 ? allowedModels : [...FREE_MODELS];
+}
+
+/** True bila masa aktif paket sudah lewat. */
+export function isExpired(creditsExpireAt: Date | null | undefined): boolean {
+  return !!creditsExpireAt && creditsExpireAt.getTime() <= Date.now();
+}
+
 /** Batas pesan per hari; null = tanpa batas. */
 export const PLAN_DAILY_LIMITS: Record<PlanId, number | null> = {
   free: 100,
@@ -30,7 +50,7 @@ export const PLAN_DAILY_LIMITS: Record<PlanId, number | null> = {
 
 /** Pola allowedModels bawaan saat admin menetapkan paket. */
 export const PLAN_MODELS: Record<PlanId, string[]> = {
-  free: ["zaltr-core"],
+  free: FREE_MODELS,
   // Starter: model premium kelas CEPAT + semua model Turbo lokal.
   starter: [
     "zaltr-core",

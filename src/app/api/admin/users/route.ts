@@ -21,6 +21,7 @@ export const GET = guarded(async () => {
       notes: true,
       lastLoginAt: true,
       createdAt: true,
+      creditsExpireAt: true,
       _count: { select: { conversations: true } },
     },
   });
