@@ -10,7 +10,8 @@ import { embed, embedOne, EMBED_MODEL } from "@/server/embeddings";
 
 /** Potong teks jadi bagian ~1200 karakter dengan tumpang-tindih 200. */
 export function chunkText(text: string, size = 1200, overlap = 200): string[] {
-  const clean = text.replace(/\r\n/g, "\n").trim();
+  // Buang byte NUL (Postgres tolak 0x00; PDF/berkas biner sering menyisipkannya).
+  const clean = text.replace(/\u0000/g, "").replace(/\r\n/g, "\n").trim();
   if (!clean) return [];
   if (clean.length <= size) return [clean];
   const chunks: string[] = [];

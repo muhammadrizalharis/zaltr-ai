@@ -40,4 +40,11 @@ describe("chunkText (RAG)", () => {
     const total = out.reduce((n, c) => n + c.length, 0);
     expect(total).toBeGreaterThan(text.length);
   });
+
+  it("membuang byte NUL (0x00) yang ditolak Postgres", () => {
+    const out = chunkText("halo\u0000dunia");
+    expect(out).toHaveLength(1);
+    expect(out[0]).not.toContain("\u0000");
+    expect(out[0]).toBe("halodunia");
+  });
 });
