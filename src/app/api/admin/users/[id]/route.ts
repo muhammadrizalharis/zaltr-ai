@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guarded, hashPassword, requireAdmin } from "@/server/auth";
-import { PLAN_MODELS, isPlan } from "@/server/plans";
+import { PLAN_MODELS, PLAN_LABELS, PLAN_PRICES, isPlan, effectiveDailyLimit } from "@/server/plans";
+import { sendEmail, paymentReceiptEmail } from "@/server/email";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -15,6 +16,8 @@ const patchSchema = z.object({
   dailyMsgLimit: z.number().int().min(1).max(100_000).nullable().optional(),
   notes: z.string().max(2_000).nullable().optional(),
   newPassword: z.string().min(8).max(200).optional(),
+  // Hanya utk struk email (BUKAN kolom DB): jumlah rupiah yang dibayar user.
+  amountPaid: z.number().int().min(0).max(1_000_000_000).optional(),
 });
 
 /**
@@ -33,7 +36,7 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
 
   const target = await db.user.findUnique({
     where: { id },
-    select: { id: true, role: true, status: true },
+    select: { id: true, role: true, status: true, creditBalance: true },
   });
   if (!target) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
 
@@ -96,7 +99,7 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
     }
   }
 
-  const { newPassword, ...rest } = body.data;
+  const { newPassword, amountPaid, ...rest } = body.data;
   const data: Record<string, unknown> = { ...rest };
   if (newPassword) data.passwordHash = await hashPassword(newPassword);
   // Ganti paket = buka model bawaan paket + limit ikut paket (reset override),
@@ -133,6 +136,25 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
   if (body.data.status === "suspended") {
     await db.session.deleteMany({ where: { userId: id } });
   }
+
+  // Notif email "struk pembayaran" saat saldo kredit NAIK (momen pembayaran
+  // selesai). Best-effort: no-op bila SMTP belum diset / user tanpa email.
+  const creditsAdded = user.creditBalance - target.creditBalance;
+  if (creditsAdded > 0 && user.email) {
+    const planId = isPlan(user.plan) ? user.plan : "free";
+    const dl = effectiveDailyLimit(user.plan, user.dailyMsgLimit);
+    const receipt = paymentReceiptEmail({
+      name: user.name,
+      planLabel: PLAN_LABELS[planId],
+      creditsAdded,
+      newBalance: user.creditBalance,
+      amount: amountPaid ?? (planId !== "free" ? PLAN_PRICES[planId] : null),
+      dailyLimitLabel: dl == null ? "Tanpa batas" : `${dl.toLocaleString("id-ID")} pesan/hari`,
+      appUrl: process.env.ZALTR_PUBLIC_URL || "https://calyzr-ai.my.id",
+    });
+    void sendEmail({ to: user.email, subject: receipt.subject, html: receipt.html, text: receipt.text });
+  }
+
   return NextResponse.json({ user });
 });
 

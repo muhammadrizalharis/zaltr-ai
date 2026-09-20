@@ -17,6 +17,7 @@
     "jszip": "^3.10.1",
     "minio": "^8.0.7",
     "next": "16.2.12",
+    "nodemailer": "^10.0.10",
     "pdf-parse": "^1.1.1",
     "pg": "^8.22.0",
     "react": "19.2.4",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",

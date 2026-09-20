@@ -12,6 +12,14 @@ export const PLAN_LABELS: Record<PlanId, string> = {
   power: "Power",
 };
 
+/** Harga paket (Rupiah) — dipakai halaman upgrade & struk email pembayaran. */
+export const PLAN_PRICES: Record<PlanId, number> = {
+  free: 0,
+  starter: 15_000,
+  plus: 60_000,
+  power: 150_000,
+};
+
 /** Batas pesan per hari; null = tanpa batas. */
 export const PLAN_DAILY_LIMITS: Record<PlanId, number | null> = {
   free: 100,

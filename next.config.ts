@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   // SDK Copilot memuat addon native (koffi) — jangan dibundle Turbopack,
   // biarkan di-require langsung dari node_modules saat runtime Node.
   // pdf-parse: CJS dengan kode debug path-relatif — juga jangan dibundle.
-  serverExternalPackages: ["@github/copilot-sdk", "koffi", "minio", "pdf-parse", "web-push"],
+  serverExternalPackages: ["@github/copilot-sdk", "koffi", "minio", "nodemailer", "pdf-parse", "web-push"],
   // Security headers dasar (aman, tanpa risiko merusak app). CSP penuh dipisah
   // agar bisa diuji tersendiri.
   async headers() {

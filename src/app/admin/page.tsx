@@ -128,12 +128,14 @@ function UserCard({
   onDelete: (u: AdminUser) => void;
 }) {
   const [credit, setCredit] = useState(String(u.creditBalance));
+  const [amount, setAmount] = useState("");
   const [limit, setLimit] = useState(u.dailyMsgLimit == null ? "" : String(u.dailyMsgLimit));
   const [notes, setNotes] = useState(u.notes ?? "");
   const [allowed, setAllowed] = useState<string[]>(u.allowedModels);
 
   useEffect(() => {
     setCredit(String(u.creditBalance));
+    setAmount("");
     setLimit(u.dailyMsgLimit == null ? "" : String(u.dailyMsgLimit));
     setNotes(u.notes ?? "");
     setAllowed(u.allowedModels);
@@ -275,7 +277,13 @@ function UserCard({
                   />
                   <button
                     disabled={!canEditPolicy}
-                    onClick={() => void onPatch(u.id, { creditBalance: Number(credit) })}
+                    onClick={() => {
+                      void onPatch(u.id, {
+                        creditBalance: Number(credit),
+                        ...(amount ? { amountPaid: Number(amount) } : {}),
+                      });
+                      setAmount("");
+                    }}
                     className="rounded-xl border border-accent-a/50 px-4 py-2 text-sm text-accent-a hover:bg-accent-a/10 disabled:opacity-40"
                   >
                     Simpan
@@ -291,8 +299,21 @@ function UserCard({
                     </button>
                   ))}
                 </div>
+                <label className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted">
+                  Jumlah dibayar (Rp) untuk struk email — opsional:
+                  <input
+                    type="number"
+                    min={0}
+                    value={amount}
+                    disabled={!canEditPolicy}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="mis. 60000"
+                    className="input w-32 tabular-nums"
+                  />
+                </label>
                 <p className="mt-1 text-[11px] text-muted">
                   1 kredit = 1 pesan Copilot. Model lokal (Ollama/ComfyUI/demo) gratis.
+                  Menaikkan saldo kredit otomatis mengirim email struk ke user.
                   {!isSuper && u.id === me?.id && " Kredit sendiri hanya bisa diubah superadmin."}
                 </p>
               </Section>

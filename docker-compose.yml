@@ -206,6 +206,12 @@ services:
       # Alert error klien & server ke Telegram (token rahasia di .env; kosong = nonaktif)
       ZALTR_TELEGRAM_BOT_TOKEN: ${ZALTR_TELEGRAM_BOT_TOKEN:-}
       ZALTR_TELEGRAM_CHAT_ID: ${ZALTR_TELEGRAM_CHAT_ID:-}
+      # Email transaksional (struk pembayaran ke user). SMTP rahasia di .env; kosong = nonaktif
+      ZALTR_SMTP_HOST: ${ZALTR_SMTP_HOST:-}
+      ZALTR_SMTP_PORT: ${ZALTR_SMTP_PORT:-587}
+      ZALTR_SMTP_USER: ${ZALTR_SMTP_USER:-}
+      ZALTR_SMTP_PASS: ${ZALTR_SMTP_PASS:-}
+      ZALTR_SMTP_FROM: ${ZALTR_SMTP_FROM:-}
 
   # ------------------------------------------------------------------
   # Web search self-hosted (fitur "Cari web" di chat). Internal-only.
