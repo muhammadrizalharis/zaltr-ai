@@ -335,13 +335,24 @@ export const POST = guarded(async (req: Request) => {
           olderKeys.push(k);
         }
       }
-      for (const k of olderKeys.slice(0, MAX_CTX_IMAGES - images.length)) {
-        const nm = k.split("/").pop() ?? k;
-        try {
-          const buf = await getObjectBuffer(k);
-          recalledImages.push({ data: buf.toString("base64"), mimeType: imageMime(nm), name: nm });
-        } catch {
-          /* berkas mungkin sudah dihapus (mis. sementara/ephemeral) — abaikan */
+      // Hemat token: hanya kirim ulang gambar lama bila pesan menyinggung visual
+      // atau menyebut nama berkas gambarnya (tak perlu di giliran teks biasa).
+      const wantsImages =
+        /gambar|foto|image|picture|screenshot|tangkapan|lihat|tampak|warna|desain|diagram|grafik|chart|logo|ikon|visual|di atas/i.test(
+          content,
+        ) ||
+        olderKeys.some((k) =>
+          content.toLowerCase().includes((k.split("/").pop() ?? "").toLowerCase()),
+        );
+      if (wantsImages) {
+        for (const k of olderKeys.slice(0, MAX_CTX_IMAGES - images.length)) {
+          const nm = k.split("/").pop() ?? k;
+          try {
+            const buf = await getObjectBuffer(k);
+            recalledImages.push({ data: buf.toString("base64"), mimeType: imageMime(nm), name: nm });
+          } catch {
+            /* berkas mungkin sudah dihapus (mis. sementara/ephemeral) — abaikan */
+          }
         }
       }
       if (recalledImages.length > 0) {
