@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { dispatch } from "@/server/providers";
 import type { HistoryItem } from "@/server/providers";
 import { cleanupStaleEphemeral } from "@/server/uploads";
+import { sendToUser } from "@/server/push";
 
 function creditCost(modelId: string): number {
   return modelId.startsWith("copilot:") ? 1 : 0;
@@ -71,6 +72,13 @@ export async function runTask(taskId: string): Promise<{ ok: boolean; conversati
       data: { lastRunAt: new Date(), lastResult: acc.slice(0, 500) },
     }),
   ]);
+  // Notifikasi Web Push: beri tahu user tugas selesai (async, tak memblok).
+  void sendToUser(task.userId, {
+    title: `Tugas selesai: ${task.title || "Terjadwal"}`,
+    body: acc.replace(/\s+/g, " ").slice(0, 120),
+    url: `/chat/${conv.id}`,
+    tag: `task-${taskId}`,
+  }).catch(() => {});
   return { ok: true, conversationId: conv.id };
 }
 

@@ -44,6 +44,7 @@ model User {
   scheduledTasks ScheduledTask[]
   uploads       Upload[]
   apiKeys       ApiKey[]
+  pushSubs      PushSubscription[]
 }
 
 // Memori antar-percakapan (ala ChatGPT Memory): fakta personal yang diekstrak
@@ -241,6 +242,19 @@ model ApiKey {
   lastUsedAt DateTime?
   revokedAt  DateTime?
   createdAt  DateTime  @default(now())
+  @@index([userId])
+}
+
+// Langganan Web Push (notifikasi ke HP/desktop) per perangkat/browser.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  ua        String?
+  createdAt DateTime @default(now())
 
   @@index([userId])
 }

@@ -193,6 +193,10 @@ services:
       # Batas teks lampiran yang dibaca model (kosong = default 200rb/file, 300rb total)
       ZALTR_MAX_FILE_CHARS: ${ZALTR_MAX_FILE_CHARS:-}
       ZALTR_MAX_TOTAL_CHARS: ${ZALTR_MAX_TOTAL_CHARS:-}
+      # Web Push (notifikasi HP): kunci VAPID (privat = rahasia, di .env)
+      ZALTR_VAPID_PUBLIC_KEY: ${ZALTR_VAPID_PUBLIC_KEY:-}
+      ZALTR_VAPID_PRIVATE_KEY: ${ZALTR_VAPID_PRIVATE_KEY:-}
+      ZALTR_VAPID_SUBJECT: ${ZALTR_VAPID_SUBJECT:-mailto:admin@calyzr-ai.my.id}
 
   # ------------------------------------------------------------------
   # Web search self-hosted (fitur "Cari web" di chat). Internal-only.

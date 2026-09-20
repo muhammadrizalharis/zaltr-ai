@@ -7,7 +7,9 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "calyzr.ai",
+  metadataBase: new URL(process.env.ZALTR_PUBLIC_URL || "https://calyzr-ai.my.id"),
+  title: { default: "calyzr.ai", template: "%s · calyzr.ai" },
+  applicationName: "CALYZR.AI",
   description:
     "Semua AI terbaik dunia dalam satu ruang kerja pribadi — chat, gambar, video, dan musik.",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Calyzr" },
@@ -16,6 +18,14 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
+    type: "website",
+    siteName: "CALYZR.AI",
+    title: "calyzr.ai — semua AI dalam satu ruang kerja",
+    description: "Chat, gambar, video, musik, dan analisa dokumen — satu akun pribadi.",
+    images: [{ url: "/logo-512.png", width: 512, height: 512, alt: "CALYZR.AI" }],
+  },
+  twitter: {
+    card: "summary",
     title: "calyzr.ai",
     description: "Semua AI terbaik dunia dalam satu ruang kerja pribadi.",
     images: ["/logo-512.png"],
