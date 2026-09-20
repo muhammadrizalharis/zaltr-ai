@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/pwa";
+import { ClientErrorReporter } from "@/components/client-error-reporter";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         {children}
         <ServiceWorkerRegister />
+        <ClientErrorReporter />
       </body>
     </html>
   );
