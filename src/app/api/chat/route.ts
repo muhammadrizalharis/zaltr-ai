@@ -178,6 +178,8 @@ export const POST = guarded(async (req: Request) => {
     content: m.content,
   }));
   const last = providerHistory.at(-1);
+  // Sitasi RAG untuk ditampilkan di klien ([K#] -> nama sumber + cuplikan).
+  const citations: Array<{ k: number; name: string; snippet: string }> = [];
   /** Peringatan untuk pengguna (mis. gambar tak terbaca), dikirim di awal stream. */
   let peringatan = "";
   if (last) {
@@ -440,6 +442,9 @@ export const POST = guarded(async (req: Request) => {
           });
           const block = formatKnowledge(kb);
           if (block) preamble.push(block);
+          for (let i = 0; i < kb.length; i++) {
+            citations.push({ k: i + 1, name: kb[i].name, snippet: kb[i].content.slice(0, 240) });
+          }
           // Inventaris dokumen: beri model daftar berkas terindeks agar bisa
           // menjawab pertanyaan overview / merangkum seluruh folder.
           const names = await listSourceNames({
@@ -488,7 +493,7 @@ export const POST = guarded(async (req: Request) => {
         }
       };
 
-      send({ type: "meta", userMessageId, conversationTitle: title, runId });
+      send({ type: "meta", userMessageId, conversationTitle: title, runId, citations });
       if (peringatan) send({ type: "error", message: peringatan });
 
       let acc = "";

@@ -5,7 +5,7 @@ import { Markdown } from "@/components/markdown";
 import { ModelPicker, loadSavedModel, DEFAULT_MODEL } from "@/components/model-picker";
 import { CanvasEditor } from "@/components/canvas-editor";
 import { notifyConversationsChanged } from "@/components/sidebar";
-import type { ChatMessage, ModelDescriptor, StreamLine } from "@/lib/types";
+import type { ChatMessage, Citation, ModelDescriptor, StreamLine } from "@/lib/types";
 import { MODE_PARAFRASE, type ModeParafrase } from "@/server/paraphrase";
 
 /** Batas lampiran per pesan (server menolak lebih dari ini). */
@@ -78,6 +78,12 @@ export function ChatView({
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [folderBusy, setFolderBusy] = useState(false);
+  const [folderProgress, setFolderProgress] = useState<{
+    folder: string;
+    done: number;
+    total: number;
+    indexed: number;
+  } | null>(null);
   const [ephemeralActive, setEphemeralActive] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [webSearch, setWebSearch] = useState(false);
@@ -94,6 +100,7 @@ export function ChatView({
   const [canvasInstruction, setCanvasInstruction] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const runIdRef = useRef<string | null>(null);
+  const citationsRef = useRef<Citation[] | null>(null);
   // Naik tiap "chat baru" -> callback stream lama diabaikan (tak mengotori chat baru).
   const sessionRef = useRef(0);
   // Auto-scroll hanya saat pembaca memang sedang di bawah; kalau ia menggulir
@@ -222,26 +229,55 @@ export function ChatView({
       fd.append("path", f.webkitRelativePath || f.name);
     }
     setFolderBusy(true);
-    setNotice(`Mengindeks folder "${folderName}" (${picked.length} berkas)… bisa beberapa saat.`);
+    setNotice(null);
+    setFolderProgress({ folder: folderName, done: 0, total: picked.length, indexed: 0 });
     try {
       const res = await fetch("/api/uploads/folder", { method: "POST", body: fd });
-      const data = (await res.json()) as {
+      const start = (await res.json()) as {
+        jobId?: string;
+        total?: number;
         folder?: string;
-        indexedCount?: number;
-        skippedCount?: number;
         error?: string;
       };
-      if (!res.ok) throw new Error(data.error ?? "Gagal mengindeks folder");
-      setNotice(
-        `📁 Folder "${data.folder}" siap dianalisa — ${data.indexedCount} berkas terindeks` +
-          (data.skippedCount ? `, ${data.skippedCount} dilewati` : "") +
-          `. Sekarang tanyakan apa saja tentang isinya.`,
-      );
+      if (!res.ok || !start.jobId) {
+        throw new Error(start.error ?? "Gagal memulai pengindeksan folder");
+      }
+      const jobId = start.jobId;
+      // Polling progres proses-latar (maks ~15 menit).
+      for (let i = 0; i < 900; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const p = (await fetch(`/api/uploads/folder?job=${encodeURIComponent(jobId)}`)
+          .then((r) => r.json())
+          .catch(() => null)) as {
+          folder?: string;
+          total?: number;
+          done?: number;
+          indexedCount?: number;
+          skippedCount?: number;
+          status?: string;
+        } | null;
+        if (!p) continue;
+        setFolderProgress({
+          folder: p.folder ?? folderName,
+          done: p.done ?? 0,
+          total: p.total ?? picked.length,
+          indexed: p.indexedCount ?? 0,
+        });
+        if (p.status && p.status !== "running") {
+          setNotice(
+            `📁 Folder "${p.folder}" siap dianalisa — ${p.indexedCount} berkas terindeks` +
+              (p.skippedCount ? `, ${p.skippedCount} dilewati` : "") +
+              `. Sekarang tanyakan apa saja tentang isinya.`,
+          );
+          break;
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal mengindeks folder");
       setNotice(null);
     } finally {
       setFolderBusy(false);
+      setFolderProgress(null);
     }
   }
 
@@ -385,6 +421,7 @@ export function ChatView({
           if (sessionRef.current !== mySession) continue; // sesi lama (chat baru ditekan)
           if (line.type === "meta") {
             runIdRef.current = line.runId;
+            citationsRef.current = line.citations ?? null;
             notifyConversationsChanged();
           }
           if (line.type === "delta") {
@@ -405,6 +442,7 @@ export function ChatView({
                 model,
                 status: line.status,
                 createdAt: new Date().toISOString(),
+                citations: citationsRef.current ?? undefined,
               },
             ]);
             void loadSuggestions(convId);
@@ -717,6 +755,29 @@ export function ChatView({
                 </button>
               </span>
             ))}
+          </div>
+        )}
+        {folderProgress && (
+          <div className="mx-auto mb-2 w-full max-w-3xl rounded-xl border border-line bg-panel-2 px-3 py-2">
+            <div className="mb-1 flex items-center justify-between gap-2 text-xs text-muted">
+              <span className="min-w-0 truncate">
+                📁 Mengindeks “{folderProgress.folder}” — {folderProgress.done}/{folderProgress.total} berkas
+              </span>
+              <span className="shrink-0">
+                {folderProgress.total > 0
+                  ? Math.round((folderProgress.done / folderProgress.total) * 100)
+                  : 0}
+                %
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg">
+              <div
+                className="h-full bg-gradient-to-r from-accent-a to-accent-b transition-all"
+                style={{
+                  width: `${folderProgress.total > 0 ? Math.round((folderProgress.done / folderProgress.total) * 100) : 0}%`,
+                }}
+              />
+            </div>
           </div>
         )}
         <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
@@ -1151,6 +1212,25 @@ function Bubble({
           <Markdown>{message.content}</Markdown>
         )}
       </div>
+      {!isUser && message.citations && message.citations.length > 0 && (
+        <details className="mt-1.5 rounded-xl border border-line bg-panel-2 px-3 py-1.5 text-xs">
+          <summary className="cursor-pointer text-muted hover:text-ink">
+            Sumber ({message.citations.length}) — dari dokumenmu
+          </summary>
+          <ul className="mt-1.5 space-y-1.5">
+            {message.citations.map((c) => (
+              <li key={c.k} className="border-l-2 border-accent-b/50 pl-2">
+                <span className="font-medium text-ink">
+                  [K{c.k}] {c.name}
+                </span>
+                <span className="mt-0.5 block whitespace-pre-wrap break-words text-muted">
+                  {c.snippet}…
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {/* Aksi kecil ala ChatGPT: salin / regenerate / edit */}
       <div
         className={`mt-1 flex gap-3 opacity-0 transition-opacity group-hover:opacity-100 max-md:gap-4 max-md:py-1 max-md:opacity-100 ${

@@ -1,28 +1,24 @@
-import { db } from "@/lib/db";
 import { guarded, requireUser } from "@/server/auth";
 import { extractText, isBinarySkip } from "@/server/extract";
 import { ingestSource } from "@/server/knowledge";
 import { rateLimit } from "@/server/ratelimit";
+import { bumpFolderJob, createFolderJob, finishFolderJob, getFolderJob } from "@/server/folderjobs";
 
 export const runtime = "nodejs";
 
 /**
  * Unggah SATU FOLDER untuk dianalisa. Tiap file diekstrak teksnya lalu di-embed
  * ke basis pengetahuan (RAG/pgvector) sebagai satu sumber bernama "<folder>/<path>".
- * Setelah itu model bisa mencari & menganalisa lintas seluruh folder di chat,
- * tanpa batas jumlah file (retrieval semantik), dengan sitasi menunjukkan path file.
- *
- * Catatan: folder di-INGEST untuk analisa (teks disimpan sebagai potongan ber-embedding),
- * bukan disimpan sebagai berkas yang bisa diunduh ulang. Kelola/hapus di panel Pengetahuan.
+ * Pengindeksan berjalan di LATAR: POST mengembalikan { jobId } segera, klien
+ * polling GET ?job=<id> untuk bar progres. Model lalu bisa menganalisa lintas
+ * seluruh folder di chat, dengan sitasi menunjukkan path file.
  */
 
 const MAX_FILES = 800;
 const MAX_TOTAL_BYTES = 300 * 1024 * 1024; // 300 MB total per folder
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // lewati file tunggal > 25 MB
 const PER_FILE_TEXT_CHARS = 120_000; // batas karakter teks yang di-embed per file
-
-type FileResult = { path: string; chunks: number };
-type SkipResult = { path: string; reason: string };
+const CONCURRENCY = 4;
 
 export const POST = guarded(async (req: Request) => {
   const me = await requireUser();
@@ -54,43 +50,58 @@ export const POST = guarded(async (req: Request) => {
     );
   }
 
-  const indexed: FileResult[] = [];
-  const skipped: SkipResult[] = [];
-  let totalBytes = 0;
-  let totalChunks = 0;
-
-  // Saring dulu (murah, urut) lalu proses ekstrak+embed dengan konkurensi
-  // terbatas agar folder besar terindeks jauh lebih cepat (I/O + Ollama paralel).
+  // Saring murah (urut) -> daftar file yang akan diproses + hitung yang dilewati.
   const toProcess: { file: File; rel: string }[] = [];
+  let totalBytes = 0;
+  let preSkipped = 0;
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const rel = (paths[i] || file.name).replace(/^[/\\]+/, "").slice(0, 300);
     if (totalBytes + file.size > MAX_TOTAL_BYTES) {
-      skipped.push({ path: rel, reason: "melebihi total folder (300 MB)" });
+      preSkipped++;
       continue;
     }
     totalBytes += file.size;
-    if (file.size === 0 || isBinarySkip(rel)) {
-      skipped.push({ path: rel, reason: "biner/kosong" });
-      continue;
-    }
-    if (file.size > MAX_FILE_BYTES) {
-      skipped.push({ path: rel, reason: "file > 25 MB" });
+    if (file.size === 0 || isBinarySkip(rel) || file.size > MAX_FILE_BYTES) {
+      preSkipped++;
       continue;
     }
     toProcess.push({ file, rel });
   }
+  if (toProcess.length === 0) {
+    return Response.json(
+      { error: "Tidak ada berkas teks yang bisa diindeks dari folder ini." },
+      { status: 422 },
+    );
+  }
 
+  const jobId = createFolderJob(me.id, folderName, toProcess.length, preSkipped);
+  // Proses di LATAR (Node standalone: promise tetap jalan setelah respons).
+  void processFolder(jobId, me.id, folderName, toProcess, projectId, assistantId);
+  return Response.json(
+    { jobId, folder: folderName, total: toProcess.length, preSkipped },
+    { status: 202 },
+  );
+});
+
+async function processFolder(
+  jobId: string,
+  userId: string,
+  folderName: string,
+  items: { file: File; rel: string }[],
+  projectId: string | null,
+  assistantId: string | null,
+): Promise<void> {
   const ingestOne = async ({ file, rel }: { file: File; rel: string }) => {
     try {
       const buf = Buffer.from(await file.arrayBuffer());
       const text = await extractText(buf, rel, PER_FILE_TEXT_CHARS);
       if (!text || text.trim().length < 3) {
-        skipped.push({ path: rel, reason: "tak ada teks terbaca" });
+        bumpFolderJob(jobId, { done: 1, skipped: 1 });
         return;
       }
       const { chunkCount } = await ingestSource({
-        userId: me.id,
+        userId,
         projectId,
         assistantId,
         kind: "upload",
@@ -99,40 +110,39 @@ export const POST = guarded(async (req: Request) => {
         text,
         bytes: file.size,
       });
-      indexed.push({ path: rel, chunks: chunkCount });
-      totalChunks += chunkCount;
+      bumpFolderJob(jobId, { done: 1, indexed: 1, chunks: chunkCount });
     } catch {
-      skipped.push({ path: rel, reason: "gagal diproses" });
+      bumpFolderJob(jobId, { done: 1, skipped: 1 });
     }
   };
 
-  const CONCURRENCY = 4;
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, toProcess.length) }, async () => {
-      while (next < toProcess.length) await ingestOne(toProcess[next++]);
-    }),
-  );
-
-  if (indexed.length === 0) {
-    return Response.json(
-      { error: "Tidak ada file berisi teks yang bisa diindeks dari folder ini." },
-      { status: 422 },
+  try {
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
+        while (next < items.length) await ingestOne(items[next++]);
+      }),
     );
+    finishFolderJob(jobId, "done");
+  } catch (e) {
+    finishFolderJob(jobId, "error", (e as Error).message);
   }
+}
 
-  const totalIndexed = await db.knowledgeSource.count({
-    where: { userId: me.id, status: "indexed" },
-  });
-
+export const GET = guarded(async (req: Request) => {
+  const me = await requireUser();
+  const id = new URL(req.url).searchParams.get("job");
+  if (!id) return Response.json({ error: "parameter job diperlukan" }, { status: 400 });
+  const j = getFolderJob(id, me.id);
+  if (!j) return Response.json({ error: "job tak ditemukan" }, { status: 404 });
   return Response.json({
-    folder: folderName,
-    fileCount: files.length,
-    indexedCount: indexed.length,
-    skippedCount: skipped.length,
-    totalChunks,
-    totalSourcesIndexed: totalIndexed,
-    indexed: indexed.slice(0, 300),
-    skipped: skipped.slice(0, 60),
+    folder: j.folder,
+    total: j.total,
+    done: j.done,
+    indexedCount: j.indexedCount,
+    skippedCount: j.skippedCount,
+    totalChunks: j.totalChunks,
+    status: j.status,
+    error: j.error ?? null,
   });
 });

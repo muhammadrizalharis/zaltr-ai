@@ -29,6 +29,8 @@ export interface ConversationSummary {
   updatedAt: string;
 }
 
+export type Citation = { k: number; name: string; snippet: string };
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -36,11 +38,12 @@ export interface ChatMessage {
   model?: string | null;
   status?: string;
   createdAt: string;
+  citations?: Citation[];
 }
 
 /** Baris protokol stream JSONL dari /api/chat */
 export type StreamLine =
-  | { type: "meta"; userMessageId: string; conversationTitle: string; runId: string }
+  | { type: "meta"; userMessageId: string; conversationTitle: string; runId: string; citations?: Citation[] }
   | { type: "delta"; text: string }
   | { type: "done"; messageId: string; content: string; status: "completed" | "stopped" | "failed" }
   | { type: "error"; message: string };
