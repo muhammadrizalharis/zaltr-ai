@@ -37,6 +37,11 @@ echo "[zaltr-backup] ${TS} mulai"
 pg_dump --format=custom --no-password --file="${WORK}/db.dump" \
   || fail "pg_dump gagal"
 
+# 1b. Validasi dump memang bisa di-pg_restore (deteksi korup sebelum diarsipkan)
+pg_restore --list "${WORK}/db.dump" >/dev/null 2>&1 \
+  || fail "db.dump tidak valid untuk pg_restore"
+echo "[zaltr-backup] validasi pg_restore db.dump OK"
+
 # 2. MinIO: mirror seluruh bucket zaltr
 mc alias set zaltr "${MINIO_URL}" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" >/dev/null
 mkdir -p "${WORK}/minio"

@@ -17,3 +17,4 @@ next-env.d.ts
 # Prisma generated client
 src/generated/
 public/calyzr.apk
+docker/backup/mc
