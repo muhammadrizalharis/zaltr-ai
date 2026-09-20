@@ -37,6 +37,8 @@ export function KnowledgeView() {
   const [notice, setNotice] = useState<string | null>(null);
   const [instr, setInstr] = useState("");
   const [savingInstr, setSavingInstr] = useState(false);
+  const [summary, setSummary] = useState<{ title: string; text: string; meta: string } | null>(null);
+  const [summarizing, setSummarizing] = useState<string | null>(null);
 
   const projectId = scope.startsWith("p:") ? scope.slice(2) : null;
   const assistantId = scope.startsWith("a:") ? scope.slice(2) : null;
@@ -146,6 +148,37 @@ export function KnowledgeView() {
     setSources((prev) => prev.filter((s) => !ids.has(s.id)));
   }
 
+  async function summarize(
+    target: { sourceId: string } | { folder: string },
+    title: string,
+    key: string,
+  ) {
+    setSummarizing(key);
+    setSummary(null);
+    try {
+      const body =
+        "sourceId" in target
+          ? { sourceId: target.sourceId }
+          : { folder: target.folder, projectId, assistantId };
+      const res = await fetch("/api/knowledge/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Gagal merangkum");
+      setSummary({
+        title,
+        text: data.summary,
+        meta: `${data.sourceCount} berkas · ${data.chunkCount} potongan${data.capped ? " (dipangkas)" : ""}`,
+      });
+    } catch (e) {
+      setSummary({ title, text: (e as Error).message, meta: "gagal" });
+    } finally {
+      setSummarizing(null);
+    }
+  }
+
   async function saveInstr() {
     if (!projectId) return;
     setSavingInstr(true);
@@ -163,6 +196,32 @@ export function KnowledgeView() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-8 px-4 py-8">
+      {summary && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setSummary(null)}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-panel-solid p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-semibold">Ringkasan — {summary.title}</h3>
+                <p className="text-xs text-muted">{summary.meta}</p>
+              </div>
+              <button
+                onClick={() => setSummary(null)}
+                className="shrink-0 text-muted hover:text-ink"
+                aria-label="Tutup"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{summary.text}</div>
+          </div>
+        </div>
+      )}
       <div>
         <h1 className="text-lg font-semibold">Basis Pengetahuan</h1>
         <p className="text-sm text-muted">
@@ -304,6 +363,17 @@ export function KnowledgeView() {
                       <button
                         onClick={(e) => {
                           e.preventDefault();
+                          void summarize({ folder }, `📁 ${folder}`, `folder:${folder}`);
+                        }}
+                        disabled={summarizing !== null}
+                        className="text-xs text-muted hover:text-accent-a disabled:opacity-40"
+                        title="Rangkum seluruh folder (map-reduce)"
+                      >
+                        {summarizing === `folder:${folder}` ? "Merangkum…" : "Ringkas"}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
                           void removeGroup(items);
                         }}
                         className="text-xs text-muted hover:text-red-400"
@@ -348,13 +418,23 @@ export function KnowledgeView() {
                     {s.error ? ` · ${s.error}` : ""}
                   </span>
                 </span>
-                <button
-                  onClick={() => void remove(s.id)}
-                  className="shrink-0 text-xs text-muted hover:text-red-400"
-                  title="Hapus sumber ini"
-                >
-                  Hapus
-                </button>
+                <span className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={() => void summarize({ sourceId: s.id }, s.name, `src:${s.id}`)}
+                    disabled={summarizing !== null}
+                    className="text-xs text-muted hover:text-accent-a disabled:opacity-40"
+                    title="Rangkum sumber ini (map-reduce)"
+                  >
+                    {summarizing === `src:${s.id}` ? "Merangkum…" : "Ringkas"}
+                  </button>
+                  <button
+                    onClick={() => void remove(s.id)}
+                    className="text-xs text-muted hover:text-red-400"
+                    title="Hapus sumber ini"
+                  >
+                    Hapus
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
