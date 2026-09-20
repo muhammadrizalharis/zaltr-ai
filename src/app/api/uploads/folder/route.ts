@@ -22,7 +22,7 @@ const CONCURRENCY = 4;
 
 export const POST = guarded(async (req: Request) => {
   const me = await requireUser();
-  const rl = rateLimit(`upf:${me.id}`, 6, 60_000);
+  const rl = await rateLimit(`upf:${me.id}`, 6, 60_000);
   if (!rl.ok) {
     return Response.json(
       { error: `Terlalu banyak pengindeksan folder — coba lagi dalam ${rl.retryAfter} detik.` },

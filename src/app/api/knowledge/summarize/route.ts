@@ -8,7 +8,7 @@ export const runtime = "nodejs";
  *  folder { folder, projectId?, assistantId? } dari basis pengetahuan. */
 export const POST = guarded(async (req: Request) => {
   const me = await requireUser();
-  const rl = rateLimit(`sum:${me.id}`, 8, 60_000);
+  const rl = await rateLimit(`sum:${me.id}`, 8, 60_000);
   if (!rl.ok) {
     return Response.json(
       { error: `Terlalu banyak permintaan ringkasan — coba lagi dalam ${rl.retryAfter} detik.` },

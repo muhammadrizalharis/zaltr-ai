@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { rateLimit } from "@/server/ratelimit";
+import { notifyTelegram } from "@/server/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ function clip(v: unknown, max: number): string {
 export async function POST(req: Request) {
   const h = await headers();
   const ip = (h.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
-  const rl = rateLimit(`clog:${ip}`, 10, 60_000);
+  const rl = await rateLimit(`clog:${ip}`, 10, 60_000);
   if (!rl.ok) return new Response(null, { status: 204 });
 
   try {
@@ -35,6 +36,13 @@ export async function POST(req: Request) {
       `[client-error] kind=${kind} ip=${ip} url=${url} ua="${ua}" msg="${message}"` +
         (stack ? ` stack="${stack}"` : ""),
     );
+    // Alert ke Telegram untuk error nyata (bukan uji), di-throttle per pesan.
+    if (kind !== "test") {
+      void notifyTelegram(
+        `\u26a0\ufe0f Error klien\n${kind}: ${message}\nurl=${url}\nua=${ua}`,
+        { key: `clienterr:${message.slice(0, 60)}`, cooldownMs: 600_000 },
+      );
+    }
   } catch {
     // body tak valid -> abaikan diam-diam
   }

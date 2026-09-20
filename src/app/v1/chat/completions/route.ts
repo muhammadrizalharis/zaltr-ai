@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   if (!me) return err("API key tidak valid atau dicabut", 401, "authentication_error");
 
   // Rate limit: cegah spam yang menghabiskan kredit/kuota (60 permintaan/menit/user).
-  const rl = rateLimit(`v1:${me.id}`, 60, 60_000);
+  const rl = await rateLimit(`v1:${me.id}`, 60, 60_000);
   if (!rl.ok) {
     return Response.json(
       {

@@ -166,6 +166,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "${ZALTR_WEB_BIND:-127.0.0.1}:${ZALTR_WEB_PORT:-46300}:3000"
     environment:
@@ -197,6 +199,13 @@ services:
       ZALTR_VAPID_PUBLIC_KEY: ${ZALTR_VAPID_PUBLIC_KEY:-}
       ZALTR_VAPID_PRIVATE_KEY: ${ZALTR_VAPID_PRIVATE_KEY:-}
       ZALTR_VAPID_SUBJECT: ${ZALTR_VAPID_SUBJECT:-mailto:admin@calyzr-ai.my.id}
+      # Redis (rate limit tahan-restart & lintas instance); password dari .env
+      ZALTR_REDIS_HOST: redis
+      ZALTR_REDIS_PORT: "6379"
+      ZALTR_REDIS_PASSWORD: ${ZALTR_REDIS_PASSWORD:?}
+      # Alert error klien & server ke Telegram (token rahasia di .env; kosong = nonaktif)
+      ZALTR_TELEGRAM_BOT_TOKEN: ${ZALTR_TELEGRAM_BOT_TOKEN:-}
+      ZALTR_TELEGRAM_CHAT_ID: ${ZALTR_TELEGRAM_CHAT_ID:-}
 
   # ------------------------------------------------------------------
   # Web search self-hosted (fitur "Cari web" di chat). Internal-only.

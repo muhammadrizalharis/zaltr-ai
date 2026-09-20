@@ -22,7 +22,7 @@ const MAX_MB = Math.round(MAX_UPLOAD_BYTES / 1024 / 1024);
  */
 export const POST = guarded(async (req: Request) => {
   const me = await requireUser();
-  const rl = rateLimit(`up:${me.id}`, 30, 60_000);
+  const rl = await rateLimit(`up:${me.id}`, 30, 60_000);
   if (!rl.ok) {
     return Response.json(
       { error: `Terlalu banyak unggahan — coba lagi dalam ${rl.retryAfter} detik.` },
