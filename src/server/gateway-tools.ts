@@ -105,7 +105,9 @@ function parseCall(raw: string): ToolCall | null {
 
 /** Apakah teks (mungkin belum lengkap) mengandung/terlihat akan memuat tool call. */
 export function looksLikeToolCall(text: string): boolean {
-  return text.includes(OPEN) || text.includes("<<TOOL");
+  // Mulai buffering sejak "<<" — lebih dini daripada menunggu "<<TOOL" utuh, agar
+  // tak ada karakter marker yang sempat bocor ke klien saat stream.
+  return text.includes(OPEN) || text.includes("<<");
 }
 
 /**

@@ -159,7 +159,7 @@ export async function POST(req: Request) {
             if (!buffering) {
               // Kirim sampai sebelum "<" terakhir (kemungkinan awal marker) — sisanya ditahan.
               const lt = acc.lastIndexOf("<");
-              const upto = lt >= sent && acc.length - lt < 14 ? lt : acc.length;
+              const upto = lt >= sent && acc.length - lt < 16 ? lt : acc.length;
               if (upto > sent) {
                 chunk({ content: acc.slice(sent, upto) });
                 sent = upto;
