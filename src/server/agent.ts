@@ -21,6 +21,7 @@ import {
 } from "@/server/drive";
 import { extractText, fileExt, IMAGE_EXT, isBinarySkip, needsFullDownload } from "@/server/extract";
 import { runInWorkspace, writeWorkspaceFile, readWorkspaceFile, listWorkspace, TEXT_WRITE_EXT } from "@/server/workspace";
+import { unfenceCode } from "@/server/intent";
 
 const TOOL_INSTRUCTIONS =
   "Kamu AGEN calyzr.ai dengan WORKSPACE terisolasi (Linux, Python 3.12, tanpa internet). " +
@@ -61,10 +62,7 @@ async function callModel(
 const MAX_OBS = 6000;
 
 /** Bersihkan fence ```lang ... ``` bila model membungkus kode/perintah. */
-function unfence(s: string): string {
-  const m = s.trim().match(/^```[\w-]*\s*\n([\s\S]*?)\n?```\s*$/);
-  return (m ? m[1] : s).trim();
-}
+const unfence = unfenceCode;
 
 function fmtRun(r: { stdout: string; stderr: string; exitCode: number; outputs: Array<{ path: string; size: number }> }): string {
   const parts: string[] = [];
@@ -158,6 +156,8 @@ export async function* runAgent(opts: {
     for (const o of r.outputs) produced.set(o.path, o);
   };
   const observe = (reply: string, obs: string) => {
+    // Log ringkas tiap langkah (diagnosa kualitas model/alat) — tanpa isi berkas.
+    console.log(`[agent] ${reply.trim().split("\n")[0].slice(0, 100)} -> ${obs.replace(/\s+/g, " ").slice(0, 300)}`);
     history.push({ role: "assistant", content: reply });
     history.push({ role: "user", content: `OBSERVASI:\n${obs}` });
   };

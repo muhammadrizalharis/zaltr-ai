@@ -1,5 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { wantsAction } from "@/server/intent";
+import { wantsAction, unfenceCode } from "@/server/intent";
+
+describe("unfenceCode", () => {
+  it("fence di baris baru setelah AKSI (kasus nyata qwen)", () => {
+    expect(unfenceCode("\n```python\nprint(1)\n```")).toBe("print(1)");
+  });
+  it("fence rapi + teks penjelasan setelahnya dibuang", () => {
+    expect(unfenceCode("```sh\nls -la\n```\nIni akan menampilkan berkas.")).toBe("ls -la");
+  });
+  it("tanpa fence -> apa adanya", () => {
+    expect(unfenceCode("  echo hi  ")).toBe("echo hi");
+  });
+  it("fence penutup tanpa bahasa", () => {
+    expect(unfenceCode("```\nx=1\ny=2\n```")).toBe("x=1\ny=2");
+  });
+});
 
 describe("wantsAction (auto-agent)", () => {
   it("permintaan buat/edit berkas -> true", () => {
