@@ -20,20 +20,27 @@ import {
   formatTree,
 } from "@/server/drive";
 import { extractText, fileExt, IMAGE_EXT, isBinarySkip, needsFullDownload } from "@/server/extract";
-
-const RUNNER_URL = (process.env.ZALTR_RUNNER_URL ?? "").replace(/\/$/, "");
+import { runInWorkspace, writeWorkspaceFile, readWorkspaceFile, listWorkspace } from "@/server/workspace";
 
 const TOOL_INSTRUCTIONS =
-  "Kamu agen yang boleh memakai ALAT untuk menjawab lebih akurat. Bila perlu " +
-  "informasi terkini atau perhitungan, jawab HANYA dengan SATU baris aksi " +
-  "(tanpa teks lain):\n" +
-  "AKSI: web <kata kunci>\n" +
-  "AKSI: kode <python>\n" +
-  "AKSI: catatan <kata kunci>   (cari di dokumen/knowledge base milik pengguna)\n" +
-  "AKSI: drive <link>           (baca folder/berkas Google Drive publik)\n" +
-  "Setelah menerima OBSERVASI, lanjutkan berpikir. Bila sudah cukup, tulis " +
-  "JAWABAN final untuk pengguna secara normal (TANPA awalan AKSI) dan sebutkan " +
-  "sumber bila memakai web.";
+  "Kamu AGEN calyzr.ai dengan WORKSPACE terisolasi (Linux, Python 3.12, tanpa internet). " +
+  "Lampiran pengguna tersedia di folder input/ (nama asli). Berkas yang kamu buat di workspace " +
+  "otomatis tersimpan & bisa diunduh pengguna. Pustaka tersedia: python-docx, openpyxl, python-pptx, " +
+  "pypdf, reportlab, fpdf2, Pillow, pandas, numpy, matplotlib, sympy, markdown.\n" +
+  "Untuk bertindak, jawab HANYA dengan SATU aksi (tanpa teks lain), format:\n" +
+  "AKSI: shell <perintah sh>              (mkdir, ls, cat, mv, cp, sed, dll — di workspace)\n" +
+  "AKSI: kode <python>                    (boleh multi-baris; simpan berkas hasil ke workspace)\n" +
+  "AKSI: tulis <path>\\n<isi berkas>        (tulis/timpa berkas teks: .md .txt .py .csv .html .json)\n" +
+  "AKSI: baca <path>                      (baca isi berkas workspace atau input/<nama> — pdf/docx/xlsx ok)\n" +
+  "AKSI: daftar                           (lihat semua berkas workspace)\n" +
+  "AKSI: web <kata kunci>                 (cari web)\n" +
+  "AKSI: catatan <kata kunci>             (cari knowledge base pengguna)\n" +
+  "AKSI: drive <link>                     (baca Google Drive publik)\n" +
+  "Aturan: (1) Untuk membuat Word/PDF/Excel/PPT pakai AKSI: kode dgn pustaka di atas dan simpan ke " +
+  "nama berkas yang jelas (mis. laporan.docx). (2) Untuk MENGEDIT dokumen pengguna: baca dari input/, " +
+  "ubah, simpan sebagai berkas baru. (3) Bila hasil OBSERVASI error, perbaiki & coba lagi. " +
+  "(4) Setelah selesai, tulis JAWABAN final untuk pengguna (TANPA awalan AKSI): ringkas apa yang " +
+  "dilakukan; JANGAN mengarang isi berkas — berkas hasil akan ditautkan otomatis di bawah jawabanmu.";
 
 async function callModel(
   modelId: string,
@@ -49,21 +56,22 @@ async function callModel(
   return out.trim();
 }
 
-async function runCode(code: string): Promise<string> {
-  if (!RUNNER_URL) return "(runner tidak tersedia)";
-  try {
-    const res = await fetch(`${RUNNER_URL}/run`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: code.slice(0, 20_000) }),
-      signal: AbortSignal.timeout(40_000),
-    });
-    const d = (await res.json()) as { stdout?: string; stderr?: string };
-    const text = `${d.stdout ?? ""}${d.stderr ? `\n[stderr] ${d.stderr}` : ""}`.trim();
-    return text.slice(0, 2000) || "(tanpa output)";
-  } catch {
-    return "(runner gagal)";
-  }
+const MAX_OBS = 6000;
+
+/** Bersihkan fence ```lang ... ``` bila model membungkus kode/perintah. */
+function unfence(s: string): string {
+  const m = s.trim().match(/^```[\w-]*\s*\n([\s\S]*?)\n?```\s*$/);
+  return (m ? m[1] : s).trim();
+}
+
+function fmtRun(r: { stdout: string; stderr: string; exitCode: number; outputs: Array<{ path: string; size: number }> }): string {
+  const parts: string[] = [];
+  if (r.stdout.trim()) parts.push(r.stdout.trim());
+  if (r.stderr.trim()) parts.push(`[stderr] ${r.stderr.trim()}`);
+  parts.push(`[exit ${r.exitCode}]`);
+  if (r.outputs.length) parts.push(`[berkas dihasilkan/berubah: ${r.outputs.map((o) => `${o.path} (${o.size} B)`).join(", ")}]`);
+  const s = parts.join("\n");
+  return s.length > MAX_OBS ? s.slice(0, MAX_OBS) + "\n…(dipotong)" : s;
 }
 
 /** Baca folder/berkas Google Drive publik -> teks ringkas untuk observasi agen. */
@@ -113,31 +121,117 @@ export async function* runAgent(opts: {
   signal: AbortSignal;
   userId: string;
   projectId?: string | null;
+  /** Key MinIO lampiran percakapan (uploads/<uid>/...) untuk dihidrasi ke input/. */
+  attachmentKeys?: string[];
+  sessionId?: string | null;
   maxSteps?: number;
 }): AsyncGenerator<AgentChunk> {
-  const maxSteps = opts.maxSteps ?? 4;
+  const maxSteps = opts.maxSteps ?? 10;
   const base = `agent-${randomUUID()}`;
+  const attachmentKeys = opts.attachmentKeys ?? [];
+  const produced = new Map<string, { path: string; url: string }>();
+
+  // Konteks workspace awal: berkas input + hasil sebelumnya (agar model tahu nama berkas).
+  let wsNote = "";
+  try {
+    const ws = await listWorkspace(opts.userId, opts.conversationId);
+    const inputs = attachmentKeys.map((k) => (k.split("/").pop() ?? k).replace(/^\d{10,}-[0-9a-f]{8}-/, ""));
+    const lines: string[] = [];
+    if (inputs.length) lines.push(`Lampiran pengguna (input/): ${inputs.map((n) => `input/${n}`).join(", ")}`);
+    if (ws.length) lines.push(`Berkas workspace sebelumnya: ${ws.map((w) => w.path).join(", ")}`);
+    if (lines.length) wsNote = `\n\nKONTEKS WORKSPACE:\n${lines.join("\n")}`;
+  } catch {
+    /* opsional */
+  }
+
   // Instruksi alat sbg pesan sistem di depan; riwayat tumbuh tiap langkah.
-  const history: HistoryItem[] = [{ role: "system", content: TOOL_INSTRUCTIONS }, ...opts.history];
+  const history: HistoryItem[] = [{ role: "system", content: TOOL_INSTRUCTIONS + wsNote }, ...opts.history];
+  const runOpts = {
+    userId: opts.userId,
+    conversationId: opts.conversationId,
+    attachmentKeys,
+    sessionId: opts.sessionId ?? null,
+  };
+  const note = (r: { outputs: Array<{ path: string; url: string }> }) => {
+    for (const o of r.outputs) produced.set(o.path, o);
+  };
+  const observe = (reply: string, obs: string) => {
+    history.push({ role: "assistant", content: reply });
+    history.push({ role: "user", content: `OBSERVASI:\n${obs}` });
+  };
 
   for (let step = 0; step < maxSteps; step++) {
     // Sesi model EPHEMERAL per langkah (id unik) -> selalu kirim riwayat penuh,
     // tak mengotori sesi Copilot percakapan asli.
     const reply = await callModel(opts.modelId, history, `${base}-${step}`, opts.signal);
-    const webM = reply.match(/^\s*AKSI:\s*web\s+(.+)$/im);
+    const shellM = reply.match(/^\s*AKSI:\s*shell\s+([\s\S]+)$/im);
     const codeM = reply.match(/^\s*AKSI:\s*kode\s+([\s\S]+)$/im);
+    const writeM = reply.match(/^\s*AKSI:\s*tulis\s+([^\n]+)\n([\s\S]*)$/im);
+    const readM = reply.match(/^\s*AKSI:\s*baca\s+(.+)$/im);
+    const listM = reply.match(/^\s*AKSI:\s*daftar\s*$/im);
+    const webM = reply.match(/^\s*AKSI:\s*web\s+(.+)$/im);
     const kbM = reply.match(/^\s*AKSI:\s*catatan\s+(.+)$/im);
     const driveM = reply.match(/^\s*AKSI:\s*drive\s+(.+)$/im);
+
+    if (shellM) {
+      const cmd = unfence(shellM[1]);
+      yield { kind: "progress", text: `\n🖥️ Menjalankan perintah: \`${cmd.split("\n")[0].slice(0, 80)}\`…\n` };
+      try {
+        const r = await runInWorkspace({ ...runOpts, lang: "sh", code: cmd, timeoutS: 60 });
+        note(r);
+        observe(reply, fmtRun(r));
+      } catch (e) {
+        observe(reply, `(shell gagal: ${(e as Error).message.slice(0, 200)})`);
+      }
+      continue;
+    }
+    if (codeM) {
+      yield { kind: "progress", text: `\n🧮 Menjalankan kode Python…\n` };
+      try {
+        const r = await runInWorkspace({ ...runOpts, lang: "python", code: unfence(codeM[1]), timeoutS: 90 });
+        note(r);
+        observe(reply, fmtRun(r));
+      } catch (e) {
+        observe(reply, `(kode gagal: ${(e as Error).message.slice(0, 200)})`);
+      }
+      continue;
+    }
+    if (writeM) {
+      const path = writeM[1].trim().replace(/^["'`]|["'`]$/g, "");
+      const body = unfence(writeM[2]);
+      yield { kind: "progress", text: `\n📝 Menulis berkas ${path}…\n` };
+      try {
+        const w = await writeWorkspaceFile({ ...runOpts, path, content: body });
+        if (w) {
+          produced.set(w.path, w);
+          observe(reply, `Berkas ${w.path} tersimpan (${Buffer.byteLength(body, "utf8")} B).`);
+        } else observe(reply, `(path tidak valid: ${path})`);
+      } catch (e) {
+        observe(reply, `(tulis gagal: ${(e as Error).message.slice(0, 200)})`);
+      }
+      continue;
+    }
+    if (readM) {
+      const path = readM[1].trim().replace(/^["'`]|["'`]$/g, "");
+      yield { kind: "progress", text: `\n📖 Membaca ${path}…\n` };
+      const text = await readWorkspaceFile({ ...runOpts, path, limit: 40_000 });
+      observe(reply, text ? `=== ${path} ===\n${text}` : `(berkas ${path} tidak ditemukan / tak terbaca)`);
+      continue;
+    }
+    if (listM) {
+      yield { kind: "progress", text: `\n📂 Melihat workspace…\n` };
+      const ws = await listWorkspace(opts.userId, opts.conversationId);
+      const inputs = attachmentKeys.map((k) => `input/${(k.split("/").pop() ?? k).replace(/^\d{10,}-[0-9a-f]{8}-/, "")}`);
+      observe(reply, [...inputs, ...ws.map((w) => `${w.path} (${w.size} B)`)].join("\n") || "(workspace kosong)");
+      continue;
+    }
 
     if (driveM) {
       const link = driveM[1].trim();
       yield { kind: "progress", text: `\n📁 Membaca Google Drive…\n` };
-      const obs = await readDrive(link);
-      history.push({ role: "assistant", content: reply });
-      history.push({ role: "user", content: `OBSERVASI:\n${obs}` });
+      observe(reply, await readDrive(link));
       continue;
     }
-
     if (kbM) {
       const q = kbM[1].trim().slice(0, 200);
       yield { kind: "progress", text: `\n📚 Mencari di dokumenmu: “${q}”…\n` };
@@ -148,11 +242,9 @@ export async function* runAgent(opts: {
       } catch {
         obs = "(pencarian dokumen gagal)";
       }
-      history.push({ role: "assistant", content: reply });
-      history.push({ role: "user", content: `OBSERVASI:\n${obs}` });
+      observe(reply, obs);
       continue;
     }
-
     if (webM) {
       const q = webM[1].trim().slice(0, 200);
       yield { kind: "progress", text: `\n🔎 Mencari web: “${q}”…\n` };
@@ -162,20 +254,12 @@ export async function* runAgent(opts: {
       } catch {
         obs = "(pencarian web gagal)";
       }
-      history.push({ role: "assistant", content: reply });
-      history.push({ role: "user", content: `OBSERVASI:\n${obs}` });
-      continue;
-    }
-    if (codeM) {
-      yield { kind: "progress", text: `\n🧮 Menjalankan kode…\n` };
-      const obs = await runCode(codeM[1].trim());
-      history.push({ role: "assistant", content: reply });
-      history.push({ role: "user", content: `OBSERVASI (hasil kode):\n${obs}` });
+      observe(reply, obs);
       continue;
     }
 
     // Tidak ada aksi -> ini jawaban final.
-    yield { kind: "final", text: reply };
+    yield { kind: "final", text: reply + filesFooter(produced) };
     return;
   }
 
@@ -186,5 +270,12 @@ export async function* runAgent(opts: {
     `${base}-final`,
     opts.signal,
   );
-  yield { kind: "final", text: finalReply };
+  yield { kind: "final", text: finalReply + filesFooter(produced) };
+}
+
+/** Tautan unduh berkas yang dihasilkan agen (ditambahkan di bawah jawaban). */
+function filesFooter(produced: Map<string, { path: string; url: string }>): string {
+  if (produced.size === 0) return "";
+  const lines = [...produced.values()].map((o) => `- [${o.path}](${o.url})`);
+  return `\n\n**Berkas hasil:**\n${lines.join("\n")}\n`;
 }

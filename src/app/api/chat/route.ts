@@ -21,8 +21,9 @@ import {
   formatTree,
   scoreFile,
 } from "@/server/drive";
-import { retrieve, formatKnowledge, countIndexed, ingestUploadOnce, listSourceNames } from "@/server/knowledge";
+import { retrieve, formatKnowledge, countIndexed, ingestUploadOnce, listSourceNames, fullTextOfNamedSources } from "@/server/knowledge";
 import { runAgent } from "@/server/agent";
+import { wantsAction } from "@/server/intent";
 import { webSearch, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
 import { embedMessage } from "@/server/msgsearch";
@@ -182,21 +183,37 @@ export const POST = guarded(async (req: Request) => {
   const citations: Array<{ k: number; name: string; snippet: string }> = [];
   /** Peringatan untuk pengguna (mis. gambar tak terbaca), dikirim di awal stream. */
   let peringatan = "";
+  /** Semua key lampiran percakapan (utk workspace agen: input/). */
+  let attachmentKeys: string[] = [];
   if (last) {
-    const keys = [...content.matchAll(/\]\(\/api\/files\/(uploads\/[\w./-]+)\)/g)].map(
-      (m) => m[1],
-    );
+    const keyRe = /\]\(\/api\/files\/(uploads\/[\w./-]+)\)/g;
+    const keysNow = [...content.matchAll(keyRe)].map((m) => m[1]);
+    // Lampiran dari giliran SEBELUMNYA di percakapan ini (pesan user, terbaru dulu) —
+    // isi berkas tetap tersedia utuh di giliran lanjutan tanpa unggah ulang.
+    const olderAttach: string[] = [];
+    for (let i = history.length - 2; i >= 0; i--) {
+      if (history[i].role !== "user") continue;
+      for (const m of history[i].content.matchAll(keyRe)) {
+        if (!keysNow.includes(m[1]) && !olderAttach.includes(m[1])) olderAttach.push(m[1]);
+      }
+    }
+    // Berkas hasil agen (workspace) dikecualikan dari pembacaan otomatis.
+    const isWs = (k: string) => k.startsWith(`uploads/${me.id}/ws/`);
+    const keys = [...keysNow, ...olderAttach].filter((k) => !isWs(k));
+    attachmentKeys = keys.filter((k) => k.startsWith(`uploads/${me.id}/`));
     const extras: string[] = [];
     const images: AttachedImage[] = [];
     // Pagu total teks semua lampiran (jaga context window model). Bisa diubah
     // via env ZALTR_MAX_TOTAL_CHARS. 300rb karakter ≈ 75rb token.
     let sisaBudget = Math.max(4_000, Number(process.env.ZALTR_MAX_TOTAL_CHARS) || 300_000);
-    for (const key of keys.slice(0, 5)) {
+    for (const key of keys.slice(0, 12)) {
       if (!key.startsWith(`uploads/${me.id}/`)) continue; // hanya file miliknya
-      const name = key.split("/").pop() ?? key;
+      const isOld = !keysNow.includes(key);
+      const name = (key.split("/").pop() ?? key).replace(/^\d{10,}-[0-9a-f]{8}-/, "");
       try {
         const buf = await getObjectBuffer(key);
         if (IMAGE_EXT.has(fileExt(name))) {
+          if (isOld) continue; // gambar lama ditangani blok RECALL di bawah
           images.push({
             data: buf.toString("base64"),
             mimeType: imageMime(name),
@@ -214,9 +231,10 @@ export const POST = guarded(async (req: Request) => {
               () => {},
             );
           }
+          const label = isOld ? `Isi lampiran sebelumnya "${name}"` : `Isi lampiran "${name}"`;
           extras.push(
             text
-              ? `=== Isi lampiran "${name}" ===\n${text}\n=== Akhir lampiran ===`
+              ? `=== ${label} ===\n${text}\n=== Akhir lampiran ===`
               : sisaBudget <= 0
                 ? `[Lampiran "${name}" tidak dibaca: total teks lampiran sudah mencapai batas]`
                 : `[Lampiran "${name}" tidak bisa dibaca sebagai teks]`,
@@ -225,6 +243,15 @@ export const POST = guarded(async (req: Request) => {
       } catch {
         extras.push(`[Lampiran "${name}" gagal dibaca]`);
       }
+    }
+    if (extras.length > 0) {
+      // Anti-halusinasi: model TIDAK punya filesystem/terminal di mode chat — isi
+      // berkas SUDAH disertakan; jangan pura-pura menjalankan glob/bash/find.
+      extras.unshift(
+        "[Catatan sistem: isi berkas lampiran pengguna SUDAH disertakan utuh di bawah ini. " +
+          "Jawab langsung berdasarkan isinya. Kamu TIDAK memiliki akses filesystem/terminal " +
+          "di mode ini — jangan menulis perintah glob/bash/find atau berkata akan mencari berkas.]",
+      );
     }
 
     // Google Drive PUBLIK: bila pengguna menempel link folder/berkas, susun
@@ -322,7 +349,7 @@ export const POST = guarded(async (req: Request) => {
     const MAX_CTX_IMAGES = Math.max(1, Number(process.env.ZALTR_MAX_CTX_IMAGES) || 6);
     const recalledImages: AttachedImage[] = [];
     if (images.length < MAX_CTX_IMAGES) {
-      const seen = new Set(keys);
+      const seen = new Set(keysNow);
       const olderKeys: string[] = [];
       // Telusuri riwayat (tanpa pesan terakhir) dari yang TERBARU ke terlama.
       for (let i = history.length - 2; i >= 0 && olderKeys.length < MAX_CTX_IMAGES; i--) {
@@ -470,6 +497,18 @@ export const POST = guarded(async (req: Request) => {
                 `${names.join("; ")}.`,
             );
           }
+          // Bila pengguna MENYEBUT nama dokumen/berkas terindeks, sertakan isinya UTUH
+          // (bukan hanya potongan) agar bisa dianalisis menyeluruh di giliran mana pun.
+          const full = await fullTextOfNamedSources({
+            userId: me.id,
+            projectId: conversation.projectId,
+            assistantId: conversation.assistantId,
+            message: content,
+            budget: Math.max(20_000, (Number(process.env.ZALTR_MAX_TOTAL_CHARS) || 300_000) / 2),
+          });
+          for (const f of full) {
+            preamble.push(`=== Isi lengkap dokumen "${f.name}" (dari basis pengetahuan) ===\n${f.text}\n=== Akhir dokumen ===`);
+          }
         }
       } catch {
         /* KB opsional — abaikan bila gagal */
@@ -511,8 +550,12 @@ export const POST = guarded(async (req: Request) => {
       let status: "completed" | "stopped" | "failed" = "completed";
       let errorMessage = "";
       try {
-        if (agent && modelId !== "zaltr-core") {
-          // Mode agen: loop ReAct (web/kode) terisolasi; chat biasa tak terpengaruh.
+        // Auto-agent: permintaan yang butuh TINDAKAN nyata (buat/edit/jalankan berkas,
+        // generate PDF/Word/Excel, dll) otomatis masuk mode agen walau toggle mati.
+        const useAgent =
+          (agent || wantsAction(content)) && modelId !== "zaltr-core" && !modelId.startsWith("comfyui:");
+        if (useAgent) {
+          // Mode agen: loop ReAct (workspace/shell/kode/web) terisolasi; chat biasa tak terpengaruh.
           for await (const chunk of runAgent({
             modelId,
             history: providerHistory,
@@ -520,6 +563,7 @@ export const POST = guarded(async (req: Request) => {
             signal,
             userId: me.id,
             projectId: conversation.projectId,
+            attachmentKeys,
           })) {
             acc += chunk.text;
             send({ type: "delta", text: chunk.text });

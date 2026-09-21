@@ -250,6 +250,67 @@ export async function listSourceNames(opts: {
   return rows.map((r) => r.name);
 }
 
+/**
+ * Teks UTUH sumber terindeks yang NAMANYA disebut di pesan (mis. "materi.docx",
+ * "folder/bab1.md"). Chunk digabung ulang (overlap dibuang secara kasar) sehingga
+ * model membaca seluruh isi dokumen, bukan hanya potongan hasil retrieval.
+ * Dibatasi `budget` karakter total; sumber terbaru diprioritaskan.
+ */
+export async function fullTextOfNamedSources(opts: {
+  userId: string;
+  projectId?: string | null;
+  assistantId?: string | null;
+  message: string;
+  budget: number;
+  maxSources?: number;
+}): Promise<Array<{ name: string; text: string }>> {
+  const msg = opts.message.toLowerCase();
+  if (msg.length < 3) return [];
+  const pid = opts.projectId ?? null;
+  const aid = opts.assistantId ?? null;
+  const sources = await db.knowledgeSource.findMany({
+    where: {
+      userId: opts.userId,
+      status: "indexed",
+      OR: [
+        { projectId: null, assistantId: null },
+        ...(pid ? [{ projectId: pid }] : []),
+        ...(aid ? [{ assistantId: aid }] : []),
+      ],
+    },
+    select: { id: true, name: true },
+    orderBy: { createdAt: "desc" },
+    take: 400,
+  });
+  // Cocokkan nama lengkap ATAU nama berkas (tanpa folder) yang disebut di pesan.
+  const hit = sources.filter((s) => {
+    const full = s.name.toLowerCase();
+    const base = full.split("/").pop() ?? full;
+    const stem = base.replace(/\.[a-z0-9]+$/, "");
+    return msg.includes(full) || msg.includes(base) || (stem.length >= 6 && msg.includes(stem));
+  });
+  if (hit.length === 0) return [];
+  const out: Array<{ name: string; text: string }> = [];
+  let sisa = opts.budget;
+  for (const s of hit.slice(0, opts.maxSources ?? 3)) {
+    if (sisa < 500) break;
+    const chunks = await db.$queryRaw<Array<{ content: string }>>`
+      SELECT "content" FROM "KnowledgeChunk" WHERE "sourceId" = ${s.id} ORDER BY "idx" ASC`;
+    let text = "";
+    for (const c of chunks) {
+      // Buang overlap: cari 120 char awal chunk di ekor teks yang sudah ada.
+      const head = c.content.slice(0, 120);
+      const pos = head.length >= 40 ? text.lastIndexOf(head) : -1;
+      text = pos >= 0 && text.length - pos < 1500 ? text.slice(0, pos) + c.content : text + (text ? "\n" : "") + c.content;
+      if (text.length > sisa) break;
+    }
+    text = text.slice(0, sisa);
+    sisa -= text.length;
+    out.push({ name: s.name, text });
+  }
+  return out;
+}
+
 export async function countIndexed(
   userId: string,
   projectId?: string | null,
