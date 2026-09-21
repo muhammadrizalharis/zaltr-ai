@@ -144,7 +144,7 @@ export async function POST(req: Request) {
         // Saat tools aktif, teks di-BUFFER begitu marker tool-call muncul agar blok
         // tidak bocor ke pengguna; di akhir dipancarkan sebagai tool_calls.
         let buffering = false;
-        let pending = "";
+        let sent = 0; // jumlah karakter `acc` yang sudah dikirim sebagai content
         try {
           chunk({ role: "assistant" });
           for await (const part of gen) {
@@ -155,31 +155,29 @@ export async function POST(req: Request) {
               chunk({ content: text });
               continue;
             }
-            pending += text;
             if (!buffering && looksLikeToolCall(acc)) buffering = true;
             if (!buffering) {
-              // Tahan ekor pendek yang mungkin awal marker "<<".
-              const cut = pending.lastIndexOf("<");
-              const safe = cut >= 0 && pending.length - cut < 14 ? pending.slice(0, cut) : pending;
-              if (safe) {
-                chunk({ content: safe });
-                pending = pending.slice(safe.length);
+              // Kirim sampai sebelum "<" terakhir (kemungkinan awal marker) — sisanya ditahan.
+              const lt = acc.lastIndexOf("<");
+              const upto = lt >= sent && acc.length - lt < 14 ? lt : acc.length;
+              if (upto > sent) {
+                chunk({ content: acc.slice(sent, upto) });
+                sent = upto;
               }
             }
           }
           if (tools.length > 0) {
             const { content, calls } = extractToolCalls(acc);
             if (calls.length > 0) {
-              // Sisa teks yang belum terkirim (bila ada) -> kirim sebelum tool_calls.
-              const already = acc.length - pending.length;
-              const remainder = content.length > already ? content.slice(already) : "";
+              // Teks penjelasan sebelum blok yang belum terkirim -> kirim (tanpa marker).
+              const remainder = content.length > sent ? content.slice(sent) : "";
               if (remainder.trim()) chunk({ content: remainder });
               chunk({
                 tool_calls: calls.map((c, i) => ({ index: i, id: c.id, type: "function", function: { name: c.name, arguments: c.arguments } })),
               });
               chunk({}, "tool_calls");
             } else {
-              if (pending) chunk({ content: pending });
+              if (acc.length > sent) chunk({ content: acc.slice(sent) });
               chunk({}, "stop");
             }
           } else {
