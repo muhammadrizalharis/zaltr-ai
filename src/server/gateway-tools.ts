@@ -23,6 +23,7 @@ export type ToolCall = { id: string; name: string; arguments: string };
 
 const OPEN = "<<TOOL_CALL>>";
 const CLOSE = "<</TOOL_CALL>>";
+const MAX_TOOL_RESULT = 40_000;
 
 /** Normalisasi definisi tool dari kedua format (chat.completions & responses). */
 export function normalizeTools(tools: unknown): Array<{ name: string; description: string; parameters: unknown }> {
@@ -120,7 +121,12 @@ export function flattenToolMessages(messages: Array<Record<string, unknown>>): A
     const role = String(m.role ?? "user");
     if (role === "tool") {
       const id = String(m.tool_call_id ?? "");
-      out.push({ role: "user", content: `[TOOL RESULT${id ? ` ${id}` : ""}]\n${textOf(m.content)}` });
+      // Hasil tool sangat besar (mis. dump dokumen) memicu degenerasi model -> pangkas.
+      let body = textOf(m.content);
+      if (body.length > MAX_TOOL_RESULT) {
+        body = body.slice(0, MAX_TOOL_RESULT) + `\n…[dipangkas: ${body.length - MAX_TOOL_RESULT} karakter lagi]`;
+      }
+      out.push({ role: "user", content: `[TOOL RESULT${id ? ` ${id}` : ""}]\n${body}` });
       continue;
     }
     if (role === "assistant") {

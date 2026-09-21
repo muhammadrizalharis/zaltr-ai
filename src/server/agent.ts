@@ -22,6 +22,7 @@ import {
 import { extractText, fileExt, IMAGE_EXT, isBinarySkip, needsFullDownload } from "@/server/extract";
 import { runInWorkspace, writeWorkspaceFile, readWorkspaceFile, listWorkspace, TEXT_WRITE_EXT } from "@/server/workspace";
 import { unfenceCode } from "@/server/intent";
+import { isDegenerate, trimDegenerate } from "@/server/degenerate";
 
 const TOOL_INSTRUCTIONS =
   "Kamu AGEN calyzr.ai dengan WORKSPACE terisolasi (Linux, Python 3.12, tanpa internet). " +
@@ -56,9 +57,27 @@ async function callModel(
   signal: AbortSignal,
 ): Promise<string> {
   let out = "";
-  for await (const part of dispatch(modelId, { history, conversationId, signal })) {
-    if (part.kind === "text") out += part.text;
-    else out += `\n![${part.alt}](${part.url})\n`;
+  let lastCheck = 0;
+  // Pagar degenerasi: putus stream bila model mengulang tanpa henti.
+  const ac = new AbortController();
+  const onAbort = () => ac.abort();
+  signal.addEventListener("abort", onAbort, { once: true });
+  try {
+    for await (const part of dispatch(modelId, { history, conversationId, signal: ac.signal })) {
+      if (part.kind === "text") out += part.text;
+      else out += `\n![${part.alt}](${part.url})\n`;
+      if (out.length - lastCheck > 300) {
+        lastCheck = out.length;
+        if (isDegenerate(out)) {
+          ac.abort();
+          return trimDegenerate(out).trim();
+        }
+      }
+    }
+  } catch (e) {
+    if (!ac.signal.aborted || signal.aborted) throw e;
+  } finally {
+    signal.removeEventListener("abort", onAbort);
   }
   return out.trim();
 }

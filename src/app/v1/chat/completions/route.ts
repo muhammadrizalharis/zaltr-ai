@@ -13,6 +13,7 @@ import {
   looksLikeToolCall,
   flattenToolMessages,
 } from "@/server/gateway-tools";
+import { isDegenerate, trimDegenerate } from "@/server/degenerate";
 
 export const runtime = "nodejs";
 
@@ -145,12 +146,23 @@ export async function POST(req: Request) {
         // tidak bocor ke pengguna; di akhir dipancarkan sebagai tool_calls.
         let buffering = false;
         let sent = 0; // jumlah karakter `acc` yang sudah dikirim sebagai content
+        let degenerated = false;
+        let lastCheck = 0;
         try {
           chunk({ role: "assistant" });
           for await (const part of gen) {
             const text = part.kind === "text" ? part.text : `\n![${part.alt}](${part.url})\n`;
             if (!text) continue;
             acc += text;
+            // Pagar degenerasi (repetition loop): putus stream, hemat kredit & UI.
+            if (acc.length - lastCheck > 300) {
+              lastCheck = acc.length;
+              if (isDegenerate(acc)) {
+                degenerated = true;
+                controller.abort();
+                break;
+              }
+            }
             if (tools.length === 0) {
               chunk({ content: text });
               continue;
@@ -166,7 +178,15 @@ export async function POST(req: Request) {
               }
             }
           }
-          if (tools.length > 0) {
+          if (degenerated) {
+            // Ekor berulang dibuang; tool call (bila ada) diabaikan (argumen kemungkinan rusak).
+            const clean = trimDegenerate(acc);
+            const note = clean.slice(clean.lastIndexOf("_("));
+            const headUnsent = Math.max(0, Math.min(clean.length - note.length, acc.length) - sent);
+            if (headUnsent > 0 && tools.length > 0) chunk({ content: acc.slice(sent, sent + headUnsent) });
+            chunk({ content: `\n\n${note}` });
+            chunk({}, "stop");
+          } else if (tools.length > 0) {
             const { content, calls } = extractToolCalls(acc);
             if (calls.length > 0) {
               // Teks penjelasan sebelum blok yang belum terkirim -> kirim (tanpa marker).
@@ -207,16 +227,29 @@ export async function POST(req: Request) {
   }
 
   let acc = "";
+  let lastCheck = 0;
+  let degenerated = false;
   try {
     for await (const part of gen) {
       acc += part.kind === "text" ? part.text : `\n![${part.alt}](${part.url})\n`;
+      if (acc.length - lastCheck > 300) {
+        lastCheck = acc.length;
+        if (isDegenerate(acc)) {
+          degenerated = true;
+          controller.abort();
+          break;
+        }
+      }
     }
   } catch (e) {
-    await refund();
-    return err((e as Error).message || "Gagal menghasilkan jawaban", 502, "server_error");
+    if (!degenerated) {
+      await refund();
+      return err((e as Error).message || "Gagal menghasilkan jawaban", 502, "server_error");
+    }
   }
+  if (degenerated) acc = trimDegenerate(acc);
   persistAssistant(acc);
-  if (tools.length > 0) {
+  if (tools.length > 0 && !degenerated) {
     const { content, calls } = extractToolCalls(acc);
     if (calls.length > 0) {
       return Response.json({
