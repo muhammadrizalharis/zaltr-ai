@@ -96,8 +96,8 @@ async function hydrate(
       total += buf.length;
       if (total > MAX_HYDRATE_BYTES) return;
       files[rel] = buf.toString("base64");
-    } catch {
-      /* lewati berkas hilang */
+    } catch (e) {
+      console.error(`[workspace] gagal hidrasi ${key}: ${(e as Error).message}`);
     }
   };
   // Workspace lama dulu (hasil agen), lalu lampiran ke input/.
@@ -149,8 +149,8 @@ async function persistOutputs(
         update: { size: buf.length, contentType: type, lastActiveAt: new Date() },
       });
       outputs.push({ path: s, url: `/api/files/${key}?v=${Date.now()}`, size: buf.length });
-    } catch {
-      /* lewati berkas yang gagal disimpan */
+    } catch (e) {
+      console.error(`[workspace] gagal simpan ${key}: ${(e as Error).message}`);
     }
   }
   return outputs;
