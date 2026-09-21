@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { InstallApp } from "@/components/install-app";
 import { PushToggle } from "@/components/push-toggle";
+import type { ModelDescriptor } from "@/lib/types";
 
 type MemoryItem = { id: string; content: string; createdAt: string };
 type ApiKeyItem = {
@@ -13,22 +14,45 @@ type ApiKeyItem = {
   createdAt: string;
 };
 
-/** Config Continue (VS Code) siap-tempel untuk gateway OpenAI-compatible calyzr. */
-function continueConfig(base: string, key: string): string {
+/** Model chat yang benar-benar bisa dipakai akun ini via gateway (terbuka + online). */
+function usableChatModels(models: ModelDescriptor[]): ModelDescriptor[] {
+  return models.filter(
+    (m) =>
+      !m.locked &&
+      m.available !== false &&
+      m.provider !== "comfyui" &&
+      m.capabilities.includes("chat"),
+  );
+}
+
+/**
+ * Config Continue (VS Code) siap-tempel untuk gateway OpenAI-compatible calyzr.
+ * Daftar model MENGIKUTI yang terbuka untuk akun (bukan contoh statis).
+ */
+function continueConfig(base: string, key: string, models: ModelDescriptor[]): string {
   const apiBase = `${base}/v1`;
-  const model = (name: string, id: string) =>
-    `  - name: ${name}\n    provider: openai\n    model: ${id}\n    apiBase: ${apiBase}\n    apiKey: ${key}`;
-  return [
-    "name: Calyzr",
-    "version: 1.0.0",
-    "schema: v1",
-    "models:",
-    model("Calyzr Sonnet 5", "copilot:claude-sonnet-5"),
-    model("Calyzr Opus 5", "copilot:claude-opus-5"),
-    model("Calyzr Haiku 4.5 (cepat)", "copilot:claude-haiku-4.5"),
-    `# Model lain yang tersedia untukmu: buka ${apiBase}/models`,
+  const q = (s: string) => JSON.stringify(s); // aman utk YAML (label bisa berisi ':' dll)
+  const entry = (name: string, id: string) =>
+    `  - name: ${q(name)}\n    provider: openai\n    model: ${q(id)}\n    apiBase: ${apiBase}\n    apiKey: ${key}`;
+  const usable = usableChatModels(models);
+  const lines = ["name: Calyzr", "version: 1.0.0", "schema: v1", "models:"];
+  if (usable.length === 0) {
+    lines.push(entry("Calyzr Free", "zaltr-core"));
+  } else {
+    for (const m of usable) lines.push(entry(`Calyzr — ${m.label}`, m.id));
+  }
+  lines.push(
+    "  # Embedding utk @codebase — model lokal calyzr (GRATIS, tak memakai kredit)",
+    "  - name: Calyzr Embeddings",
+    "    provider: openai",
+    "    model: bge-m3",
+    `    apiBase: ${apiBase}`,
+    `    apiKey: ${key}`,
+    "    roles: [embed]",
+    `# Daftar model terbaru akunmu: GET ${apiBase}/models`,
     "",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 /**
@@ -46,18 +70,21 @@ export function SettingsView() {
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [keyBusy, setKeyBusy] = useState(false);
   const [keyErr, setKeyErr] = useState<string | null>(null);
+  const [models, setModels] = useState<ModelDescriptor[]>([]);
 
   useEffect(() => {
     void (async () => {
       setBase(window.location.origin);
-      const [p, m, k] = await Promise.all([
+      const [p, m, k, md] = await Promise.all([
         fetch("/api/profile").then((r) => r.json()),
         fetch("/api/memories").then((r) => r.json()),
         fetch("/api/apikeys").then((r) => r.json()),
+        fetch("/api/models", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
       ]);
       setInstructions(p.profile?.customInstructions ?? "");
       setMemories(m.memories ?? []);
       setApiKeys(k.keys ?? []);
+      setModels(md.models ?? []);
     })();
   }, []);
 
@@ -218,11 +245,11 @@ export function SettingsView() {
               <b>Buat API key</b> di bawah (atau langsung <b>Salin config</b> yang sudah terisi
               setelah key dibuat):
             </p>
-            <pre className="max-h-56 overflow-auto whitespace-pre rounded bg-bg px-2 py-2 text-[11px] leading-relaxed">{continueConfig(base || "https://calyzr-ai.my.id", "sk-calyzr-XXXXXXXXXXXXXXXX")}</pre>
+            <pre className="max-h-56 overflow-auto whitespace-pre rounded bg-bg px-2 py-2 text-[11px] leading-relaxed">{continueConfig(base || "https://calyzr-ai.my.id", "sk-calyzr-XXXXXXXXXXXXXXXX", models)}</pre>
             <button
               onClick={() =>
                 void navigator.clipboard?.writeText(
-                  continueConfig(base || "https://calyzr-ai.my.id", "sk-calyzr-XXXXXXXXXXXXXXXX"),
+                  continueConfig(base || "https://calyzr-ai.my.id", "sk-calyzr-XXXXXXXXXXXXXXXX", models),
                 )
               }
               className="rounded-lg border border-line bg-panel-2 px-2 py-1 text-xs hover:text-ink"
@@ -251,9 +278,9 @@ export function SettingsView() {
                 Config Continue siap‑tempel (ke{" "}
                 <code className="rounded bg-bg px-1">~/.continue/config.yaml</code>):
               </p>
-              <pre className="max-h-48 overflow-auto whitespace-pre rounded bg-bg px-2 py-2 text-[11px] leading-relaxed">{continueConfig(base, createdKey)}</pre>
+              <pre className="max-h-48 overflow-auto whitespace-pre rounded bg-bg px-2 py-2 text-[11px] leading-relaxed">{continueConfig(base, createdKey, models)}</pre>
               <button
-                onClick={() => void navigator.clipboard?.writeText(continueConfig(base, createdKey))}
+                onClick={() => void navigator.clipboard?.writeText(continueConfig(base, createdKey, models))}
                 className="rounded-lg border border-line bg-panel-2 px-2 py-1 text-xs hover:text-ink"
               >
                 Salin config
