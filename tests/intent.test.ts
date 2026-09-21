@@ -14,6 +14,13 @@ describe("unfenceCode", () => {
   it("fence penutup tanpa bahasa", () => {
     expect(unfenceCode("```\nx=1\ny=2\n```")).toBe("x=1\ny=2");
   });
+  it("penjelasan PANJANG setelah fence penutup ikut dibuang", () => {
+    const long = "Penjelasan. ".repeat(50);
+    expect(unfenceCode("```python\nprint(1)\n```\n" + long)).toBe("print(1)");
+  });
+  it("fence pembuka tanpa penutup", () => {
+    expect(unfenceCode("```python\nprint(2)")).toBe("print(2)");
+  });
 });
 
 describe("wantsAction (auto-agent)", () => {

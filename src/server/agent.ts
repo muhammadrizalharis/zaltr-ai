@@ -168,7 +168,7 @@ export async function* runAgent(opts: {
     const reply = await callModel(opts.modelId, history, `${base}-${step}`, opts.signal);
     const shellM = reply.match(/^\s*AKSI:\s*shell\s+([\s\S]+)$/im);
     const codeM = reply.match(/^\s*AKSI:\s*kode\s+([\s\S]+)$/im);
-    const writeM = reply.match(/^\s*AKSI:\s*tulis\s+([^\n]+)\n([\s\S]*)$/im);
+    const writeM = reply.match(/^\s*AKSI:\s*tulis\s+(\S+)(?:\\n|\n)([\s\S]*)$/im);
     const readM = reply.match(/^\s*AKSI:\s*baca\s+(.+)$/im);
     const listM = reply.match(/^\s*AKSI:\s*daftar\s*$/im);
     const webM = reply.match(/^\s*AKSI:\s*web\s+(.+)$/im);
@@ -199,10 +199,10 @@ export async function* runAgent(opts: {
       continue;
     }
     if (writeM) {
-      // Path = token pertama baris (model kadang menulis "\n" literal atau teks lain di belakangnya).
-      const rawPath = writeM[1].trim().split(/\\n|\s/)[0].replace(/^["'`]|["'`]$/g, "");
-      const path = rawPath;
-      const body = unfence(writeM[2]);
+      const path = writeM[1].trim().replace(/^["'`]|["'`]$/g, "");
+      // Model kadang menulis "\n" literal alih-alih baris baru -> normalkan.
+      let body = unfence(writeM[2]);
+      if (!body.includes("\n") && body.includes("\\n")) body = body.replace(/\\n/g, "\n");
       const ext = (path.split(".").pop() ?? "").toLowerCase();
       if (!TEXT_WRITE_EXT.has(ext)) {
         observe(
@@ -268,6 +268,15 @@ export async function* runAgent(opts: {
         obs = "(pencarian web gagal)";
       }
       observe(reply, obs);
+      continue;
+    }
+
+    // Ada "AKSI:" tapi format tak dikenali -> beri tahu model, jangan dianggap jawaban final.
+    if (/^\s*AKSI:/im.test(reply)) {
+      observe(
+        reply,
+        "(format AKSI tidak dikenali. Gunakan persis salah satu: shell, kode, tulis <path> lalu baris baru + isi, baca <path>, daftar, web, catatan, drive.)",
+      );
       continue;
     }
 

@@ -19,9 +19,17 @@ export function wantsAction(text: string): boolean {
  * boleh diikuti teks penjelasan singkat (ikut dibuang).
  */
 export function unfenceCode(s: string): string {
-  let t = s.replace(/\r\n/g, "\n").trim();
-  t = t.replace(/^\s*```[\w+-]*[ \t]*\n?/, "");
-  const close = t.lastIndexOf("```");
-  if (close >= 0 && t.slice(close + 3).trim().length < 200) t = t.slice(0, close);
-  return t.trim();
+  const t = s.replace(/\r\n/g, "\n").trim();
+  // Ada fence pembuka di awal -> ambil isi sampai fence PENUTUP pertama (teks
+  // penjelasan setelahnya dibuang, berapa pun panjangnya).
+  const open = t.match(/^\s*```[\w+-]*[ \t]*\n?/);
+  if (open) {
+    const rest = t.slice(open[0].length);
+    const close = rest.indexOf("\n```");
+    return (close >= 0 ? rest.slice(0, close) : rest.replace(/\n?```\s*$/, "")).trim();
+  }
+  // Tanpa fence pembuka di awal tapi ada blok fence di tengah -> ambil blok pertama.
+  const mid = t.match(/```[\w+-]*[ \t]*\n([\s\S]*?)\n```/);
+  if (mid) return mid[1].trim();
+  return t;
 }
