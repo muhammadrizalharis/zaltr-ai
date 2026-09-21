@@ -36,7 +36,8 @@ MAX_OUT_FILES = 60
 def limit_resources() -> None:
     resource.setrlimit(resource.RLIMIT_AS, (2 * 1024 * 1024 * 1024,) * 2)
     resource.setrlimit(resource.RLIMIT_CPU, (MAX_TIMEOUT_S,) * 2)
-    resource.setrlimit(resource.RLIMIT_NPROC, (96, 96))
+    # RLIMIT_NPROC SENGAJA tidak dipasang: dihitung per-UID GLOBAL di host (UID 1000
+    # dipakai proses lain di server bersama) -> "Cannot fork". Pagar proses = pids_limit cgroup.
 
 
 def safe_rel(p: str) -> str | None:
