@@ -13,7 +13,7 @@ function notFound(method: string, slug: string[]) {
       error: {
         message:
           `Endpoint ${path} tidak tersedia di calyzr.ai. Yang didukung: ` +
-          `POST /v1/chat/completions, POST /v1/embeddings, GET /v1/models.`,
+          `POST /v1/chat/completions, POST /v1/responses, POST /v1/embeddings, GET /v1/models.`,
         type: "invalid_request_error",
         code: "unknown_endpoint",
       },
