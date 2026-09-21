@@ -45,5 +45,7 @@ export interface ChatMessage {
 export type StreamLine =
   | { type: "meta"; userMessageId: string; conversationTitle: string; runId: string; citations?: Citation[] }
   | { type: "delta"; text: string }
+  /** Langkah alat agen (UI-only, tidak dipersist): mis. "Menjalankan kode Python…". */
+  | { type: "step"; text: string }
   | { type: "done"; messageId: string; content: string; status: "completed" | "stopped" | "failed" }
   | { type: "error"; message: string };

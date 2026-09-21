@@ -69,6 +69,9 @@ export const DELETE = guarded(async (req: Request, { params }: Params) => {
 
   const permanent = new URL(req.url).searchParams.get("permanent") === "1";
   if (permanent) {
+    // Workspace agen (berkas hasil) ikut dihapus — objek MinIO + baris Upload.
+    const { deleteWorkspace } = await import("@/server/workspace");
+    await deleteWorkspace(me.id, id).catch(() => 0);
     await db.conversation.delete({ where: { id } });
     return NextResponse.json({ ok: true, permanent: true });
   }

@@ -6,6 +6,7 @@ import { ModelPicker, loadSavedModel, DEFAULT_MODEL } from "@/components/model-p
 import { CanvasEditor } from "@/components/canvas-editor";
 import { notifyConversationsChanged } from "@/components/sidebar";
 import type { ChatMessage, Citation, ModelDescriptor, StreamLine } from "@/lib/types";
+import { AgentSteps, ConversationFiles } from "@/components/conversation-files";
 import { MODE_PARAFRASE, type ModeParafrase } from "@/server/paraphrase";
 
 /** Batas lampiran per pesan (server menolak lebih dari ini). */
@@ -73,6 +74,8 @@ export function ChatView({
   const [draft, setDraft] = useState("");
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [streamText, setStreamText] = useState<string | null>(null);
+  const [steps, setSteps] = useState<string[]>([]);
+  const [filesKey, setFilesKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -127,6 +130,7 @@ export function ChatView({
       setConversationId(null);
       setMessages([]);
       setStreamText(null);
+      setSteps([]);
       setDraft("");
       setError(null);
       setSuggestions([]);
@@ -382,6 +386,7 @@ export function ChatView({
       setMessages((prev) => [...prev, optimistic]);
     }
     setStreamText("");
+    setSteps([]);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -428,9 +433,13 @@ export function ChatView({
             acc += line.text;
             setStreamText(acc);
           }
+          if (line.type === "step") {
+            setSteps((prev) => (prev[prev.length - 1] === line.text ? prev : [...prev, line.text]));
+          }
           if (line.type === "error") setError(line.message);
           if (line.type === "done") {
             notifyConversationsChanged(); // judul hasil AI biasanya siap di sini
+            setFilesKey((k) => k + 1); // panel berkas percakapan muat ulang
             // Jawaban kosong bukan jawaban — servernya pun tidak menyimpannya.
             if (!line.content.trim()) continue;
             setMessages((prev) => [
@@ -620,11 +629,13 @@ export function ChatView({
             {streaming && (
               <div className="text-sm leading-relaxed">
                 <RoleTag role="assistant" />
+                <AgentSteps steps={steps} />
                 <div className="stream-caret mt-1">
                   <Markdown>{streamText ?? ""}</Markdown>
                 </div>
               </div>
             )}
+            {!streaming && <ConversationFiles conversationId={conversationId} refreshKey={filesKey} />}
             {!streaming && suggestions.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {suggestions.map((s, i) => (
@@ -864,7 +875,7 @@ export function ChatView({
                 />
                 <PlusItem
                   title="Agent"
-                  desc={agentMode ? "Aktif — model pakai web/kode beruntun" : "Model memilih alat (web/kode) sendiri"}
+                  desc={agentMode ? "Aktif — sandbox: shell, Python, buat/edit Word/PDF/Excel; tanpa internet" : "Model bekerja di sandbox: jalankan kode, buat & edit berkas (otomatis aktif utk permintaan berkas)"}
                   active={agentMode}
                   onClick={() => {
                     setAgentMode((v) => !v);

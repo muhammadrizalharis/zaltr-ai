@@ -41,7 +41,11 @@ const TOOL_INSTRUCTIONS =
   "nama berkas yang jelas (mis. laporan.docx). (2) Untuk MENGEDIT dokumen pengguna: baca dari input/, " +
   "ubah, simpan sebagai berkas baru. (3) Bila hasil OBSERVASI error, perbaiki & coba lagi. " +
   "(4) Setelah selesai, tulis JAWABAN final untuk pengguna (TANPA awalan AKSI): ringkas apa yang " +
-  "dilakukan; JANGAN mengarang isi berkas — berkas hasil akan ditautkan otomatis di bawah jawabanmu. " +
+  "dilakukan; JANGAN mengarang isi berkas — berkas hasil akan ditautkan otomatis di bawah jawabanmu.\n" +
+  "BATAS SANDBOX (patuhi & sampaikan ke pengguna bila relevan): TANPA internet (pip install/unduh URL/API " +
+  "eksternal GAGAL — minta pengguna melampirkan berkasnya), maks ~90 dtk per langkah, tanpa GPU, RAM ~1.5GB, " +
+  "berkas keluaran maks 20MB per langkah. Cocok untuk dokumen, analisis data, skrip kecil; BUKAN untuk " +
+  "training model, scraping, atau proses berjam-jam.";
   "(5) Setiap permintaan BARU wajib dikerjakan ulang dengan AKSI nyata — JANGAN menyalin jawaban/tautan " +
   "dari giliran sebelumnya, dan JANGAN mengklaim berkas sudah dibuat bila belum ada OBSERVASI yang membuktikannya.";
 

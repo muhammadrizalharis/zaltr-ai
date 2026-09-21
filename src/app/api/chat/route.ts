@@ -565,10 +565,14 @@ export const POST = guarded(async (req: Request) => {
             projectId: conversation.projectId,
             attachmentKeys,
           })) {
-            // Progres alat hanya untuk UI (stream); yang dipersist ke riwayat cuma
-            // jawaban final agar model tidak meniru log/tautan lama di giliran berikutnya.
-            if (chunk.kind === "final") acc += chunk.text;
-            send({ type: "delta", text: chunk.text });
+            // Progres alat hanya untuk UI (stream, tipe "step"); yang dipersist ke riwayat
+            // cuma jawaban final agar model tidak meniru log/tautan lama di giliran berikutnya.
+            if (chunk.kind === "final") {
+              acc += chunk.text;
+              send({ type: "delta", text: chunk.text });
+            } else {
+              send({ type: "step", text: chunk.text.replace(/\s+/g, " ").trim() });
+            }
           }
         } else {
           const gen = dispatch(modelId, {

@@ -130,6 +130,19 @@ export function startScheduler(): void {
   // Pengingat masa aktif segera berakhir (H-3) via email + push (cek tiap 6 jam).
   void remindExpiring();
   setInterval(() => void remindExpiring(), 6 * 60 * 60_000);
+  // Bersihkan workspace agen milik percakapan yang sudah dihapus / lama di trash (harian).
+  void sweepWorkspaces();
+  setInterval(() => void sweepWorkspaces(), 24 * 60 * 60_000);
+}
+
+async function sweepWorkspaces(): Promise<void> {
+  try {
+    const { sweepOrphanWorkspaces } = await import("@/server/workspace");
+    const n = await sweepOrphanWorkspaces(30);
+    if (n) console.log(`[scheduler] hapus ${n} berkas workspace tanpa percakapan`);
+  } catch (e) {
+    console.error("[scheduler] sweepWorkspaces:", (e as Error).message);
+  }
 }
 
 /** Set kredit -> 0 untuk user yang masa aktif (creditsExpireAt) sudah lewat. */

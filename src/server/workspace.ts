@@ -267,3 +267,47 @@ export async function readWorkspaceFile(opts: {
 export function newRunId(): string {
   return randomUUID();
 }
+
+/** Hapus SELURUH workspace percakapan (objek MinIO + baris Upload). */
+export async function deleteWorkspace(userId: string, conversationId: string): Promise<number> {
+  const prefix = wsPrefix(userId, conversationId);
+  const rows = await db.upload.findMany({ where: { userId, key: { startsWith: prefix } }, select: { key: true } });
+  if (rows.length === 0) return 0;
+  const { removeObjects } = await import("@/lib/storage");
+  await removeObjects(rows.map((r) => r.key)).catch(() => {});
+  await db.upload.deleteMany({ where: { userId, key: { startsWith: prefix } } });
+  return rows.length;
+}
+
+/**
+ * Sweep: hapus workspace yang percakapannya sudah TIDAK ADA (hard-deleted) atau
+ * di-trash lebih dari `trashDays` hari. Dipanggil scheduler harian.
+ */
+export async function sweepOrphanWorkspaces(trashDays = 30): Promise<number> {
+  const rows = await db.upload.findMany({
+    where: { key: { contains: "/ws/" } },
+    select: { userId: true, key: true },
+    take: 5000,
+  });
+  const byConv = new Map<string, { userId: string; convId: string }>();
+  for (const r of rows) {
+    const m = r.key.match(/^uploads\/([^/]+)\/ws\/([^/]+)\//);
+    if (m) byConv.set(`${m[1]}:${m[2]}`, { userId: m[1], convId: m[2] });
+  }
+  if (byConv.size === 0) return 0;
+  const convIds = [...byConv.values()].map((v) => v.convId);
+  const alive = await db.conversation.findMany({
+    where: { id: { in: convIds } },
+    select: { id: true, trashedAt: true },
+  });
+  const cutoff = Date.now() - trashDays * 86_400_000;
+  const keep = new Set(
+    alive.filter((c) => !c.trashedAt || c.trashedAt.getTime() > cutoff).map((c) => c.id),
+  );
+  let removed = 0;
+  for (const v of byConv.values()) {
+    if (keep.has(v.convId)) continue;
+    removed += await deleteWorkspace(v.userId, v.convId).catch(() => 0);
+  }
+  return removed;
+}
