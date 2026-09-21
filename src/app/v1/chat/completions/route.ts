@@ -6,6 +6,13 @@ import { effectiveDailyLimit } from "@/server/plans";
 import { rateLimit } from "@/server/ratelimit";
 import { dispatch } from "@/server/providers";
 import type { HistoryItem } from "@/server/providers";
+import {
+  normalizeTools,
+  toolsSystemPrompt,
+  extractToolCalls,
+  looksLikeToolCall,
+  flattenToolMessages,
+} from "@/server/gateway-tools";
 
 export const runtime = "nodejs";
 
@@ -22,17 +29,7 @@ function err(message: string, status: number, type = "invalid_request_error") {
   return Response.json({ error: { message, type } }, { status });
 }
 
-function textOf(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((p) => (p && typeof (p as { text?: unknown }).text === "string" ? (p as { text: string }).text : ""))
-      .join("");
-  }
-  return content == null ? "" : String(content);
-}
-
-/** POST /v1/chat/completions — kompatibel OpenAI (stream & non-stream). */
+/** POST /v1/chat/completions — kompatibel OpenAI (stream & non-stream, emulasi tools). */
 export async function POST(req: Request) {
   const me = await userFromApiKey(req);
   if (!me) return err("API key tidak valid atau dicabut", 401, "authentication_error");
@@ -55,6 +52,8 @@ export async function POST(req: Request) {
     model?: string;
     messages?: Array<{ role?: string; content?: unknown }>;
     stream?: boolean;
+    tools?: unknown;
+    tool_choice?: unknown;
   } | null;
   if (!body || typeof body.model !== "string" || !Array.isArray(body.messages)) {
     return err("Wajib menyertakan 'model' dan 'messages'", 400);
@@ -82,10 +81,13 @@ export async function POST(req: Request) {
     return err("Kredit habis — hubungi admin untuk menambah kredit", 402, "insufficient_quota");
   }
 
-  const history: HistoryItem[] = body.messages.map((m) => ({
-    role: m.role === "assistant" ? "assistant" : m.role === "system" ? "system" : "user",
-    content: textOf(m.content),
-  }));
+  // Emulasi function-calling: tools klien -> instruksi sistem; pesan role "tool" -> teks.
+  const tools = body.tool_choice === "none" ? [] : normalizeTools(body.tools);
+  const flat = flattenToolMessages(body.messages as Array<Record<string, unknown>>);
+  const history: HistoryItem[] = [
+    ...(tools.length ? [{ role: "system" as const, content: toolsSystemPrompt(tools) }] : []),
+    ...flat,
+  ];
   const lastUser = [...history].reverse().find((h) => h.role === "user");
 
   // Percakapan sentinel (utk pencatatan/limit); DIBUAT sekali per user.
@@ -132,22 +134,62 @@ export async function POST(req: Request) {
     const enc = new TextEncoder();
     const sse = new ReadableStream<Uint8Array>({
       async start(ctrl) {
-        const send = (o: unknown) => ctrl.enqueue(enc.encode(`data: ${JSON.stringify(o)}\n\n`));
+        const chunk = (delta: Record<string, unknown>, finish: string | null = null) =>
+          ctrl.enqueue(
+            enc.encode(
+              `data: ${JSON.stringify({ id, object: "chat.completion.chunk", created, model: modelId, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`,
+            ),
+          );
         let acc = "";
+        // Saat tools aktif, teks di-BUFFER begitu marker tool-call muncul agar blok
+        // tidak bocor ke pengguna; di akhir dipancarkan sebagai tool_calls.
+        let buffering = false;
+        let pending = "";
         try {
-          send({ id, object: "chat.completion.chunk", created, model: modelId, choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] });
+          chunk({ role: "assistant" });
           for await (const part of gen) {
             const text = part.kind === "text" ? part.text : `\n![${part.alt}](${part.url})\n`;
             if (!text) continue;
             acc += text;
-            send({ id, object: "chat.completion.chunk", created, model: modelId, choices: [{ index: 0, delta: { content: text }, finish_reason: null }] });
+            if (tools.length === 0) {
+              chunk({ content: text });
+              continue;
+            }
+            pending += text;
+            if (!buffering && looksLikeToolCall(acc)) buffering = true;
+            if (!buffering) {
+              // Tahan ekor pendek yang mungkin awal marker "<<".
+              const cut = pending.lastIndexOf("<");
+              const safe = cut >= 0 && pending.length - cut < 14 ? pending.slice(0, cut) : pending;
+              if (safe) {
+                chunk({ content: safe });
+                pending = pending.slice(safe.length);
+              }
+            }
           }
-          send({ id, object: "chat.completion.chunk", created, model: modelId, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] });
+          if (tools.length > 0) {
+            const { content, calls } = extractToolCalls(acc);
+            if (calls.length > 0) {
+              // Sisa teks yang belum terkirim (bila ada) -> kirim sebelum tool_calls.
+              const already = acc.length - pending.length;
+              const remainder = content.length > already ? content.slice(already) : "";
+              if (remainder.trim()) chunk({ content: remainder });
+              chunk({
+                tool_calls: calls.map((c, i) => ({ index: i, id: c.id, type: "function", function: { name: c.name, arguments: c.arguments } })),
+              });
+              chunk({}, "tool_calls");
+            } else {
+              if (pending) chunk({ content: pending });
+              chunk({}, "stop");
+            }
+          } else {
+            chunk({}, "stop");
+          }
           ctrl.enqueue(enc.encode("data: [DONE]\n\n"));
           persistAssistant(acc);
         } catch (e) {
           await refund();
-          send({ error: { message: (e as Error).message || "gagal", type: "server_error" } });
+          ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ error: { message: (e as Error).message || "gagal", type: "server_error" } })}\n\n`));
         } finally {
           ctrl.close();
         }
@@ -176,6 +218,29 @@ export async function POST(req: Request) {
     return err((e as Error).message || "Gagal menghasilkan jawaban", 502, "server_error");
   }
   persistAssistant(acc);
+  if (tools.length > 0) {
+    const { content, calls } = extractToolCalls(acc);
+    if (calls.length > 0) {
+      return Response.json({
+        id,
+        object: "chat.completion",
+        created,
+        model: modelId,
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: content || null,
+              tool_calls: calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: c.arguments } })),
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      });
+    }
+  }
   return Response.json({
     id,
     object: "chat.completion",

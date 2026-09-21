@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { POST as chatCompletions } from "@/app/v1/chat/completions/route";
+import { normalizeTools } from "@/server/gateway-tools";
 
 export const runtime = "nodejs";
 
@@ -19,8 +20,13 @@ type InputItem = {
   content?: string | Part[];
   output?: unknown;
   call_id?: string;
+  name?: string;
+  arguments?: string;
 };
-type Msg = { role: "system" | "user" | "assistant"; content: string };
+type Msg =
+  | { role: "system" | "user" | "assistant"; content: string }
+  | { role: "assistant"; content: string; tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> }
+  | { role: "tool"; tool_call_id: string; content: string };
 
 function partsText(c: string | Part[] | undefined): string {
   if (typeof c === "string") return c;
@@ -42,10 +48,18 @@ function toMessages(input: unknown, instructions?: unknown): Msg[] {
     if (!raw) continue;
     if (raw.type === "function_call_output") {
       const o = typeof raw.output === "string" ? raw.output : JSON.stringify(raw.output ?? "");
-      out.push({ role: "user", content: `[hasil tool${raw.call_id ? ` ${raw.call_id}` : ""}]\n${o}` });
+      out.push({ role: "tool", tool_call_id: raw.call_id ?? "", content: o });
       continue;
     }
-    if (raw.type === "function_call" || raw.type === "reasoning") continue;
+    if (raw.type === "function_call") {
+      out.push({
+        role: "assistant",
+        content: "",
+        tool_calls: [{ id: raw.call_id ?? "", type: "function", function: { name: raw.name ?? "", arguments: raw.arguments ?? "{}" } }],
+      });
+      continue;
+    }
+    if (raw.type === "reasoning") continue;
     const role = raw.role === "assistant" ? "assistant" : raw.role === "system" || raw.role === "developer" ? "system" : "user";
     const text = partsText(raw.content);
     if (text) out.push({ role, content: text });
@@ -53,25 +67,36 @@ function toMessages(input: unknown, instructions?: unknown): Msg[] {
   return out;
 }
 
-function responseObject(id: string, model: string, created: number, text: string, status: "in_progress" | "completed") {
+function responseObject(
+  id: string,
+  model: string,
+  created: number,
+  text: string,
+  status: "in_progress" | "completed",
+  calls: Array<{ id: string; name: string; arguments: string }> = [],
+) {
+  const output: unknown[] = [];
+  if (status === "completed") {
+    if (text) {
+      output.push({
+        type: "message",
+        id: `msg_${id}`,
+        status: "completed",
+        role: "assistant",
+        content: [{ type: "output_text", text, annotations: [] }],
+      });
+    }
+    for (const c of calls) {
+      output.push({ type: "function_call", id: `fc_${c.id}`, call_id: c.id, name: c.name, arguments: c.arguments, status: "completed" });
+    }
+  }
   return {
     id,
     object: "response",
     created_at: created,
     status,
     model,
-    output:
-      status === "completed"
-        ? [
-            {
-              type: "message",
-              id: `msg_${id}`,
-              status: "completed",
-              role: "assistant",
-              content: [{ type: "output_text", text, annotations: [] }],
-            },
-          ]
-        : [],
+    output,
     usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
   };
 }
@@ -82,6 +107,8 @@ export async function POST(req: Request) {
     input?: unknown;
     instructions?: unknown;
     stream?: boolean;
+    tools?: unknown;
+    tool_choice?: unknown;
   } | null;
   if (!body || typeof body.model !== "string" || body.input == null) {
     return Response.json(
@@ -95,10 +122,16 @@ export async function POST(req: Request) {
   }
 
   const stream = body.stream === true;
+  const tools = normalizeTools(body.tools);
   const inner = new Request(new URL("/v1/chat/completions", req.url), {
     method: "POST",
     headers: { authorization: req.headers.get("authorization") ?? "", "content-type": "application/json" },
-    body: JSON.stringify({ model: body.model, messages, stream }),
+    body: JSON.stringify({
+      model: body.model,
+      messages,
+      stream,
+      ...(tools.length ? { tools: tools.map((t) => ({ type: "function", function: t })), tool_choice: body.tool_choice } : {}),
+    }),
     signal: req.signal,
   });
   const res = await chatCompletions(inner);
@@ -110,9 +143,13 @@ export async function POST(req: Request) {
   const model = body.model;
 
   if (!stream) {
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const text = data.choices?.[0]?.message?.content ?? "";
-    return Response.json(responseObject(id, model, created, text, "completed"));
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string | null; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> } }>;
+    };
+    const msg = data.choices?.[0]?.message;
+    const text = msg?.content ?? "";
+    const calls = (msg?.tool_calls ?? []).map((c) => ({ id: c.id, name: c.function.name, arguments: c.function.arguments }));
+    return Response.json(responseObject(id, model, created, text, "completed", calls));
   }
 
   // Stream: terjemahkan SSE chat.completion.chunk -> event Responses API.
@@ -127,6 +164,7 @@ export async function POST(req: Request) {
         ctrl.enqueue(enc.encode(`event: ${type}\ndata: ${JSON.stringify({ type, sequence_number: seq++, ...payload })}\n\n`));
       let acc = "";
       let buf = "";
+      const calls: Array<{ id: string; name: string; arguments: string }> = [];
       emit("response.created", { response: responseObject(id, model, created, "", "in_progress") });
       emit("response.in_progress", { response: responseObject(id, model, created, "", "in_progress") });
       emit("response.output_item.added", {
@@ -151,7 +189,12 @@ export async function POST(req: Request) {
             if (!line.startsWith("data:")) continue;
             const payload = line.slice(5).trim();
             if (payload === "[DONE]") continue;
-            let obj: { choices?: Array<{ delta?: { content?: string } }>; error?: { message?: string } };
+            let obj: {
+              choices?: Array<{
+                delta?: { content?: string; tool_calls?: Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }> };
+              }>;
+              error?: { message?: string };
+            };
             try {
               obj = JSON.parse(payload);
             } catch {
@@ -161,10 +204,16 @@ export async function POST(req: Request) {
               emit("error", { code: "server_error", message: obj.error.message ?? "gagal", param: null });
               continue;
             }
-            const delta = obj.choices?.[0]?.delta?.content;
+            const d = obj.choices?.[0]?.delta;
+            const delta = d?.content;
             if (delta) {
               acc += delta;
               emit("response.output_text.delta", { item_id: itemId, output_index: 0, content_index: 0, delta });
+            }
+            for (const tc of d?.tool_calls ?? []) {
+              if (tc.id && tc.function?.name) {
+                calls.push({ id: tc.id, name: tc.function.name, arguments: tc.function.arguments ?? "{}" });
+              }
             }
           }
         }
@@ -185,7 +234,16 @@ export async function POST(req: Request) {
             content: [{ type: "output_text", text: acc, annotations: [] }],
           },
         });
-        emit("response.completed", { response: responseObject(id, model, created, acc, "completed") });
+        // Tool calls (emulasi) -> item function_call agar klien mengeksekusi tool-nya.
+        calls.forEach((c, i) => {
+          const idx = i + 1;
+          const item = { type: "function_call", id: `fc_${c.id}`, call_id: c.id, name: c.name, arguments: "", status: "in_progress" };
+          emit("response.output_item.added", { output_index: idx, item });
+          emit("response.function_call_arguments.delta", { item_id: item.id, output_index: idx, delta: c.arguments });
+          emit("response.function_call_arguments.done", { item_id: item.id, output_index: idx, arguments: c.arguments });
+          emit("response.output_item.done", { output_index: idx, item: { ...item, arguments: c.arguments, status: "completed" } });
+        });
+        emit("response.completed", { response: responseObject(id, model, created, acc, "completed", calls) });
       } catch (e) {
         emit("error", { code: "server_error", message: (e as Error).message || "gagal", param: null });
       } finally {
