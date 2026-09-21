@@ -565,7 +565,9 @@ export const POST = guarded(async (req: Request) => {
             projectId: conversation.projectId,
             attachmentKeys,
           })) {
-            acc += chunk.text;
+            // Progres alat hanya untuk UI (stream); yang dipersist ke riwayat cuma
+            // jawaban final agar model tidak meniru log/tautan lama di giliran berikutnya.
+            if (chunk.kind === "final") acc += chunk.text;
             send({ type: "delta", text: chunk.text });
           }
         } else {
