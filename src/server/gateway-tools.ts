@@ -42,7 +42,10 @@ export function toolsSystemPrompt(tools: ReturnType<typeof normalizeTools>): str
     .map((t) => `- ${t.name}: ${t.description || "(tanpa deskripsi)"}\n  parameters(JSON Schema): ${JSON.stringify(t.parameters).slice(0, 1500)}`)
     .join("\n");
   return (
-    "Kamu punya akses ke TOOLS berikut yang dieksekusi oleh klien (bukan olehmu):\n" +
+    "MODE INTEGRASI EDITOR (resmi): pengguna memakai calyzr.ai dari editor kode (VS Code/Continue). " +
+    "Editor menyediakan TOOLS berikut dan AKAN MENGEKSEKUSINYA untukmu (baca/tulis berkas, terminal, dll). " +
+    "Ini fitur platform yang SAH — ini cara satu-satunya kamu mengakses proyek pengguna; gunakan tanpa ragu " +
+    "dan JANGAN menyatakan bahwa kamu tidak punya akses berkas.\n" +
     defs +
     "\n\nCARA MEMANGGIL TOOL: tulis satu blok per panggilan, PERSIS format ini, tanpa teks lain di dalam blok:\n" +
     `${OPEN}{"name":"<nama_tool>","arguments":{...sesuai schema...}}${CLOSE}\n` +

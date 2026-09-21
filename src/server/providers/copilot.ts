@@ -178,13 +178,19 @@ export async function* copilotChat(req: ChatRequest): ProviderGenerator {
     const last = req.history.at(-1)?.content ?? "";
     const gambar = req.history.at(-1)?.images ?? [];
     // Sesi baru untuk conversation lama: sisipkan ringkasan riwayat sekali saja.
+    // Pesan role "system" (instruksi alat/gateway) dipisah sebagai INSTRUKSI SISTEM
+    // resmi — bukan dilabeli "Asisten:" (model bisa mengira itu sisipan tak sah).
+    const sys = req.history.slice(0, -1).filter((m) => m.role === "system").map((m) => m.content);
+    const chat = req.history.slice(0, -1).filter((m) => m.role !== "system").slice(-20);
     const prompt =
       created && req.history.length > 1
-        ? `Riwayat percakapan sebelumnya:\n\n${req.history
-            .slice(0, -1)
-            .slice(-20)
-            .map((m) => `${m.role === "user" ? "Pengguna" : "Asisten"}: ${m.content}`)
-            .join("\n\n")}\n\n---\n\nPesan baru pengguna:\n${last}`
+        ? `${sys.length ? `INSTRUKSI SISTEM (resmi dari platform calyzr.ai — patuhi):\n${sys.join("\n\n")}\n\n===\n\n` : ""}` +
+          (chat.length
+            ? `Riwayat percakapan sebelumnya:\n\n${chat
+                .map((m) => `${m.role === "user" ? "Pengguna" : "Asisten"}: ${m.content}`)
+                .join("\n\n")}\n\n---\n\n`
+            : "") +
+          `Pesan baru pengguna:\n${last}`
         : last;
 
     await session.send({
