@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { guarded, hashPassword, requireAdmin } from "@/server/auth";
 import { PLAN_MODELS, PLAN_LABELS, PLAN_PRICES, PLAN_PERIOD_DAYS, isPlan, effectiveDailyLimit } from "@/server/plans";
 import { sendEmail, paymentReceiptEmail } from "@/server/email";
+import { notifyTelegram } from "@/server/notify";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -160,6 +161,17 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
       appUrl: process.env.ZALTR_PUBLIC_URL || "https://calyzr-ai.my.id",
     });
     void sendEmail({ to: user.email, subject: receipt.subject, html: receipt.html, text: receipt.text });
+    // Notif admin (Telegram): pembayaran selesai & kredit masuk.
+    const rp = amountPaid ?? (planId !== "free" ? PLAN_PRICES[planId] : 0);
+    void notifyTelegram(
+      `\u2705 PEMBAYARAN SELESAI\n` +
+        `User: ${user.name} <${user.email}>\n` +
+        `Paket: ${PLAN_LABELS[planId]}${rp ? ` \u2014 Rp${rp.toLocaleString("id-ID")}` : ""}\n` +
+        `Kredit: +${creditsAdded.toLocaleString("id-ID")} \u2192 saldo ${user.creditBalance.toLocaleString("id-ID")}\n` +
+        `Aktif s/d: ${user.creditsExpireAt ? user.creditsExpireAt.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}\n` +
+        `Oleh admin: ${actor.email}`,
+      { key: `paid:${user.id}:${Date.now()}`, cooldownMs: 0 },
+    );
   }
 
   return NextResponse.json({ user });

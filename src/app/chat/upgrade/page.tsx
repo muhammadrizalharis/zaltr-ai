@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSessionUser } from "@/server/auth";
+import { WaBuyLink } from "@/components/wa-buy-link";
 
 export const metadata = { title: "Beli Kredit — calyzr.ai" };
 export const dynamic = "force-dynamic";
@@ -152,10 +153,9 @@ export default async function UpgradePage() {
               ))}
             </ul>
             {p.kredit !== null && waAdmin && (
-              <a
+              <WaBuyLink
                 href={waLink(p)}
-                target="_blank"
-                rel="noreferrer"
+                plan={p.nama.toLowerCase()}
                 className={`mt-4 rounded-xl py-2 text-center text-sm font-semibold transition-opacity hover:opacity-90 ${
                   p.unggulan
                     ? "bg-gradient-to-r from-accent-a to-accent-b text-black"
@@ -163,7 +163,7 @@ export default async function UpgradePage() {
                 }`}
               >
                 Pilih {p.nama} →
-              </a>
+              </WaBuyLink>
             )}
           </div>
         ))}
@@ -178,14 +178,12 @@ export default async function UpgradePage() {
         </ol>
         <div className="mt-5 flex flex-wrap gap-3">
           {waAdmin ? (
-            <a
+            <WaBuyLink
               href={waUmum}
-              target="_blank"
-              rel="noreferrer"
               className="rounded-xl bg-gradient-to-r from-accent-a to-accent-b px-5 py-2.5 text-sm font-semibold text-black hover:opacity-90"
             >
               Chat Admin via WhatsApp →
-            </a>
+            </WaBuyLink>
           ) : (
             <p className="text-sm text-muted">
               Hubungi admin calyzr.ai yang mengundangmu untuk menyelesaikan pembayaran.
