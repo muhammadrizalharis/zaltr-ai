@@ -125,6 +125,11 @@ export async function* copilotChat(req: ChatRequest): ProviderGenerator {
   const c = await client();
   const sessionId = `zaltr-${req.conversationId}`;
 
+  // Instruksi tambahan role "system" di riwayat (alat agen/gateway) digabung ke
+  // SYSTEM MESSAGE resmi sesi — satu-satunya kanal yang dipercaya model sebagai
+  // instruksi platform (bila disisipkan di prompt user, Claude menolaknya sebagai injeksi).
+  const sysExtra = req.history.filter((m) => m.role === "system").map((m) => m.content);
+
   // Resume sesi CLI milik conversation ini; bila belum ada, buat baru.
   let session;
   let created = false;
@@ -135,7 +140,7 @@ export async function* copilotChat(req: ChatRequest): ProviderGenerator {
       sessionId,
       model: req.model,
       streaming: true,
-      systemMessage: { content: SYSTEM_MESSAGE },
+      systemMessage: { content: sysExtra.length ? `${SYSTEM_MESSAGE}\n\n# Instruksi tambahan platform\n${sysExtra.join("\n\n")}` : SYSTEM_MESSAGE },
       // mode "empty" + tanpa tool: deny-by-default sesuai README.
       availableTools: [],
     });
@@ -178,19 +183,14 @@ export async function* copilotChat(req: ChatRequest): ProviderGenerator {
     const last = req.history.at(-1)?.content ?? "";
     const gambar = req.history.at(-1)?.images ?? [];
     // Sesi baru untuk conversation lama: sisipkan ringkasan riwayat sekali saja.
-    // Pesan role "system" (instruksi alat/gateway) dipisah sebagai INSTRUKSI SISTEM
-    // resmi — bukan dilabeli "Asisten:" (model bisa mengira itu sisipan tak sah).
-    const sys = req.history.slice(0, -1).filter((m) => m.role === "system").map((m) => m.content);
+    // Pesan role "system" SUDAH masuk systemMessage sesi (lihat createSession) —
+    // di sini hanya riwayat user/asisten.
     const chat = req.history.slice(0, -1).filter((m) => m.role !== "system").slice(-20);
     const prompt =
-      created && req.history.length > 1
-        ? `${sys.length ? `INSTRUKSI SISTEM (resmi dari platform calyzr.ai — patuhi):\n${sys.join("\n\n")}\n\n===\n\n` : ""}` +
-          (chat.length
-            ? `Riwayat percakapan sebelumnya:\n\n${chat
-                .map((m) => `${m.role === "user" ? "Pengguna" : "Asisten"}: ${m.content}`)
-                .join("\n\n")}\n\n---\n\n`
-            : "") +
-          `Pesan baru pengguna:\n${last}`
+      created && chat.length > 0
+        ? `Riwayat percakapan sebelumnya:\n\n${chat
+            .map((m) => `${m.role === "user" ? "Pengguna" : "Asisten"}: ${m.content}`)
+            .join("\n\n")}\n\n---\n\nPesan baru pengguna:\n${last}`
         : last;
 
     await session.send({

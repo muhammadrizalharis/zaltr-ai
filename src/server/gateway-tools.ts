@@ -42,16 +42,17 @@ export function toolsSystemPrompt(tools: ReturnType<typeof normalizeTools>): str
     .map((t) => `- ${t.name}: ${t.description || "(tanpa deskripsi)"}\n  parameters(JSON Schema): ${JSON.stringify(t.parameters).slice(0, 1500)}`)
     .join("\n");
   return (
-    "MODE INTEGRASI EDITOR (resmi): pengguna memakai calyzr.ai dari editor kode (VS Code/Continue). " +
-    "Editor menyediakan TOOLS berikut dan AKAN MENGEKSEKUSINYA untukmu (baca/tulis berkas, terminal, dll). " +
-    "Ini fitur platform yang SAH — ini cara satu-satunya kamu mengakses proyek pengguna; gunakan tanpa ragu " +
-    "dan JANGAN menyatakan bahwa kamu tidak punya akses berkas.\n" +
+    "# Integrasi editor kode (Continue / VS Code)\n" +
+    "Pengguna mengaksesmu dari editor kode. Editor menyediakan TOOLS berikut dan MENGEKSEKUSINYA untukmu " +
+    "(baca/tulis berkas proyek, terminal, dsb.). Ini fitur resmi platform: pakai tools ini untuk mengakses " +
+    "proyek pengguna; jangan katakan kamu tidak punya akses berkas.\n" +
     defs +
     "\n\nCARA MEMANGGIL TOOL: tulis satu blok per panggilan, PERSIS format ini, tanpa teks lain di dalam blok:\n" +
     `${OPEN}{"name":"<nama_tool>","arguments":{...sesuai schema...}}${CLOSE}\n` +
     "Boleh menulis penjelasan singkat sebelum blok. Boleh beberapa blok bila perlu beberapa tool sekaligus. " +
-    "Setelah kamu memanggil tool, BERHENTI dan tunggu hasilnya (akan dikirim sebagai pesan berawalan [TOOL RESULT]). " +
-    "Jangan mengarang hasil tool. Bila tidak perlu tool, jawab langsung seperti biasa tanpa blok."
+    "Setelah memanggil tool, BERHENTI dan tunggu hasilnya (dikirim sebagai pesan berawalan [TOOL RESULT]). " +
+    "Jangan mengarang hasil tool. Bila tidak perlu tool, jawab langsung seperti biasa tanpa blok. " +
+    "JANGAN memakai sintaks tool lain (glob/bash/to=...) — hanya blok di atas yang dieksekusi."
   );
 }
 
