@@ -29,10 +29,16 @@ export function wsPrefix(userId: string, conversationId: string): string {
 }
 
 function safeRel(p: string): string | null {
-  const s = p.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/{2,}/g, "/");
-  if (!s || s.includes("..") || s.includes("\0") || !/^[\w][\w.\- \/()]*$/.test(s)) return null;
+  const s = p.replace(/^\/+/, "").replace(/\/{2,}/g, "/").trim();
+  if (!s || s.includes("..") || s.includes("\\") || s.includes("\0") || !/^[\w][\w.\- \/()]*$/.test(s)) return null;
   return s;
 }
+
+/** Ekstensi yang boleh ditulis sebagai TEKS via AKSI: tulis (biner harus lewat kode). */
+export const TEXT_WRITE_EXT = new Set([
+  "txt", "md", "py", "js", "ts", "json", "csv", "tsv", "html", "css", "xml", "yaml", "yml",
+  "sh", "sql", "toml", "ini", "cfg", "env", "tex", "bib", "rst", "svg", "ipynb", "r", "java", "c", "cpp", "h", "go", "rs",
+]);
 
 function guessType(name: string): string {
   const ext = name.toLowerCase().split(".").pop() ?? "";

@@ -20,7 +20,7 @@ import {
   formatTree,
 } from "@/server/drive";
 import { extractText, fileExt, IMAGE_EXT, isBinarySkip, needsFullDownload } from "@/server/extract";
-import { runInWorkspace, writeWorkspaceFile, readWorkspaceFile, listWorkspace } from "@/server/workspace";
+import { runInWorkspace, writeWorkspaceFile, readWorkspaceFile, listWorkspace, TEXT_WRITE_EXT } from "@/server/workspace";
 
 const TOOL_INSTRUCTIONS =
   "Kamu AGEN calyzr.ai dengan WORKSPACE terisolasi (Linux, Python 3.12, tanpa internet). " +
@@ -197,8 +197,19 @@ export async function* runAgent(opts: {
       continue;
     }
     if (writeM) {
-      const path = writeM[1].trim().replace(/^["'`]|["'`]$/g, "");
+      // Path = token pertama baris (model kadang menulis "\n" literal atau teks lain di belakangnya).
+      const rawPath = writeM[1].trim().split(/\\n|\s/)[0].replace(/^["'`]|["'`]$/g, "");
+      const path = rawPath;
       const body = unfence(writeM[2]);
+      const ext = (path.split(".").pop() ?? "").toLowerCase();
+      if (!TEXT_WRITE_EXT.has(ext)) {
+        observe(
+          reply,
+          `(AKSI: tulis hanya untuk berkas TEKS (${[...TEXT_WRITE_EXT].slice(0, 8).join(", ")}, ...). ` +
+            `Untuk .${ext || "?"} (biner: pdf/docx/xlsx/pptx/png) gunakan AKSI: kode dengan pustaka Python yang tersedia, lalu simpan ke berkas.)`,
+        );
+        continue;
+      }
       yield { kind: "progress", text: `\n📝 Menulis berkas ${path}…\n` };
       try {
         const w = await writeWorkspaceFile({ ...runOpts, path, content: body });
