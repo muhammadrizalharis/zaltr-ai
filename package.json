@@ -2,6 +2,7 @@
   "name": "zaltr-ai",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "next dev -p 46300",
     "build": "next build",

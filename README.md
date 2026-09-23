@@ -132,6 +132,8 @@ zaltr-ai/
 
 ## Lisensi
 
-Hak cipta dilindungi. Proyek pribadi (akses undangan) — kode dapat dibaca, namun **belum**
-dilisensikan untuk penggunaan ulang atau redistribusi. Ingin lisensi terbuka (mis. MIT)?
-Tambahkan berkas `LICENSE`.
+**Proprietary — Hak Cipta Dilindungi (All Rights Reserved).** © 2026 Developer CALYZR.AI RZL.
+
+Kode ini ditampilkan publik **hanya** untuk referensi/transparansi — **bukan** open-source.
+Dilarang menggunakan, menyalin, memodifikasi, atau mendistribusikan tanpa izin tertulis.
+Selengkapnya di berkas [LICENSE](LICENSE).
