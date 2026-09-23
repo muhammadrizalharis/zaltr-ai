@@ -19,3 +19,6 @@ next-env.d.ts
 src/generated/
 public/calyzr.apk
 docker/backup/mc
+
+# Dokumen internal (blueprint) — jangan di-push
+*.local.md
