@@ -47,13 +47,6 @@
 └────────────────────────────────────────────────────────────────────
 ```
 
-<!-- 🎬 DEMO: rekam layar app, simpan ke public/demo.gif, lalu GANTI <img> di bawah dengan:
-     <img src="public/demo.gif" width="860" alt="Demo CALYZR.AI" />  -->
-<div align="center">
-<img src="https://placehold.co/920x430/05060A/00F0FF?text=%E2%96%B6%20CALYZR.AI%20%E2%80%94%20DEMO&font=source-code-pro" width="860" alt="Demo CALYZR.AI (placeholder — ganti dengan public/demo.gif)" />
-<br /><sub>🎬 <i>Placeholder</i> — taruh rekaman di <code>public/demo.gif</code> lalu aktifkan baris <code>&lt;img&gt;</code> di komentar atas.</sub>
-</div>
-
 <img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
 
 ## 🎯 Satu Ruang Kerja, Semua Model AI
