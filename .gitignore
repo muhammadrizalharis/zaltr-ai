@@ -1,6 +1,7 @@
 # zaltr.ai — jangan commit rahasia & data runtime
 .env
 .env.*
+!.env.example
 secrets/*
 !secrets/.gitkeep
 node_modules/
