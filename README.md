@@ -1,42 +1,44 @@
+<!-- ══════════════════════════ HERO ══════════════════════════ -->
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&height=170&color=0:2E1065,50:7C3AED,100:22D3EE&section=header" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=waving&height=210&color=0:0F172A,20:4C1D95,55:7C3AED,100:22D3EE&text=CALYZR.AI&fontColor=FFFFFF&fontSize=68&fontAlignY=34&desc=Semua%20AI%20terbaik%20dalam%20satu%20ruang%20kerja%20pribadi&descSize=17&descAlignY=55&animation=fadeIn" width="100%" alt="CALYZR.AI" />
 
-<img src="public/logo-512.png" alt="CALYZR.AI" width="118" />
+<img src="public/logo-512.png" alt="CALYZR.AI" width="112" />
 
-# CALYZR.AI
-
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&duration=3000&pause=800&color=A855F7&center=true&vCenter=true&width=720&lines=Semua+AI+terbaik+dalam+satu+ruang+kerja+pribadi;Chat+%C2%B7+Coding+%C2%B7+Gambar+%C2%B7+Video+%C2%B7+Musik;Next.js+16+%C2%B7+React+19+%C2%B7+Prisma+7+%C2%B7+pgvector;Cloud+%C2%B7+Lokal+%C2%B7+Generatif+dalam+satu+ruang" alt="CALYZR.AI" />
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=23&duration=2800&pause=700&color=A855F7&center=true&vCenter=true&width=760&lines=Chat+%C2%B7+Coding+%C2%B7+Gambar+%C2%B7+Video+%C2%B7+Musik;Cloud+%2B+Lokal+%2B+Generatif+dalam+satu+antarmuka;Agent+yang+menjalankan+kode+sungguhan;Gateway+kompatibel+OpenAI+untuk+editor+kodemu" alt="" />
 
 <br />
 
-[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
-[![Redis](https://img.shields.io/badge/Redis-cache-DC382D?logo=redis&logoColor=white)](https://redis.io)
-[![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
+<img src="https://img.shields.io/badge/⚡%20Streaming-realtime-7C3AED?style=for-the-badge" alt="" />
+<img src="https://img.shields.io/badge/🤖%20Agent-eksekusi%20kode-A855F7?style=for-the-badge" alt="" />
+<img src="https://img.shields.io/badge/🎨%20ComfyUI-gambar-22D3EE?style=for-the-badge" alt="" />
+<img src="https://img.shields.io/badge/🔌%20OpenAI%20API-%2Fv1-06B6D4?style=for-the-badge" alt="" />
 
-[![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-E11D48?logo=git&logoColor=white)](LICENSE)
-![Self-Hosted](https://img.shields.io/badge/self--hosted-100%25-7C3AED)
-![Access](https://img.shields.io/badge/akses-undangan-22D3EE)
-[![Last Commit](https://img.shields.io/github/last-commit/muhammadrizalharis/zaltr-ai?logo=git&logoColor=white&color=7C3AED&label=commit%20terakhir)](https://github.com/muhammadrizalharis/zaltr-ai/commits)
-[![Repo Size](https://img.shields.io/github/repo-size/muhammadrizalharis/zaltr-ai?logo=github&color=6D28D9&label=ukuran)](https://github.com/muhammadrizalharis/zaltr-ai)
-[![Top Language](https://img.shields.io/github/languages/top/muhammadrizalharis/zaltr-ai?logo=typescript&logoColor=white&color=2E1065)](https://github.com/muhammadrizalharis/zaltr-ai)
+<br /><br />
+
+<a href="#-teknologi"><img src="https://skillicons.dev/icons?i=nextjs,react,ts,tailwind,prisma,postgres,redis,docker&perline=8&theme=dark" alt="tech stack" /></a>
+
+<br /><br />
+
+[![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-E11D48?style=for-the-badge&logo=git&logoColor=white)](LICENSE)
+&nbsp;![Self-Hosted](https://img.shields.io/badge/Self--Hosted-100%25-7C3AED?style=for-the-badge)
+&nbsp;![Access](https://img.shields.io/badge/Akses-Undangan-22D3EE?style=for-the-badge)
+
+[![Last Commit](https://img.shields.io/github/last-commit/muhammadrizalharis/zaltr-ai?style=flat-square&logo=git&logoColor=white&color=7C3AED&label=commit%20terakhir)](https://github.com/muhammadrizalharis/zaltr-ai/commits)
+[![Repo Size](https://img.shields.io/github/repo-size/muhammadrizalharis/zaltr-ai?style=flat-square&logo=github&color=6D28D9&label=ukuran)](https://github.com/muhammadrizalharis/zaltr-ai)
+[![Top Language](https://img.shields.io/github/languages/top/muhammadrizalharis/zaltr-ai?style=flat-square&logo=typescript&logoColor=white&color=2E1065)](https://github.com/muhammadrizalharis/zaltr-ai)
 
 <br />
 
-**[✨ Fitur](#-fitur-unggulan) · [🧩 Arsitektur](#-arsitektur) · [🧰 Teknologi](#-teknologi) · [🚀 Mulai](#-mulai-cepat) · [🔧 Konfigurasi](#-konfigurasi) · [🔌 Provider](#-provider-ai) · [🔒 Keamanan](#-keamanan) · [📄 Lisensi](#-lisensi)**
+### ✨ [Fitur](#-fitur-unggulan) &nbsp;•&nbsp; 🧩 [Arsitektur](#-arsitektur) &nbsp;•&nbsp; 🧰 [Teknologi](#-teknologi) &nbsp;•&nbsp; 🚀 [Mulai](#-mulai-cepat) &nbsp;•&nbsp; 🔧 [Konfigurasi](#-konfigurasi) &nbsp;•&nbsp; 🔌 [Provider](#-provider-ai) &nbsp;•&nbsp; 🔒 [Keamanan](#-keamanan) &nbsp;•&nbsp; 📄 [Lisensi](#-lisensi)
 
 <br />
 
-<img src="public/CALIZR-AI.png" alt="Pratinjau CALYZR.AI" width="660" />
+<img src="public/CALIZR-AI.png" alt="Pratinjau CALYZR.AI" width="680" />
 
 </div>
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## 🎯 Satu Ruang Kerja, Semua Model AI
 
@@ -77,7 +79,7 @@ Endpoint `/v1` (`chat/completions`, `responses`, `embeddings`) dengan **emulasi 
 </tr>
 </table>
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## ✨ Fitur Unggulan
 
@@ -146,13 +148,14 @@ Endpoint `/v1` (`chat/completions`, `responses`, `embeddings`) dengan **emulasi 
 
 </details>
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## 🧩 Arsitektur
 
 Modular monolith yang bersih: satu bahasa (**TypeScript**) end-to-end, penyimpanan self-hosted, dan provider AI yang dapat ditukar hanya lewat variabel lingkungan.
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#7C3AED','primaryTextColor':'#FFFFFF','primaryBorderColor':'#A855F7','lineColor':'#22D3EE','fontFamily':'Inter','clusterBkg':'#0F172A','clusterBorder':'#4C1D95'}}}%%
 flowchart TD
     U["👤 Pengguna<br/>Browser / PWA"] -->|HTTPS| WEB["⚛️ Next.js 16<br/>App Router · SSR · Gateway /v1"]
     IDE["🧩 Editor Kode<br/>Continue, dll."] -->|"OpenAI API /v1"| WEB
@@ -173,11 +176,22 @@ flowchart TD
         MIN
         RUN
     end
+
+    classDef store fill:#4C1D95,stroke:#A855F7,color:#fff;
+    classDef ai fill:#0E7490,stroke:#22D3EE,color:#fff;
+    class PG,RDS,MIN store;
+    class COP,OLL,CMF,RUN ai;
 ```
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## 🧰 Teknologi
+
+<div align="center">
+<img src="https://skillicons.dev/icons?i=nextjs,react,ts,tailwind,prisma,postgres,redis,docker,nodejs,vercel&perline=10&theme=dark" alt="tech stack" />
+</div>
+
+<br />
 
 | Lapisan | Teknologi | Peran |
 |---|---|---|
@@ -193,7 +207,7 @@ flowchart TD
 | **Deploy** | Docker · docker-compose · cloudflared | Reproducible & tunnel publik |
 | **Kualitas** | Vitest · ESLint | Unit test & lint |
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## 📂 Struktur Proyek
 
@@ -214,7 +228,7 @@ zaltr-ai/
 └─ .env.example
 ```
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## 🚀 Mulai Cepat
 
@@ -262,7 +276,7 @@ Butuh Postgres/Redis/MinIO aktif — cara termudah:
 </tr>
 </table>
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## 🔧 Konfigurasi
 
@@ -279,7 +293,7 @@ Seluruh konfigurasi dibaca dari variabel lingkungan berawalan `ZALTR_`. Salin `.
 
 > 🔒 Rahasia sungguhan (`.env`, isi `secrets/`) **tidak pernah** di-commit — lihat `.gitignore`.
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## 🔌 Provider AI
 
@@ -289,7 +303,7 @@ Seluruh konfigurasi dibaca dari variabel lingkungan berawalan `ZALTR_`. Salin `.
 | 🐙 **GitHub Copilot** | Isi token *service account* di `secrets/copilot_github_token`, aktifkan profile `ai` |
 | 🎨 **ComfyUI** | Isi `ZALTR_COMFYUI_URL`; setiap checkpoint tampil sebagai model gambar |
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## 📟 Perintah
 
@@ -302,7 +316,7 @@ Seluruh konfigurasi dibaca dari variabel lingkungan berawalan `ZALTR_`. Salin `.
 | `npm test` | Unit test (Vitest) |
 | `bin/zaltrctl <cmd>` | Orkestrasi Docker (`init` / `up` / `deploy-web` / `status` / `logs`) |
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## 🔒 Keamanan
 
@@ -311,7 +325,7 @@ Seluruh konfigurasi dibaca dari variabel lingkungan berawalan `ZALTR_`. Salin `.
 - 🔐 **Backup AES-256** harian dengan retensi.
 - 🚦 **Rate limiting** & sanitasi input pada boundary API.
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%" alt="" />
 
 ## 📄 Lisensi
 
@@ -326,7 +340,7 @@ Kode ini ditampilkan publik **hanya** untuk referensi/transparansi — **bukan**
 
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&height=120&color=0:22D3EE,50:7C3AED,100:2E1065&section=footer" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=waving&height=130&color=0:22D3EE,45:7C3AED,100:0F172A&section=footer&reversal=true" width="100%" alt="" />
 
 <sub>Dibuat dengan 💜 oleh <b>Developer CALYZR.AI RZL</b></sub>
 
