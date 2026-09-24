@@ -102,10 +102,44 @@ async function fromPptx(buf: Buffer): Promise<string> {
 
 async function fromXlsx(buf: Buffer): Promise<string> {
   const zip = await JSZip.loadAsync(buf);
-  const shared = zip.file("xl/sharedStrings.xml");
-  if (!shared) return "";
-  const xml = await shared.async("string");
-  return xmlTexts(xml, "t").join("\n");
+  // Peta indeks -> teks dari sharedStrings (tiap <si> bisa punya banyak <t>).
+  const shared: string[] = [];
+  const ss = zip.file("xl/sharedStrings.xml");
+  if (ss) {
+    const xml = await ss.async("string");
+    for (const si of xml.split(/<\/si>/)) {
+      if (si.includes("<si")) shared.push(xmlTexts(si, "t").join(""));
+    }
+  }
+  const sheets = Object.keys(zip.files)
+    .filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))
+    .sort((a, b) => Number(a.match(/\d+/)?.[0]) - Number(b.match(/\d+/)?.[0]));
+  const parts: string[] = [];
+  for (const sheet of sheets) {
+    const xml = await zip.files[sheet].async("string");
+    const rows: string[] = [];
+    for (const rowXml of xml.split(/<\/row>/)) {
+      if (!rowXml.includes("<c")) continue;
+      const cells: string[] = [];
+      // Nilai sel: t="s" -> indeks sharedStrings; t="inlineStr" -> <is><t>; lainnya (angka) -> <v>.
+      const cellRe = /<c\b([^>]*)>([\s\S]*?)<\/c>/g;
+      let m: RegExpExecArray | null;
+      while ((m = cellRe.exec(rowXml)) !== null) {
+        const type = /t="([^"]+)"/.exec(m[1])?.[1];
+        if (type === "s") cells.push(shared[Number(xmlTexts(m[2], "v")[0] ?? "")] ?? "");
+        else if (type === "inlineStr") cells.push(xmlTexts(m[2], "t").join(""));
+        else cells.push(decodeXmlEntities(xmlTexts(m[2], "v")[0] ?? ""));
+      }
+      rows.push(cells.join("\t"));
+      if (rows.length >= 1000) break; // batasi agar tak membanjiri konteks model
+    }
+    if (rows.length) {
+      const label = sheets.length > 1 ? `[Sheet ${sheet.match(/\d+/)?.[0]}]\n` : "";
+      parts.push(label + rows.join("\n"));
+    }
+  }
+  // Fallback: bila struktur sheet tak terbaca, pakai sharedStrings apa adanya.
+  return parts.join("\n\n") || shared.join("\n");
 }
 
 async function fromPdf(buf: Buffer): Promise<string> {

@@ -53,7 +53,15 @@ export function toolsSystemPrompt(tools: ReturnType<typeof normalizeTools>): str
     "Boleh menulis penjelasan singkat sebelum blok. Boleh beberapa blok bila perlu beberapa tool sekaligus. " +
     "Setelah memanggil tool, BERHENTI dan tunggu hasilnya (dikirim sebagai pesan berawalan [TOOL RESULT]). " +
     "Jangan mengarang hasil tool. Bila tidak perlu tool, jawab langsung seperti biasa tanpa blok. " +
-    "JANGAN memakai sintaks tool lain (glob/bash/to=...) — hanya blok di atas yang dieksekusi."
+    "JANGAN memakai sintaks tool lain (glob/bash/to=...) — hanya blok di atas yang dieksekusi.\n\n" +
+    "# Penanganan path & folder\n" +
+    "Bila pengguna memberi PATH berkas/folder, panggil tool baca/daftar dengan path PERSIS seperti " +
+    "diberikan pengguna (umumnya relatif terhadap folder kerja/workspace). JANGAN mengubahnya menjadi " +
+    "path absolut sistem (mis. C:\\...) atau mengarang lokasi. Bila path gagal/tak ditemukan, panggil " +
+    "tool daftar-isi folder untuk menemukan lokasi berkas yang sebenarnya, lalu ulangi membacanya. " +
+    "Untuk BANYAK berkas, periksa SATU PER SATU: baca satu berkas -> simpulkan -> lanjut ke berkas " +
+    "berikutnya sampai semua selesai. Jangan mengaku sudah membaca sebuah berkas sebelum tool benar-benar " +
+    "mengembalikan isinya."
   );
 }
 
