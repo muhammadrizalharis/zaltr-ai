@@ -20,11 +20,10 @@ Jalankan di mesin yang menjalankan Continue (mesin lokal, atau host Remote‑SSH
 
 ```bash
 cd tools/mcp-doc-reader
-npm install
-npm run smoke      # verifikasi ekstraksi (opsional)
+node smoke.mjs     # verifikasi (opsional)
 ```
 
-Butuh **Node.js 18+**.
+**Tanpa dependency apa pun** — tak perlu `npm install`. Cukup **Node.js 18+**. PDF memakai `pdftotext` (poppler) **sistem** bila tersedia (Linux: `sudo apt install poppler-utils` · macOS: `brew install poppler`); docx/xlsx/pptx/teks tak butuh apa pun.
 
 ## Konfigurasi Continue
 
