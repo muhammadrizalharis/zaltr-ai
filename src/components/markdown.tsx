@@ -3,11 +3,24 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+
+// Model kadang menulis math dengan \[..\] / \(..\); samakan ke $$..$$ / $..$ agar
+// remark-math + KaTeX merendernya jadi rumus typeset (seperti Word/Gemini).
+function normalizeMath(s: string): string {
+  return s
+    .replace(/\\\[/g, () => "$$")
+    .replace(/\\\]/g, () => "$$")
+    .replace(/\\\(/g, () => "$")
+    .replace(/\\\)/g, () => "$");
+}
 
 export function Markdown({ children }: { children: string }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
       components={{
         h1: (p) => <h1 className="mb-2 mt-4 text-xl font-bold" {...p} />,
         h2: (p) => <h2 className="mb-2 mt-4 text-lg font-bold" {...p} />,
@@ -83,7 +96,7 @@ export function Markdown({ children }: { children: string }) {
         pre: ({ children, ...p }) => <CodeBlock {...p}>{children}</CodeBlock>,
       }}
     >
-      {children}
+      {normalizeMath(children)}
     </ReactMarkdown>
   );
 }
