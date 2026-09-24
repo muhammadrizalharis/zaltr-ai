@@ -270,10 +270,10 @@ export function SettingsView() {
               <b>calyzr-doc-reader</b> agar model bisa <b>baca &amp; tulis</b> semua format itu —
               termasuk membaca satu folder berkas per berkas.
             </p>
-            <p>Sekali pasang (di mesin tempat Continue berjalan, butuh Node 18+):</p>
+            <p>Sekali pasang (di mesin tempat Continue berjalan — <b>tanpa dependency</b>, cukup Node 18+):</p>
             <pre className="overflow-auto whitespace-pre rounded bg-bg px-2 py-2 text-[11px] leading-relaxed">{`git clone https://github.com/muhammadrizalharis/zaltr-ai
 cd zaltr-ai/tools/mcp-doc-reader
-npm install`}</pre>
+node smoke.mjs   # opsional: verifikasi`}</pre>
             <p>
               Tambahkan blok ini ke{" "}
               <code className="rounded bg-panel-2 px-1">~/.continue/config.yaml</code>{" "}
