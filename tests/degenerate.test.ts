@@ -29,6 +29,27 @@ describe("isDegenerate", () => {
   it("teks pendek -> false", () => {
     expect(isDegenerate("0.0 0.0 0.0")).toBe(false);
   });
+
+  it("aliran biner acak tanpa spasi (kasus nyata GPT-6 Astra baca .docx) -> true", () => {
+    let s = 7;
+    let bits = "";
+    for (let i = 0; i < 800; i++) {
+      s = (s * 1103515245 + 12345) & 0x7fffffff;
+      bits += (s % 2) + ":";
+    }
+    const out = "flt is not supported: boost::too_many_args, actual sample = " + bits;
+    expect(isDegenerate(out)).toBe(true);
+  });
+
+  it("desimal berulang tanpa spasi '0.00.0...' -> true", () => {
+    expect(isDegenerate("Hasil: " + "0.0".repeat(600))).toBe(true);
+  });
+
+  it("string padat entropi tinggi (base64) tanpa spasi -> false", () => {
+    const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const dense = Array.from({ length: 1600 }, (_, i) => B64[(i * 37 + ((i * i) % 61)) % 64]).join("");
+    expect(isDegenerate(dense)).toBe(false);
+  });
 });
 
 describe("trimDegenerate", () => {

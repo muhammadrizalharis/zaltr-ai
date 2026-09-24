@@ -1,7 +1,8 @@
 /**
  * Deteksi keluaran model yang DEGENERASI (repetition loop): pola pendek berulang
- * tanpa henti, mis. "jet_mass 0.0 pricing 0.0 matcher 0.0 …". Dipakai gateway/agen
- * untuk MEMUTUS stream lebih awal — hemat kredit & waktu pengguna, UI tak banjir.
+ * tanpa henti, mis. "jet_mass 0.0 pricing 0.0 matcher 0.0 …" ATAU aliran tanpa spasi
+ * ber-entropi rendah "1:1:0:1:1:0:…". Dipakai gateway/agen untuk MEMUTUS stream lebih
+ * awal — hemat kredit & waktu pengguna, UI tak banjir.
  */
 
 const WINDOW = 1200; // karakter terakhir yang diperiksa
@@ -18,6 +19,21 @@ export function isDegenerate(text: string): boolean {
     let reps = 0;
     for (let i = tail.length - len; i >= 0 && tail.slice(i, i + len) === unit; i -= len) reps++;
     if (reps >= 10) return true;
+  }
+
+  // (1b) Degenerasi TANPA spasi / entropi karakter rendah, mis. "1:1:0:1:1:0:..."
+  // atau "0.00.00.0". Cek berbasis karakter — cek token di bawah gagal tanpa spasi.
+  const spaceRatio = (tail.match(/\s/g)?.length ?? 0) / tail.length;
+  if (spaceRatio < 0.08) {
+    if (new Set(tail).size <= 8) return true; // alfabet sangat kecil -> pasti loop
+    // k-gram karakter dominan: pola pendek berulang walau tak periodik sempurna.
+    const K = 4;
+    const g = new Map<string, number>();
+    for (let i = 0; i + K <= tail.length; i++) {
+      const key = tail.slice(i, i + K);
+      g.set(key, (g.get(key) ?? 0) + 1);
+    }
+    if (g.size && Math.max(...g.values()) / (tail.length - K + 1) >= 0.18) return true;
   }
 
   const tokens = tail.split(/\s+/).filter(Boolean);
