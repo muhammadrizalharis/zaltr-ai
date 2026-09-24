@@ -1,0 +1,17 @@
+{
+  "name": "calyzr-doc-reader",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server pembaca dokumen (docx/pdf/xlsx/pptx/teks) untuk Continue — ekstraksi berjalan di sisi klien.",
+  "bin": { "calyzr-doc-reader": "server.mjs" },
+  "scripts": {
+    "start": "node server.mjs",
+    "smoke": "node smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "jszip": "^3.10.1",
+    "pdf-parse": "^1.1.1"
+  }
+}
