@@ -259,6 +259,48 @@ export function SettingsView() {
           </div>
         </details>
 
+        <details className="rounded-xl border border-line bg-panel px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium">
+            Baca &amp; tulis dokumen di Continue (MCP) — docx / pdf / xlsx / pptx
+          </summary>
+          <div className="mt-2 space-y-2 text-xs text-muted">
+            <p>
+              Continue membaca berkas di komputermu, tapi <code className="rounded bg-panel-2 px-1">read_file</code>{" "}
+              bawaannya tak bisa mengekstrak docx/pdf/xlsx/pptx. Pasang MCP{" "}
+              <b>calyzr-doc-reader</b> agar model bisa <b>baca &amp; tulis</b> semua format itu —
+              termasuk membaca satu folder berkas per berkas.
+            </p>
+            <p>Sekali pasang (di mesin tempat Continue berjalan, butuh Node 18+):</p>
+            <pre className="overflow-auto whitespace-pre rounded bg-bg px-2 py-2 text-[11px] leading-relaxed">{`git clone https://github.com/muhammadrizalharis/zaltr-ai
+cd zaltr-ai/tools/mcp-doc-reader
+npm install`}</pre>
+            <p>
+              Tambahkan blok ini ke{" "}
+              <code className="rounded bg-panel-2 px-1">~/.continue/config.yaml</code>{" "}
+              (ganti PATH dengan lokasi nyata hasil clone):
+            </p>
+            <pre className="overflow-auto whitespace-pre rounded bg-bg px-2 py-2 text-[11px] leading-relaxed">{`mcpServers:
+  - name: calyzr-doc-reader
+    command: node
+    args:
+      - /PATH/ke/zaltr-ai/tools/mcp-doc-reader/server.mjs`}</pre>
+            <button
+              onClick={() =>
+                void navigator.clipboard?.writeText(
+                  "mcpServers:\n  - name: calyzr-doc-reader\n    command: node\n    args:\n      - /PATH/ke/zaltr-ai/tools/mcp-doc-reader/server.mjs",
+                )
+              }
+              className="rounded-lg border border-line bg-panel-2 px-2 py-1 text-xs hover:text-ink"
+            >
+              Salin blok MCP
+            </button>
+            <p>
+              Restart Continue → mode <b>Agent</b> → mis. &quot;baca folder JURNAL_SAYA satu per
+              satu&quot; atau &quot;tulis ringkasan ke hasil.md&quot;.
+            </p>
+          </div>
+        </details>
+
         {createdKey && (
           <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2">
             <p className="text-xs text-amber-200">

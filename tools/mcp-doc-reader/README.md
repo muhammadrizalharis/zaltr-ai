@@ -12,6 +12,7 @@ Tools yang disediakan:
 | `read_document` | Baca & ekstrak satu berkas pada `path`. |
 | `list_directory` | Daftar isi folder pada `path`. |
 | `read_folder` | Baca & ekstrak SEMUA dokumen dalam folder, satu per satu. |
+| `write_file` | Tulis/timpa teks ke berkas pada `path` (opsi `append`). |
 
 ## Instalasi
 

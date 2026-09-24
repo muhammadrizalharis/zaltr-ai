@@ -6,7 +6,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, writeFile, appendFile, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { extractText } from "./extract.mjs";
@@ -60,6 +60,20 @@ const TOOLS = [
       required: ["path"],
     },
   },
+  {
+    name: "write_file",
+    description:
+      "Tulis (atau timpa) teks ke sebuah berkas pada path. Membuat folder induk otomatis bila belum ada. Set append=true untuk menambah di akhir berkas.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Path berkas tujuan (boleh ~)." },
+        content: { type: "string", description: "Isi teks yang akan ditulis." },
+        append: { type: "boolean", description: "true = tambahkan di akhir (default: timpa)." },
+      },
+      required: ["path", "content"],
+    },
+  },
 ];
 
 const server = new Server({ name: "calyzr-doc-reader", version: "1.0.0" }, { capabilities: { tools: {} } });
@@ -102,6 +116,15 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         ? `\n\n…(${entries.filter((e) => e.isFile()).length - files.length} berkas lagi tidak dibaca — naikkan 'max')`
         : "";
       return { content: [{ type: "text", text: (parts.join("\n\n") || "(folder kosong / tidak ada berkas)") + note }] };
+    }
+    if (name === "write_file") {
+      const p = resolveSafe(args?.path);
+      const content = String(args?.content ?? "");
+      await mkdir(path.dirname(p), { recursive: true });
+      if (args?.append) await appendFile(p, content);
+      else await writeFile(p, content);
+      const bytes = Buffer.byteLength(content, "utf8");
+      return { content: [{ type: "text", text: `OK: ${args?.append ? "ditambahkan ke" : "ditulis ke"} ${p} (${bytes} byte)` }] };
     }
     return { content: [{ type: "text", text: `Tool tidak dikenal: ${name}` }], isError: true };
   } catch (e) {
