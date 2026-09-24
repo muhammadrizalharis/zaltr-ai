@@ -90,17 +90,27 @@ async function callTool(name, args) {
   if (name === "read_folder") {
     const p = resolveSafe(args?.path);
     const max = Math.max(1, Number(args?.max) || 20);
+    // Batas TOTAL teks agar tak membanjiri editor (penyebab "window not responding").
+    const BUDGET = Number(process.env.DOC_FOLDER_BUDGET) || 120_000;
     const files = (await readdir(p, { withFileTypes: true })).filter((e) => e.isFile());
     const parts = [];
+    let total = 0;
     for (const f of files.slice(0, max)) {
+      if (total >= BUDGET) break;
       const fp = path.join(p, f.name);
       try {
-        parts.push(`=== ${f.name} ===\n${await extractText(await readFile(fp), f.name)}`);
+        let t = await extractText(await readFile(fp), f.name);
+        const room = BUDGET - total;
+        if (t.length > room) t = t.slice(0, room) + "\n…(dipotong; batas total tercapai)";
+        total += t.length;
+        parts.push(`=== ${f.name} ===\n${t}`);
       } catch (e) {
         parts.push(`=== ${f.name} ===\n(gagal dibaca: ${e.message})`);
       }
     }
-    const note = files.length > max ? `\n\n…(${files.length - max} berkas lagi tidak dibaca — naikkan 'max')` : "";
+    const note = files.length > parts.length
+      ? `\n\n…(berhenti di ${parts.length}/${files.length} berkas demi batas ${BUDGET.toLocaleString("id-ID")} karakter — baca lebih spesifik, atau naikkan 'max'/DOC_FOLDER_BUDGET)`
+      : "";
     return textResult((parts.join("\n\n") || "(folder kosong / tidak ada berkas)") + note);
   }
   if (name === "write_file") {
