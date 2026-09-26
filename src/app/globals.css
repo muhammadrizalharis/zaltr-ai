@@ -393,6 +393,13 @@ body {
   gap: 0.75rem;
   animation: marquee 30s linear infinite;
 }
+
+/* Pesan di luar layar tak dirender/di-layout (hemat CPU di percakapan panjang).
+   contain-intrinsic-size: auto -> browser INGAT ukuran terukur -> tak ada lompatan scroll. */
+.msg-cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+}
 .marquee-track:hover { animation-play-state: paused; }
 
 /* Muncul dari bawah dengan jeda berantai */

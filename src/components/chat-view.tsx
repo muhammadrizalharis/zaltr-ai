@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { ModelPicker, loadSavedModel, DEFAULT_MODEL } from "@/components/model-picker";
 import { CanvasEditor } from "@/components/canvas-editor";
@@ -560,6 +560,19 @@ export function ChatView({
     }
   }
 
+  // Handler ber-identitas STABIL agar <Bubble> yang di-memo tak ikut re-render
+  // tiap ketikan di composer; ref selalu menunjuk fungsi terbaru (tanpa closure basi).
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  const openCanvasRef = useRef(openCanvas);
+  openCanvasRef.current = openCanvas;
+  const handleRegenerate = useCallback(() => void sendRef.current(undefined, { regenerate: true }), []);
+  const handleEdit = useCallback((text: string) => {
+    setDraft(text);
+    textareaRef.current?.focus();
+  }, []);
+  const handleCanvas = useCallback((content: string) => openCanvasRef.current(content), []);
+
   return (
     <div
       className="relative flex h-full flex-col"
@@ -618,12 +631,9 @@ export function ChatView({
                   !messages.slice(i + 1).some((x) => x.role === "user") &&
                   !streaming
                 }
-                onRegenerate={() => void send(undefined, { regenerate: true })}
-                onEdit={(text) => {
-                  setDraft(text);
-                  textareaRef.current?.focus();
-                }}
-                onCanvas={openCanvas}
+                onRegenerate={handleRegenerate}
+                onEdit={handleEdit}
+                onCanvas={handleCanvas}
               />
             ))}
             {streaming && (
@@ -1149,7 +1159,7 @@ function RoleTag({ role }: { role: string }) {
   );
 }
 
-function Bubble({
+const Bubble = memo(function Bubble({
   message,
   isLastAssistant,
   isLastUser,
@@ -1205,7 +1215,7 @@ function Bubble({
 
   return (
     <div
-      className={`group text-sm leading-relaxed ${
+      className={`msg-cv group text-sm leading-relaxed ${
         isUser ? "flex flex-col items-end" : ""
       }`}
     >
@@ -1300,4 +1310,4 @@ function Bubble({
       )}
     </div>
   );
-}
+});
