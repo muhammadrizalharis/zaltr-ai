@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -16,7 +16,9 @@ function normalizeMath(s: string): string {
     .replace(/\\\)/g, () => "$");
 }
 
-export function Markdown({ children }: { children: string }) {
+// Di-memo: tiap ketikan di composer me-render ulang ChatView; tanpa memo SEMUA
+// pesan mem-parse ulang markdown + KaTeX (berat) -> lag di percakapan panjang.
+export const Markdown = memo(function Markdown({ children }: { children: string }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkMath]}
@@ -99,7 +101,7 @@ export function Markdown({ children }: { children: string }) {
       {normalizeMath(children)}
     </ReactMarkdown>
   );
-}
+});
 
 /** Ambil teks mentah dari children React (untuk salin/eksekusi kode). */
 function extractText(node: React.ReactNode): string {
