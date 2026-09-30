@@ -245,7 +245,15 @@ function summarizeDelimited(
   const cols = header
     .map((h, i) => `${h || `kolom${i + 1}`} (${inferColType(sample.map((r) => r[i] ?? ""))})`)
     .join(", ");
-  const preview = [lines[0], ...dataLines.slice(0, 20)].join("\n");
+  const previewRows = Math.max(20, Number(process.env.ZALTR_CSV_PREVIEW_ROWS) || 50);
+  const preview = [lines[0], ...dataLines.slice(0, previewRows)].join("\n");
+  // Sinyal integritas ringkas: jumlah sel kosong per kolom (dari sampel) — bantu audit.
+  const empties = header
+    .map((h, i) => ({ h: h || `kolom${i + 1}`, n: sample.filter((r) => (r[i] ?? "") === "").length }))
+    .filter((c) => c.n > 0);
+  const emptyLine = empties.length
+    ? `- Sel kosong (dari ${sample.length} baris sampel): ${empties.map((c) => `${c.h}=${c.n}`).join(", ")}`
+    : `- Tidak ada sel kosong pada ${sample.length} baris sampel`;
   let rowsLine: string;
   const readBytes = Buffer.byteLength(raw, "utf8");
   if (opts?.partial && opts.sourceBytes && readBytes > 0) {
@@ -258,8 +266,9 @@ function summarizeDelimited(
     `Ringkasan tabel "${name}":\n` +
     `${rowsLine}\n` +
     `- Jumlah kolom: ${header.length}\n` +
-    `- Kolom & tipe (perkiraan): ${cols}\n\n` +
-    `20 baris pertama (mentah):\n${preview}`
+    `- Kolom & tipe (perkiraan): ${cols}\n` +
+    `${emptyLine}\n\n` +
+    `${previewRows} baris pertama (mentah):\n${preview}`
   );
 }
 
