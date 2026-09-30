@@ -20,7 +20,8 @@ const FOLDER_IGNORE_DIR =
   /(^|\/)(node_modules|\.git|\.next|\.nuxt|dist|build|out|\.cache|venv|\.venv|env|__pycache__|\.idea|\.vscode|coverage|\.turbo|target|bin|obj)(\/|$)/i;
 const FOLDER_IGNORE_EXT =
   /\.(png|jpe?g|gif|webp|bmp|ico|icns|svg|mp3|mp4|mov|avi|mkv|webm|wav|flac|ogg|zip|gz|bz2|tar|tgz|rar|7z|exe|dll|so|dylib|bin|safetensors|pt|pth|ckpt|onnx|pkl|pickle|joblib|npy|npz|parquet|feather|h5|hdf5|woff2?|ttf|eot|otf|lock|map)$/i;
-const FOLDER_MAX_FILE_BYTES = 25 * 1024 * 1024;
+// Pra-saring klien; harus cocok dgn default server ZALTR_FOLDER_MAX_FILE_MB (50 MB).
+const FOLDER_MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 type UploadResp = {
   files?: Array<{ url: string; name: string; type: string; size: number; ephemeral: boolean }>;

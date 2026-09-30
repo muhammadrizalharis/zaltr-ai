@@ -14,10 +14,12 @@ export const runtime = "nodejs";
  * seluruh folder di chat, dengan sitasi menunjukkan path file.
  */
 
-const MAX_FILES = 800;
-const MAX_TOTAL_BYTES = 300 * 1024 * 1024; // 300 MB total per folder
-const MAX_FILE_BYTES = 25 * 1024 * 1024; // lewati file tunggal > 25 MB
-const PER_FILE_TEXT_CHARS = 120_000; // batas karakter teks yang di-embed per file
+const MAX_FILES = Number(process.env.ZALTR_FOLDER_MAX_FILES) || 800;
+// Semua batas bisa disetel via .env (kosong = default). Catatan: lewat domain publik
+// (Cloudflare Free) satu request dibatasi ~100MB, jadi total folder efektif ~100MB di web/APK.
+const MAX_TOTAL_BYTES = (Number(process.env.ZALTR_FOLDER_MAX_TOTAL_MB) || 300) * 1024 * 1024;
+const MAX_FILE_BYTES = (Number(process.env.ZALTR_FOLDER_MAX_FILE_MB) || 50) * 1024 * 1024;
+const PER_FILE_TEXT_CHARS = Number(process.env.ZALTR_FOLDER_FILE_TEXT_CHARS) || 200_000;
 const CONCURRENCY = 4;
 
 export const POST = guarded(async (req: Request) => {
