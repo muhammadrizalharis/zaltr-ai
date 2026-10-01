@@ -184,8 +184,17 @@ export async function retrieve(opts: {
     kwRows = []; // query kata-kunci kosong/aneh -> cukup pakai vektor
   }
 
-  // 3) Reciprocal Rank Fusion: gabung kedua peringkat. Kandidat vektor yang
-  //    terlalu jauh (dist > 0.8) tak diikutkan agar konteks tetap relevan.
+  // 3) Reciprocal Rank Fusion dengan GERBANG RELEVANSI: hanya kandidat vektor yang
+  //    benar-benar dekat (dist <= RELEVANCE_MAX) yang dianggap relevan. Bila TAK ADA
+  //    satu pun yang relevan -> kembalikan kosong, sehingga chat biasa TIDAK disuntik
+  //    dokumen & tak ada sitasi. Kata kunci hanya me-RANGKING ULANG chunk yang sudah
+  //    relevan secara semantik (cegah kecocokan kata yang kebetulan menyeret dokumen
+  //    tak nyambung, mis. kata umum "file"/"upload").
+  const RELEVANCE_MAX = Number(process.env.ZALTR_RAG_MAX_DIST) || 0.6;
+  const relevant = vecRows.filter((r) => r.dist <= RELEVANCE_MAX);
+  if (relevant.length === 0) return [];
+  const relevantIds = new Set(relevant.map((r) => r.chunkId));
+
   const RRF_K = 60;
   const fused = new Map<string, { hit: KnowledgeHit; score: number }>();
   const bump = (r: Row, rank: number) => {
@@ -198,25 +207,24 @@ export async function retrieve(opts: {
         score: add,
       });
   };
-  vecRows.forEach((r, i) => {
-    if (r.dist <= 0.8) bump(r, i);
-  });
-  kwRows.forEach((r, i) => bump(r, i));
+  relevant.forEach((r, i) => bump(r, i));
+  kwRows.filter((r) => relevantIds.has(r.chunkId)).forEach((r, i) => bump(r, i));
   return [...fused.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, topK)
     .map((x) => x.hit);
 }
 
-/** Format hasil retrieval jadi blok konteks ber-sitasi untuk prompt. */
+/** Format hasil retrieval jadi konteks LATAR untuk prompt (tanpa penanda sitasi). */
 export function formatKnowledge(hits: KnowledgeHit[]): string {
   if (hits.length === 0) return "";
-  const rows = hits.map((h, i) => `[K${i + 1}] (sumber: ${h.name})\n${h.content}`).join("\n\n");
+  const rows = hits.map((h) => `(dari ${h.name})\n${h.content}`).join("\n\n");
   return (
-    `=== Basis pengetahuan (dokumen milik pengguna) ===\n${rows}\n` +
-    `=== Akhir basis pengetahuan ===\n` +
-    `Jawab berdasarkan potongan di atas bila relevan, dan sebutkan sumbernya sebagai [K#]. ` +
-    `Bila tidak ada yang relevan, jawab dari pengetahuanmu dan katakan itu.`
+    `=== Konteks dari dokumen milik pengguna (latar belakang) ===\n${rows}\n` +
+    `=== Akhir konteks ===\n` +
+    `Gunakan konteks di atas HANYA bila benar-benar relevan dengan pertanyaan, dan jawab secara alami ` +
+    `TANPA menulis penanda seperti [K1]/[K2] atau daftar "Sumber". Bila konteks tak menjawab ` +
+    `pertanyaan, abaikan saja dan jawab seperti biasa.`
   );
 }
 

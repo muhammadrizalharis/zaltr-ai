@@ -480,22 +480,24 @@ export const POST = guarded(async (req: Request) => {
           });
           const block = formatKnowledge(kb);
           if (block) preamble.push(block);
-          for (let i = 0; i < kb.length; i++) {
-            citations.push({ k: i + 1, name: kb[i].name, snippet: kb[i].content.slice(0, 240) });
-          }
-          // Inventaris dokumen: beri model daftar berkas terindeks agar bisa
-          // menjawab pertanyaan overview / merangkum seluruh folder.
-          const names = await listSourceNames({
-            userId: me.id,
-            projectId: conversation.projectId,
-            assistantId: conversation.assistantId,
-            limit: 40,
-          });
-          if (names.length > 0) {
-            preamble.push(
-              `Berkas/dokumen milik pengguna yang sudah terindeks (bisa kamu rujuk & rangkum): ` +
-                `${names.join("; ")}.`,
-            );
+          // Inventaris dokumen HANYA bila ada potongan relevan ATAU pengguna memang
+          // bertanya soal berkas/dokumen/folder (hindari menyeret daftar dokumen ke
+          // obrolan yang tak terkait).
+          const wantsDocs =
+            kb.length > 0 || /\b(file|berkas|dokumen|folder|rangkum|ringkas|daftar|unggah)\b/i.test(content);
+          if (wantsDocs) {
+            const names = await listSourceNames({
+              userId: me.id,
+              projectId: conversation.projectId,
+              assistantId: conversation.assistantId,
+              limit: 40,
+            });
+            if (names.length > 0) {
+              preamble.push(
+                `Berkas/dokumen milik pengguna yang sudah terindeks (bisa kamu rujuk & rangkum): ` +
+                  `${names.join("; ")}.`,
+              );
+            }
           }
           // Bila pengguna MENYEBUT nama dokumen/berkas terindeks, sertakan isinya UTUH
           // (bukan hanya potongan) agar bisa dianalisis menyeluruh di giliran mana pun.
