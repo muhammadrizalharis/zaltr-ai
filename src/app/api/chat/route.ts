@@ -480,12 +480,9 @@ export const POST = guarded(async (req: Request) => {
           });
           const block = formatKnowledge(kb);
           if (block) preamble.push(block);
-          // Inventaris dokumen HANYA bila ada potongan relevan ATAU pengguna memang
-          // bertanya soal berkas/dokumen/folder (hindari menyeret daftar dokumen ke
-          // obrolan yang tak terkait).
-          const wantsDocs =
-            kb.length > 0 || /\b(file|berkas|dokumen|folder|rangkum|ringkas|daftar|unggah)\b/i.test(content);
-          if (wantsDocs) {
+          // Inventaris dokumen HANYA bila ADA potongan yang benar-benar relevan.
+          // Chat yang tak nyambung dengan dokumen pengguna -> tak ada daftar dokumen.
+          if (kb.length > 0) {
             const names = await listSourceNames({
               userId: me.id,
               projectId: conversation.projectId,
