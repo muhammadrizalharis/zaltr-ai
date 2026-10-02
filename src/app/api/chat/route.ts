@@ -424,7 +424,13 @@ export const POST = guarded(async (req: Request) => {
     // Model generasi gambar (ComfyUI) hanya butuh prompt mentah pengguna —
     // JANGAN suntikkan memori/instruksi/RAG/web (mengotori prompt & alt gambar).
     const isImageGen = modelId.startsWith("comfyui:");
-    const noContext = isFree || isImageGen;
+    // Mode PARAFRASE = transformasi teks MURNI milik pengguna. Perlakukan seperti
+    // noContext: JANGAN suntik memori/RAG/instruksi/web — kalau tidak, promptParafrase
+    // membungkus preamble (profil & dokumen) sehingga model mem-parafrase ITU, bukan
+    // teks pengguna (gejala "jawaban ngawur" merangkum memori/dokumen).
+    const isParafrase =
+      !isImageGen && parsed.data.paraphrase != null && isModeParafrase(parsed.data.paraphrase);
+    const noContext = isFree || isImageGen || isParafrase;
     const preamble: string[] = [];
     if (!noContext && me.customInstructions?.trim()) {
       preamble.push(`Instruksi pribadi dari pengguna (patuhi):\n${me.customInstructions.trim().slice(0, 2_000)}`);
