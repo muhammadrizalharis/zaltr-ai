@@ -34,12 +34,15 @@ PRINSIP WAJIB
    sama dengan literatur lain — jangan diganti hanya demi terlihat berbeda.
 4. JANGAN mengubah klaim, temuan, arah hubungan, maupun kekuatan pernyataan.
    Jangan menambah fakta, angka, atau rujukan baru.
-5. Jangan menyebut proses ini. Keluarkan hasil tulisannya saja.`;
+5. BAHASA: tulis hasil dalam bahasa yang SAMA dengan teks asli — JANGAN
+   menerjemahkan (teks Inggris -> hasil Inggris; teks Indonesia -> hasil Indonesia).
+   Bila pengguna secara eksplisit meminta bahasa tertentu, ikuti permintaan itu.
+6. Jangan menyebut proses ini. Keluarkan hasil tulisannya saja.`;
 
 const GAYA: Record<ModeParafrase, string> = {
   akademik:
-    "GAYA: ragam ilmiah Bahasa Indonesia yang efektif dan lugas. Hindari kalimat " +
-    "berbelit dan kata mubazir. Susun sebagai paragraf yang mengalir, bukan poin-poin.",
+    "GAYA: ragam ilmiah yang efektif dan lugas (dalam bahasa teks asli). Hindari " +
+    "kalimat berbelit dan kata mubazir. Susun sebagai paragraf yang mengalir, bukan poin-poin.",
   sederhana:
     "GAYA: bahasa sehari-hari yang mudah dipahami pembaca awam. Uraikan istilah " +
     "sulit secara singkat dalam kurung, tetapi istilah teknisnya tetap ditulis.",
@@ -50,8 +53,9 @@ const GAYA: Record<ModeParafrase, string> = {
     "GAYA: formal dan profesional untuk keperluan resmi/korespondensi akademik. " +
     "Hindari bentuk percakapan.",
   perbaiki:
-    "GAYA: pertahankan struktur asli semaksimal mungkin. Perbaiki hanya ejaan " +
-    "(EYD), tanda baca, imbuhan, kata baku, dan kalimat yang tidak efektif.",
+    "GAYA: pertahankan struktur asli semaksimal mungkin. Perbaiki hanya ejaan, " +
+    "tanda baca, tata bahasa, dan kalimat yang tidak efektif sesuai kaidah baku " +
+    "bahasa teks (mis. EYD untuk Bahasa Indonesia).",
 };
 
 /** Instruksi yang disisipkan ke pesan pengguna sebelum dikirim ke model. */
