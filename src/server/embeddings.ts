@@ -24,8 +24,9 @@ function cachePut(key: string, vec: number[]): void {
   embedCache.set(key, vec);
 }
 
-/** Embedding banyak teks sekaligus (batch). Kosong -> []. Memakai cache. */
-export async function embed(texts: string[]): Promise<number[][]> {
+/** Embedding banyak teks sekaligus (batch). Kosong -> []. Memakai cache.
+ *  timeoutMs: jalur INGEST pakai default panjang; jalur QUERY interaktif kirim nilai kecil. */
+export async function embed(texts: string[], timeoutMs = 120_000): Promise<number[][]> {
   if (texts.length === 0) return [];
   if (!OLLAMA) throw new Error("ZALTR_OLLAMA_URL belum diset");
   const out: (number[] | null)[] = texts.map((t) => embedCache.get(t) ?? null);
@@ -36,7 +37,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ model: EMBED_MODEL, input: missIdx.map((i) => texts[i]) }),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: "no-store",
     });
     if (!res.ok) throw new Error(`Embedding gagal (${res.status})`);
@@ -51,7 +52,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
   return out as number[][];
 }
 
-export async function embedOne(text: string): Promise<number[]> {
-  const [v] = await embed([text]);
+export async function embedOne(text: string, timeoutMs?: number): Promise<number[]> {
+  const [v] = await embed([text], timeoutMs);
   return v;
 }

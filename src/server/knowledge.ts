@@ -143,8 +143,10 @@ export async function retrieve(opts: {
 
   type Row = { chunkId: string; content: string; name: string; sourceId: string; dist: number };
 
-  // 1) Kandidat SEMANTIK (vektor / cosine).
-  const vec = await embedOne(q.slice(0, 2_000));
+  // 1) Kandidat SEMANTIK (vektor / cosine). Timeout PENDEK di jalur query interaktif:
+  //    bila Ollama embed lambat (host sibuk), lempar -> retrieve di-skip (RAG opsional)
+  //    ketimbang memblok chat sampai 2 menit.
+  const vec = await embedOne(q.slice(0, 2_000), Number(process.env.ZALTR_EMBED_QUERY_TIMEOUT_MS) || 5000);
   const vecStr = `[${vec.join(",")}]`;
   const vecRows = await db.$queryRaw<Row[]>`
     SELECT c."id" AS "chunkId", c."content" AS content, s."name" AS name, c."sourceId" AS "sourceId",

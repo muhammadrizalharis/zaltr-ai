@@ -202,6 +202,8 @@ services:
       ZALTR_FOLDER_FILE_TEXT_CHARS: ${ZALTR_FOLDER_FILE_TEXT_CHARS:-}
       # Ambang relevansi RAG (jarak cosine maks; makin kecil makin ketat; default 0.6)
       ZALTR_RAG_MAX_DIST: ${ZALTR_RAG_MAX_DIST:-}
+      # Timeout (ms) embed query RAG; bila Ollama embed lebih lambat, RAG dilewati (default 5000)
+      ZALTR_EMBED_QUERY_TIMEOUT_MS: ${ZALTR_EMBED_QUERY_TIMEOUT_MS:-}
       # Web Push (notifikasi HP): kunci VAPID (privat = rahasia, di .env)
       ZALTR_VAPID_PUBLIC_KEY: ${ZALTR_VAPID_PUBLIC_KEY:-}
       ZALTR_VAPID_PRIVATE_KEY: ${ZALTR_VAPID_PRIVATE_KEY:-}
