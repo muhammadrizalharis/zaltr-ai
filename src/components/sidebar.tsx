@@ -200,7 +200,7 @@ export function Sidebar({
     <aside className="hidden w-14 shrink-0 flex-col items-center gap-3 border-r border-line bg-panel py-4 md:flex">
       <button onClick={() => setMiniPersist(false)} title="Bentangkan sidebar">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-192.png" alt="zaltr" className="h-8 w-8 rounded-lg" />
+        <img src="/logo-192.png" alt="calyzr.ai" className="h-8 w-8 rounded-lg" />
       </button>
       <Link
         href="/chat"

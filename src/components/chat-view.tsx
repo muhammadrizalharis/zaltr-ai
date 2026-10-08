@@ -1155,7 +1155,7 @@ function RoleTag({ role }: { role: string }) {
     </span>
   ) : (
     <span className="wordmark text-[11px] font-semibold uppercase tracking-wider">
-      zaltr
+      calyzr
     </span>
   );
 }
