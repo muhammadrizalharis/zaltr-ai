@@ -93,16 +93,56 @@ export async function copilotCatalog(): Promise<ModelDescriptor[]> {
     return models.map((m) => {
       const vision = m.capabilities?.supports?.vision === true;
       if (vision) visionModels.add(m.id);
+      const supportsReasoning = m.capabilities?.supports?.reasoningEffort === true;
+      const reasoningEfforts = Array.isArray(m.supportedReasoningEfforts)
+        ? (m.supportedReasoningEfforts as string[]).filter((e) => typeof e === "string")
+        : undefined;
+      const contextWindow = m.capabilities?.limits?.max_context_window_tokens;
+      const costMultiplier = m.billing?.multiplier;
+      const tp = m.billing?.tokenPrices;
+      const toPricing = (p?: {
+        batchSize?: number;
+        inputPrice?: number;
+        outputPrice?: number;
+        cacheReadPrice?: number;
+        cacheWritePrice?: number;
+      }) =>
+        p &&
+        (typeof p.inputPrice === "number" ||
+          typeof p.outputPrice === "number" ||
+          typeof p.cacheReadPrice === "number" ||
+          typeof p.cacheWritePrice === "number")
+          ? {
+              ...(typeof p.batchSize === "number" ? { batchSize: p.batchSize } : {}),
+              ...(typeof p.inputPrice === "number" ? { input: p.inputPrice } : {}),
+              ...(typeof p.outputPrice === "number" ? { output: p.outputPrice } : {}),
+              ...(typeof p.cacheReadPrice === "number" ? { cacheRead: p.cacheReadPrice } : {}),
+              ...(typeof p.cacheWritePrice === "number" ? { cacheWrite: p.cacheWritePrice } : {}),
+            }
+          : undefined;
+      const pricing = toPricing(tp);
+      const lc = tp?.longContext;
+      const pricingLongContext = toPricing(
+        lc ? { ...lc, batchSize: tp?.batchSize } : undefined,
+      );
+      const caps: ModelDescriptor["capabilities"] = vision
+        ? ["chat", "vision"]
+        : ["chat"];
+      if (supportsReasoning) caps.push("reasoning");
       return {
         id: `copilot:${m.id}`,
         label: m.name || m.id,
         provider: "copilot" as const,
         providerLabel: "Calyzr Pro",
-        capabilities: (vision
-          ? ["chat", "vision"]
-          : ["chat"]) as ModelDescriptor["capabilities"],
+        capabilities: caps,
         available: true,
         local: false,
+        ...(contextWindow ? { contextWindow } : {}),
+        supportsReasoning,
+        ...(reasoningEfforts && reasoningEfforts.length ? { reasoningEfforts } : {}),
+        ...(typeof costMultiplier === "number" ? { costMultiplier } : {}),
+        ...(pricing ? { pricing } : {}),
+        ...(pricingLongContext ? { pricingLongContext } : {}),
       };
     });
   } catch {
@@ -130,16 +170,33 @@ export async function* copilotChat(req: ChatRequest): ProviderGenerator {
   // instruksi platform (bila disisipkan di prompt user, Claude menolaknya sebagai injeksi).
   const sysExtra = req.history.filter((m) => m.role === "system").map((m) => m.content);
 
+  // Opsi thinking level & context tier (hanya diterapkan bila model mendukung;
+  // UI sudah membatasi, tapi kita bungkus try/catch agar aman).
+  const tuning: { reasoningEffort?: string; contextTier?: NonNullable<ChatRequest["contextTier"]> } = {};
+  if (req.reasoningEffort) tuning.reasoningEffort = req.reasoningEffort;
+  if (req.contextTier) tuning.contextTier = req.contextTier;
+  // Runtime Copilot menerima "max"/"none"; tipe SDK lebih sempit -> cast aman.
+  const sdkTuning = tuning as { reasoningEffort?: "low" | "medium" | "high" | "xhigh"; contextTier?: NonNullable<ChatRequest["contextTier"]> };
+
   // Resume sesi CLI milik conversation ini; bila belum ada, buat baru.
   let session;
   let created = false;
   try {
     session = await c.resumeSession(sessionId, {});
+    // Sesi lama: perbarui thinking level / context tier untuk giliran ini.
+    if (tuning.reasoningEffort || tuning.contextTier) {
+      try {
+        await session.setModel(req.model, sdkTuning);
+      } catch {
+        /* model tak mendukung tuning — abaikan, pakai default */
+      }
+    }
   } catch {
     session = await c.createSession({
       sessionId,
       model: req.model,
       streaming: true,
+      ...sdkTuning,
       systemMessage: { content: sysExtra.length ? `${SYSTEM_MESSAGE}\n\n# Instruksi tambahan platform\n${sysExtra.join("\n\n")}` : SYSTEM_MESSAGE },
       // mode "empty" + tanpa tool: deny-by-default sesuai README.
       availableTools: [],
@@ -161,6 +218,24 @@ export async function* copilotChat(req: ChatRequest): ProviderGenerator {
     if (event.type === "assistant.message_delta") {
       queue.push({ kind: "text", text: event.data.deltaContent });
       notify();
+    } else if (event.type === "assistant.usage") {
+      // Pemakaian riil Copilot (nano-AIU) = satuan kredit yang dipotong.
+      const d = event.data as {
+        copilotUsage?: { totalNanoAiu?: number };
+        cost?: number;
+        inputTokens?: number;
+        outputTokens?: number;
+      };
+      const nanoAiu = d.copilotUsage?.totalNanoAiu;
+      if (typeof nanoAiu === "number" && nanoAiu > 0) {
+        queue.push({
+          kind: "usage",
+          nanoAiu,
+          ...(typeof d.inputTokens === "number" ? { inputTokens: d.inputTokens } : {}),
+          ...(typeof d.outputTokens === "number" ? { outputTokens: d.outputTokens } : {}),
+        });
+        notify();
+      }
     } else if (event.type === "session.error") {
       const data = event.data as { message?: string };
       failure = new Error(data.message ?? "Copilot session error");

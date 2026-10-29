@@ -17,9 +17,9 @@ import { isDegenerate, trimDegenerate } from "@/server/degenerate";
 
 export const runtime = "nodejs";
 
-/** Kredit per panggilan: Copilot pakai pool Enterprise -> 1; model lokal gratis. */
-function creditCost(modelId: string): number {
-  return modelId.startsWith("copilot:") ? 1 : 0;
+/** Model berbayar (pool Copilot Enterprise) memotong kredit nano-AIU; lokal gratis. */
+function isBilled(modelId: string): boolean {
+  return modelId.startsWith("copilot:");
 }
 
 // Semua pemakaian gateway dicatat di SATU percakapan sentinel per user, supaya
@@ -77,8 +77,8 @@ export async function POST(req: Request) {
     }
   }
 
-  const cost = creditCost(modelId);
-  if (cost > 0 && me.creditBalance < cost) {
+  const billed = isBilled(modelId);
+  if (billed && me.creditBalance <= 0) {
     return err("Kredit habis — hubungi admin untuk menambah kredit", 402, "insufficient_quota");
   }
 
@@ -100,20 +100,18 @@ export async function POST(req: Request) {
     existing?.id ??
     (await db.conversation.create({ data: { userId: me.id, title: API_CONV_TITLE }, select: { id: true } })).id;
 
-  // WRITE-FIRST: catat pesan user + potong kredit dalam satu transaksi.
-  await db.$transaction([
-    db.message.create({
-      data: { conversationId: convId, role: "user", content: (lastUser?.content ?? "").slice(0, 2_000), model: modelId },
-    }),
-    db.user.update({
-      where: { id: me.id },
-      data: { creditBalance: { decrement: cost }, creditUsed: { increment: cost } },
-    }),
-  ]);
-  const refund = async () => {
-    if (cost > 0) {
+  // WRITE-FIRST: catat pesan user (kredit dipotong SETELAH jawaban, by nano-AIU).
+  await db.message.create({
+    data: { conversationId: convId, role: "user", content: (lastUser?.content ?? "").slice(0, 2_000), model: modelId },
+  });
+  // Akumulasi pemakaian nano-AIU riil Copilot lalu potong kredit (dibatasi saldo).
+  let usedNanoAiu = 0;
+  const chargeUsage = async () => {
+    if (!billed || usedNanoAiu <= 0) return;
+    const charge = Math.min(usedNanoAiu, Math.max(0, me.creditBalance));
+    if (charge > 0) {
       await db.user
-        .update({ where: { id: me.id }, data: { creditBalance: { increment: cost }, creditUsed: { decrement: cost } } })
+        .update({ where: { id: me.id }, data: { creditBalance: { decrement: charge }, creditUsed: { increment: charge } } })
         .catch(() => {});
     }
   };
@@ -151,6 +149,10 @@ export async function POST(req: Request) {
         try {
           chunk({ role: "assistant" });
           for await (const part of gen) {
+            if (part.kind === "usage") {
+              usedNanoAiu += part.nanoAiu;
+              continue;
+            }
             const text = part.kind === "text" ? part.text : `\n![${part.alt}](${part.url})\n`;
             if (!text) continue;
             acc += text;
@@ -206,9 +208,9 @@ export async function POST(req: Request) {
           ctrl.enqueue(enc.encode("data: [DONE]\n\n"));
           persistAssistant(acc);
         } catch (e) {
-          await refund();
           ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ error: { message: (e as Error).message || "gagal", type: "server_error" } })}\n\n`));
         } finally {
+          await chargeUsage();
           ctrl.close();
         }
       },
@@ -231,6 +233,10 @@ export async function POST(req: Request) {
   let degenerated = false;
   try {
     for await (const part of gen) {
+      if (part.kind === "usage") {
+        usedNanoAiu += part.nanoAiu;
+        continue;
+      }
       acc += part.kind === "text" ? part.text : `\n![${part.alt}](${part.url})\n`;
       if (acc.length - lastCheck > 300) {
         lastCheck = acc.length;
@@ -243,12 +249,13 @@ export async function POST(req: Request) {
     }
   } catch (e) {
     if (!degenerated) {
-      await refund();
+      await chargeUsage();
       return err((e as Error).message || "Gagal menghasilkan jawaban", 502, "server_error");
     }
   }
   if (degenerated) acc = trimDegenerate(acc);
   persistAssistant(acc);
+  await chargeUsage();
   if (tools.length > 0 && !degenerated) {
     const { content, calls } = extractToolCalls(acc);
     if (calls.length > 0) {

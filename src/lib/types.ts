@@ -13,6 +13,31 @@ export interface ModelDescriptor {
   note?: string;
   /** Freemium: model di luar paket akun — terlihat tapi tak bisa dipilih. */
   locked?: boolean;
+  /** Ukuran context window asli model (token); dari katalog Copilot. */
+  contextWindow?: number;
+  /** True bila model mendukung pengaturan thinking level (reasoningEffort). */
+  supportsReasoning?: boolean;
+  /** Daftar level thinking yang didukung model (dari katalog Copilot). */
+  reasoningEfforts?: string[];
+  /** Multiplier biaya Copilot relatif ke base rate (untuk info kredit). */
+  costMultiplier?: number;
+  /** Rincian harga kredit per batch token (input/output/cache), tier default. */
+  pricing?: {
+    /** Jumlah token per batch penagihan (biasanya 1.000.000). */
+    batchSize?: number;
+    input?: number;
+    output?: number;
+    cacheRead?: number;
+    cacheWrite?: number;
+  };
+  /** Harga kredit untuk tier long-context (bila berbeda dari default). */
+  pricingLongContext?: {
+    batchSize?: number;
+    input?: number;
+    output?: number;
+    cacheRead?: number;
+    cacheWrite?: number;
+  };
 }
 
 export interface ProjectSummary {

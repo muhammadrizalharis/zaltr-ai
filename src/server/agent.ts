@@ -55,6 +55,7 @@ async function callModel(
   history: HistoryItem[],
   conversationId: string,
   signal: AbortSignal,
+  onUsage?: (nanoAiu: number) => void,
 ): Promise<string> {
   let out = "";
   let lastCheck = 0;
@@ -65,6 +66,7 @@ async function callModel(
   try {
     for await (const part of dispatch(modelId, { history, conversationId, signal: ac.signal })) {
       if (part.kind === "text") out += part.text;
+      else if (part.kind === "usage") onUsage?.(part.nanoAiu);
       else out += `\n![${part.alt}](${part.url})\n`;
       if (out.length - lastCheck > 300) {
         lastCheck = out.length;
@@ -135,7 +137,9 @@ async function readDrive(link: string): Promise<string> {
   return parts.join("\n\n").slice(0, 12_000) || "(kosong)";
 }
 
-export type AgentChunk = { kind: "progress" | "final"; text: string };
+export type AgentChunk =
+  | { kind: "progress" | "final"; text: string }
+  | { kind: "usage"; nanoAiu: number };
 
 export async function* runAgent(opts: {
   modelId: string;
@@ -153,6 +157,11 @@ export async function* runAgent(opts: {
   const base = `agent-${randomUUID()}`;
   const attachmentKeys = opts.attachmentKeys ?? [];
   const produced = new Map<string, { path: string; url: string }>();
+  // Akumulasi pemakaian nano-AIU riil Copilot lintas langkah agen (untuk potong kredit).
+  let usedNanoAiu = 0;
+  const addUsage = (n: number) => {
+    usedNanoAiu += n;
+  };
 
   // Konteks workspace awal: berkas input + hasil sebelumnya (agar model tahu nama berkas).
   let wsNote = "";
@@ -188,7 +197,7 @@ export async function* runAgent(opts: {
   for (let step = 0; step < maxSteps; step++) {
     // Sesi model EPHEMERAL per langkah (id unik) -> selalu kirim riwayat penuh,
     // tak mengotori sesi Copilot percakapan asli.
-    const reply = await callModel(opts.modelId, history, `${base}-${step}`, opts.signal);
+    const reply = await callModel(opts.modelId, history, `${base}-${step}`, opts.signal, addUsage);
     const shellM = reply.match(/^\s*AKSI:\s*shell\s+([\s\S]+)$/im);
     const codeM = reply.match(/^\s*AKSI:\s*kode\s+([\s\S]+)$/im);
     const writeM = reply.match(/^\s*AKSI:\s*tulis\s+(\S+)(?:\\n|\n)([\s\S]*)$/im);
@@ -304,6 +313,7 @@ export async function* runAgent(opts: {
     }
 
     // Tidak ada aksi -> ini jawaban final.
+    if (usedNanoAiu > 0) yield { kind: "usage", nanoAiu: usedNanoAiu };
     yield { kind: "final", text: reply + filesFooter(produced) };
     return;
   }
@@ -314,7 +324,9 @@ export async function* runAgent(opts: {
     [...history, { role: "user", content: "Cukup. Berikan JAWABAN final untuk pengguna sekarang, tanpa AKSI." }],
     `${base}-final`,
     opts.signal,
+    addUsage,
   );
+  if (usedNanoAiu > 0) yield { kind: "usage", nanoAiu: usedNanoAiu };
   yield { kind: "final", text: finalReply + filesFooter(produced) };
 }
 
