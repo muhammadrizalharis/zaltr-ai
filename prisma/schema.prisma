@@ -20,9 +20,10 @@ model User {
   avatarUrl     String?
   role          String    @default("user") // superadmin | admin | user
   status        String    @default("pending") // pending | active | suspended
-  // Kredit internal zaltr (dipotong oleh provider berbayar, mis. Copilot).
-  creditBalance Int       @default(0)
-  creditUsed    Int       @default(0)
+  // Kredit internal calyzr dalam satuan nano-AIU Copilot (mirror metering asli,
+  // bisa pecahan mis. 483697.5). Dipotong oleh provider berbayar (Copilot).
+  creditBalance Float     @default(0)
+  creditUsed    Float     @default(0)
   // Masa aktif paket: kredit hangus jadi 0 setelah tanggal ini (diisi saat admin beri kredit).
   creditsExpireAt DateTime?
   // Penanda pengingat masa aktif (H-3) sudah dikirim utk siklus ini; di-reset saat top-up.

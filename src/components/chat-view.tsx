@@ -74,6 +74,8 @@ export function ChatView({
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [model, setModel] = useState(DEFAULT_MODEL);
+  const [reasoningEffort, setReasoningEffort] = useState<string | null>(null);
+  const [contextTier, setContextTier] = useState<"default" | "long_context">("default");
   const [streamText, setStreamText] = useState<string | null>(null);
   const [steps, setSteps] = useState<string[]>([]);
   const [filesKey, setFilesKey] = useState(0);
@@ -405,6 +407,8 @@ export function ChatView({
           regenerate,
           ...(agentMode ? { agent: true } : {}),
           ...(parafrase ? { paraphrase: parafrase } : {}),
+          ...(reasoningEffort ? { reasoningEffort } : {}),
+          ...(contextTier === "long_context" ? { contextTier } : {}),
         }),
         signal: controller.signal,
       });
@@ -603,7 +607,15 @@ export function ChatView({
         </div>
       )}
       <div className="flex shrink-0 items-center justify-end border-b border-line/70 bg-panel/40 px-4 py-2 backdrop-blur">
-        <ModelPicker value={model} onChange={setModel} disabled={streaming} />
+        <ModelPicker
+          value={model}
+          onChange={setModel}
+          disabled={streaming}
+          reasoningEffort={reasoningEffort}
+          onReasoningEffort={setReasoningEffort}
+          contextTier={contextTier}
+          onContextTier={setContextTier}
+        />
       </div>
 
       <div

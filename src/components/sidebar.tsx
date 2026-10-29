@@ -386,7 +386,7 @@ export function Sidebar({
           <div className="min-w-0">
             <p className="truncate text-xs font-medium text-ink">{user.name}</p>
             <p className="text-[10px] uppercase tracking-wider">
-              {user.role} · {user.creditBalance.toLocaleString("id-ID")} kredit
+              {user.role} · {Math.round(user.creditBalance).toLocaleString("id-ID")} kredit
             </p>
           </div>
           <button

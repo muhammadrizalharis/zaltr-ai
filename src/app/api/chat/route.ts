@@ -38,9 +38,9 @@ import type { StreamLine } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-/** Kredit per pesan: Copilot memakai pool Enterprise -> 1 kredit; lokal gratis. */
-function creditCost(modelId: string): number {
-  return modelId.startsWith("copilot:") ? 1 : 0;
+/** Model berbayar (pool Copilot Enterprise) memotong kredit nano-AIU; lokal gratis. */
+function isBilled(modelId: string): boolean {
+  return modelId.startsWith("copilot:");
 }
 
 const bodySchema = z.object({
@@ -55,6 +55,10 @@ const bodySchema = z.object({
   regenerate: z.boolean().optional(),
   /** Mode agen: model boleh memakai alat (web/kode) beruntun. */
   agent: z.boolean().optional(),
+  /** Thinking level (hanya model yang mendukung reasoningEffort). */
+  reasoningEffort: z.enum(["none", "low", "medium", "high", "xhigh", "max"]).optional(),
+  /** Mode context panjang. */
+  contextTier: z.enum(["default", "long_context"]).optional(),
 });
 
 export const POST = guarded(async (req: Request) => {
@@ -63,7 +67,7 @@ export const POST = guarded(async (req: Request) => {
   if (!parsed.success) {
     return Response.json({ error: "Payload tidak valid" }, { status: 400 });
   }
-  const { conversationId, modelId, web, regenerate, agent } = parsed.data;
+  const { conversationId, modelId, web, regenerate, agent, reasoningEffort, contextTier } = parsed.data;
   let content = parsed.data.content;
   if (!regenerate && !content) {
     return Response.json({ error: "Pesan kosong" }, { status: 400 });
@@ -98,8 +102,12 @@ export const POST = guarded(async (req: Request) => {
       );
     }
   }
-  const cost = creditCost(modelId);
-  if (cost > 0 && me.creditBalance < cost) {
+  // Model berbayar butuh saldo > 0. Saat saldo habis, gating di auth.ts sudah
+  // menyingkirkan model premium dari allowedModels (otomatis jatuh ke Ollama),
+  // tapi cek ini jadi pertahanan tambahan. Potongan riil dilakukan SETELAH
+  // jawaban selesai, berdasarkan nano-AIU aktual dari provider.
+  const billed = isBilled(modelId);
+  if (billed && me.creditBalance <= 0) {
     return Response.json(
       { error: "Kredit habis — hubungi admin untuk menambah kredit" },
       { status: 402 },
@@ -115,7 +123,8 @@ export const POST = guarded(async (req: Request) => {
   }
 
   // WRITE-FIRST (kontrak README): prompt tersimpan durable SEBELUM provider jalan.
-  // Kredit dipotong pada transaksi yang sama; refund otomatis bila provider failed.
+  // Kredit TIDAK dipotong di muka — potongan nano-AIU riil dilakukan setelah
+  // jawaban selesai (lihat akumulasi usage di stream).
   // Mode regenerate: TIDAK membuat pesan user baru — pakai pesan user terakhir.
   let userMessageId: string;
   let title = conversation.title;
@@ -131,10 +140,6 @@ export const POST = guarded(async (req: Request) => {
     }
     userMessageId = lastUser.id;
     content = lastUser.content;
-    await db.user.update({
-      where: { id: me.id },
-      data: { creditBalance: { decrement: cost }, creditUsed: { increment: cost } },
-    });
   } else {
     title =
       conversation.title === "Chat baru"
@@ -146,10 +151,6 @@ export const POST = guarded(async (req: Request) => {
         select: { id: true },
       }),
       db.conversation.update({ where: { id: conversationId }, data: { title } }),
-      db.user.update({
-        where: { id: me.id },
-        data: { creditBalance: { decrement: cost }, creditUsed: { increment: cost } },
-      }),
     ]);
     userMessageId = userMessage.id;
     // Memori antar-percakapan: ekstrak fakta personal (async, gratis via Ollama).
@@ -552,6 +553,7 @@ export const POST = guarded(async (req: Request) => {
       if (peringatan) send({ type: "error", message: peringatan });
 
       let acc = "";
+      let usedNanoAiu = 0;
       let status: "completed" | "stopped" | "failed" = "completed";
       let errorMessage = "";
       try {
@@ -575,6 +577,8 @@ export const POST = guarded(async (req: Request) => {
             if (chunk.kind === "final") {
               acc += chunk.text;
               send({ type: "delta", text: chunk.text });
+            } else if (chunk.kind === "usage") {
+              usedNanoAiu += chunk.nanoAiu;
             } else {
               send({ type: "step", text: chunk.text.replace(/\s+/g, " ").trim() });
             }
@@ -584,11 +588,16 @@ export const POST = guarded(async (req: Request) => {
             history: providerHistory,
             conversationId,
             signal,
+            ...(reasoningEffort ? { reasoningEffort } : {}),
+            ...(contextTier ? { contextTier } : {}),
           });
           for await (const part of gen) {
             if (part.kind === "text") {
               acc += part.text;
               send({ type: "delta", text: part.text });
+            } else if (part.kind === "usage") {
+              // Pemakaian riil Copilot (nano-AIU) — diakumulasi untuk potong kredit.
+              usedNanoAiu += part.nanoAiu;
             } else {
               // Gambar sudah dipersistenkan ke MinIO oleh provider;
               // simpan sebagai markdown agar ikut kontrak "chat = markdown".
@@ -612,14 +621,8 @@ export const POST = guarded(async (req: Request) => {
 
       // Sebagian model (mis. varian preview) menutup stream tanpa mengirim satu
       // token pun. Itu kegagalan, bukan jawaban: jangan simpan pesan kosong dan
-      // jangan tagih kredit — dulu ini muncul sebagai gelembung jawaban kosong.
+      // jangan tagih kredit (nano-AIU tidak dipotong karena tak ada jawaban).
       if (!acc.trim()) {
-        if (cost > 0) {
-          await db.user.update({
-            where: { id: me.id },
-            data: { creditBalance: { increment: cost }, creditUsed: { decrement: cost } },
-          });
-        }
         if (status !== "stopped") {
           send({
             type: "error",
@@ -632,6 +635,18 @@ export const POST = guarded(async (req: Request) => {
         endRun(runId);
         if (!clientGone) controller.close();
         return;
+      }
+
+      // Potong kredit = pemakaian nano-AIU riil Copilot (mirror metering asli).
+      // Lokal/gratis: usedNanoAiu = 0 -> tak terpotong. Dibatasi agar tak minus.
+      if (billed && usedNanoAiu > 0) {
+        const charge = Math.min(usedNanoAiu, Math.max(0, me.creditBalance));
+        if (charge > 0) {
+          await db.user.update({
+            where: { id: me.id },
+            data: { creditBalance: { decrement: charge }, creditUsed: { increment: charge } },
+          });
+        }
       }
 
       const assistant = await db.message.create({
@@ -659,13 +674,6 @@ export const POST = guarded(async (req: Request) => {
             data: { title: judulBaru },
           });
         }
-      }
-      // Provider gagal bukan salah user — kembalikan kreditnya.
-      if (status === "failed" && cost > 0) {
-        await db.user.update({
-          where: { id: me.id },
-          data: { creditBalance: { increment: cost }, creditUsed: { decrement: cost } },
-        });
       }
 
       send({ type: "done", messageId: assistant.id, content: acc, status });
