@@ -606,7 +606,7 @@ export function ChatView({
           <p className="text-xs text-muted">Gambar, PDF, Word, Excel, kode — maks {MAX_FILES} berkas · {MAX_UPLOAD_MB} MB/berkas</p>
         </div>
       )}
-      <div className="flex shrink-0 items-center justify-end border-b border-line/70 bg-panel/40 px-4 py-2 backdrop-blur">
+      <div className="relative z-30 flex shrink-0 items-center justify-end border-b border-line/70 bg-panel/40 px-4 py-2 backdrop-blur">
         <ModelPicker
           value={model}
           onChange={setModel}
