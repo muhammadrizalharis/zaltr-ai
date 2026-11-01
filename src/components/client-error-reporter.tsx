@@ -17,6 +17,8 @@ export function ClientErrorReporter() {
       if (!message) return;
       // Abaikan noise dari ekstensi browser (di luar kendali kita).
       if (/chrome-extension:\/\/|moz-extension:\/\//.test(message + (stack || ""))) return;
+      // Abaikan warning jinak ResizeObserver (spurious, bukan bug nyata).
+      if (/ResizeObserver loop/i.test(message)) return;
       const sig = kind + "|" + message.slice(0, 120);
       if (seen.has(sig) || sent >= MAX) return;
       seen.add(sig);
