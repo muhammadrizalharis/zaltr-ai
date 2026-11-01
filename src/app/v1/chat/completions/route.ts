@@ -78,7 +78,7 @@ export async function POST(req: Request) {
   }
 
   const billed = isBilled(modelId);
-  if (billed && me.creditBalance <= 0) {
+  if (billed && me.role !== "superadmin" && me.creditBalance <= 0) {
     return err("Kredit habis — hubungi admin untuk menambah kredit", 402, "insufficient_quota");
   }
 
@@ -107,7 +107,7 @@ export async function POST(req: Request) {
   // Akumulasi pemakaian nano-AIU riil Copilot lalu potong kredit (dibatasi saldo).
   let usedNanoAiu = 0;
   const chargeUsage = async () => {
-    if (!billed || usedNanoAiu <= 0) return;
+    if (!billed || me.role === "superadmin" || usedNanoAiu <= 0) return;
     const charge = Math.min(usedNanoAiu, Math.max(0, me.creditBalance));
     if (charge > 0) {
       await db.user

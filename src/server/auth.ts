@@ -112,8 +112,16 @@ export interface SessionUser {
  * (2) bila kredit <= 0 (habis/hangus) -> hanya model gratis (FREE_MODELS) yang terbuka.
  */
 export function applyAccessPolicy<
-  T extends { id: string; creditBalance: number; creditsExpireAt: Date | null; allowedModels: string[] },
+  T extends {
+    id: string;
+    role?: string;
+    creditBalance: number;
+    creditsExpireAt: Date | null;
+    allowedModels: string[];
+  },
 >(u: T): T {
+  // Superadmin: kredit tak terbatas, akses penuh — tak pernah dihanguskan/dikunci.
+  if (u.role === "superadmin") return u;
   if (u.creditsExpireAt && u.creditsExpireAt.getTime() <= Date.now() && u.creditBalance > 0) {
     // Masa aktif habis -> hangus. Persist best-effort (tak memblok request).
     void db.user.update({ where: { id: u.id }, data: { creditBalance: 0 } }).catch(() => {});

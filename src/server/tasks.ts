@@ -25,10 +25,10 @@ export async function runTask(taskId: string): Promise<{ ok: boolean; conversati
   if (!task) return { ok: false, note: "tugas tidak ada" };
   const user = await db.user.findUnique({
     where: { id: task.userId },
-    select: { status: true, creditBalance: true },
+    select: { status: true, role: true, creditBalance: true },
   });
   if (!user || user.status !== "active") return { ok: false, note: "user tidak aktif" };
-  const cost = creditCost(task.model);
+  const cost = user.role === "superadmin" ? 0 : creditCost(task.model);
   if (cost > 0 && user.creditBalance < cost) {
     await db.scheduledTask.update({
       where: { id: taskId },
