@@ -14,6 +14,15 @@ type Assistant = {
 };
 type Form = { id?: string; name: string; description: string; instructions: string; model: string };
 
+type KSource = {
+  id: string;
+  name: string;
+  kind: string;
+  status: string;
+  chunkCount: number;
+  assistantId: string | null;
+};
+
 const EMPTY: Form = { name: "", description: "", instructions: "", model: "" };
 
 /** Kelola custom assistant (ala ChatGPT GPTs): instruksi + model preset. */
@@ -24,6 +33,8 @@ export function AssistantsView() {
   const [form, setForm] = useState<Form>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [sources, setSources] = useState<KSource[]>([]);
 
   async function load() {
     const [a, m] = await Promise.all([
@@ -36,6 +47,52 @@ export function AssistantsView() {
   useEffect(() => {
     void load();
   }, []);
+
+  async function loadSources(assistantId: string) {
+    try {
+      const data = await fetch("/api/knowledge").then((r) => r.json());
+      const all: KSource[] = data.sources ?? [];
+      setSources(all.filter((s) => s.assistantId === assistantId));
+    } catch {
+      setSources([]);
+    }
+  }
+  useEffect(() => {
+    if (form.id) void loadSources(form.id);
+    else setSources([]);
+  }, [form.id]);
+
+  /** Unggah tiap berkas ke MinIO lalu indeks sebagai knowledge asisten. */
+  async function attachFiles(assistantId: string): Promise<string | null> {
+    if (files.length === 0) return null;
+    let indexed = 0;
+    let totalChunks = 0;
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append("file", file);
+      const up = await fetch("/api/uploads", { method: "POST", body: fd }).then((r) => r.json());
+      const key = up.files?.[0]?.key;
+      if (!key) throw new Error(up.error ?? `Unggah ${file.name} gagal`);
+      const res = await fetch("/api/knowledge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "upload", key, assistantId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `Gagal mengindeks ${file.name}`);
+      indexed += (data.sources ?? []).length;
+      totalChunks += (data.sources ?? []).reduce(
+        (a: number, b: { chunkCount: number }) => a + b.chunkCount,
+        0,
+      );
+    }
+    return `${indexed} berkas, ${totalChunks} potongan terindeks.`;
+  }
+
+  async function delSource(id: string) {
+    const res = await fetch(`/api/knowledge/${id}`, { method: "DELETE" });
+    if (res.ok) setSources((prev) => prev.filter((s) => s.id !== id));
+  }
 
   async function save() {
     if (!form.name.trim()) {
@@ -61,14 +118,27 @@ export function AssistantsView() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-    setBusy(false);
-    if (res.ok) {
-      setForm(EMPTY);
-      setNotice("Tersimpan.");
-      await load();
-    } else {
+    if (!res.ok) {
+      setBusy(false);
       setNotice("Gagal menyimpan.");
+      return;
     }
+    const assistantId = form.id ?? (await res.json().catch(() => ({})))?.assistant?.id;
+    try {
+      if (assistantId && files.length > 0) {
+        setNotice(`Mengunggah ${files.length} berkas…`);
+        const fileNote = await attachFiles(assistantId);
+        setNotice(fileNote ? `Tersimpan. ${fileNote}` : "Tersimpan.");
+      } else {
+        setNotice("Tersimpan.");
+      }
+    } catch (e) {
+      setNotice(`Asisten tersimpan, tetapi unggahan gagal: ${(e as Error).message}`);
+    }
+    setBusy(false);
+    setForm(EMPTY);
+    setFiles([]);
+    await load();
   }
 
   async function del(id: string) {
@@ -132,6 +202,79 @@ export function AssistantsView() {
             </option>
           ))}
         </select>
+
+        <div className="space-y-2 rounded-xl border border-dashed border-line bg-panel-2/40 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">Berkas pengetahuan (opsional)</span>
+            <label className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-xs text-muted hover:text-ink">
+              + Tambah berkas
+              <input
+                type="file"
+                multiple
+                onChange={(e) => {
+                  const picked = Array.from(e.target.files ?? []);
+                  if (picked.length) setFiles((prev) => [...prev, ...picked]);
+                  e.target.value = "";
+                }}
+                className="hidden"
+              />
+            </label>
+          </div>
+          <p className="text-xs text-muted">
+            Markdown, PDF, DOCX, PPTX, XLSX, CSV, TXT, kode, dll. Asisten akan menjawab berdasarkan
+            isi berkas (RAG).
+          </p>
+          {files.length > 0 && (
+            <ul className="space-y-1">
+              {files.map((f, i) => (
+                <li
+                  key={`${f.name}-${i}`}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-panel-2 px-2.5 py-1.5 text-xs"
+                >
+                  <span className="min-w-0 truncate">
+                    {f.name} <span className="text-muted">· {(f.size / 1024).toFixed(0)} KB</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="shrink-0 text-muted hover:text-red-400"
+                  >
+                    Hapus
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {form.id && sources.length > 0 && (
+            <div className="space-y-1 border-t border-line pt-2">
+              <span className="text-xs text-muted">Sudah terlampir:</span>
+              <ul className="space-y-1">
+                {sources.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-panel-2 px-2.5 py-1.5 text-xs"
+                  >
+                    <span className="min-w-0 truncate">
+                      {s.name}{" "}
+                      <span className="text-muted">
+                        · {s.chunkCount} potongan
+                        {s.status !== "indexed" ? ` · ${s.status}` : ""}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void delSource(s.id)}
+                      className="shrink-0 text-muted hover:text-red-400"
+                    >
+                      Hapus
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center gap-3">
           <button
             onClick={() => void save()}
@@ -142,7 +285,10 @@ export function AssistantsView() {
           </button>
           {form.id && (
             <button
-              onClick={() => setForm(EMPTY)}
+              onClick={() => {
+                setForm(EMPTY);
+                setFiles([]);
+              }}
               className="rounded-xl border border-line px-3 py-2 text-sm text-muted hover:text-ink"
             >
               Batal
@@ -180,15 +326,16 @@ export function AssistantsView() {
                       Mulai chat
                     </button>
                     <button
-                      onClick={() =>
+                      onClick={() => {
+                        setFiles([]);
                         setForm({
                           id: a.id,
                           name: a.name,
                           description: a.description ?? "",
                           instructions: a.instructions ?? "",
                           model: a.model ?? "",
-                        })
-                      }
+                        });
+                      }}
                       className="text-xs text-muted hover:text-ink"
                     >
                       Ubah
