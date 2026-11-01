@@ -30,6 +30,50 @@ type UploadResp = {
   error?: string;
 };
 
+/**
+ * Ubah tabel HTML (mis. hasil salin dari Word/Excel/web) menjadi tabel Markdown
+ * GFM, supaya saat ditempel di kolom pesan tetap tampil sebagai tabel. Mengambil
+ * hanya tabel PERTAMA bila ada beberapa; mengembalikan null bila tak ada tabel.
+ */
+function htmlTableToMarkdown(html: string): string | null {
+  if (!html || !/<table[\s>]/i.test(html)) return null;
+  let doc: Document;
+  try {
+    doc = new DOMParser().parseFromString(html, "text/html");
+  } catch {
+    return null;
+  }
+  const table = doc.querySelector("table");
+  if (!table) return null;
+
+  const cellText = (el: Element) =>
+    (el.textContent || "")
+      .replace(/\s+/g, " ")
+      .replace(/\|/g, "\\|") // lindungi pemisah kolom markdown
+      .trim();
+
+  const rows: string[][] = [];
+  for (const tr of Array.from(table.querySelectorAll("tr"))) {
+    const cells = Array.from(tr.querySelectorAll("th,td"));
+    if (cells.length === 0) continue;
+    rows.push(cells.map(cellText));
+  }
+  if (rows.length === 0) return null;
+
+  const cols = Math.max(...rows.map((r) => r.length));
+  const pad = (r: string[]) => {
+    const c = r.slice(0, cols);
+    while (c.length < cols) c.push("");
+    return c;
+  };
+
+  const header = pad(rows[0]);
+  const body = rows.slice(1).map(pad);
+  const line = (r: string[]) => `| ${r.join(" | ")} |`;
+  const sep = `| ${Array(cols).fill("---").join(" | ")} |`;
+  return [line(header), sep, ...body.map(line)].join("\n");
+}
+
 /** Upload via XHR agar dapat progres unggah (fetch tidak memberi progres). */
 function uploadFiles(files: File[], onProgress: (pct: number) => void): Promise<UploadResp> {
   return new Promise((resolve, reject) => {
@@ -960,6 +1004,28 @@ export function ChatView({
                 el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
               }}
               onKeyDown={onKeyDown}
+              onPaste={(e) => {
+                const html = e.clipboardData.getData("text/html");
+                const md = htmlTableToMarkdown(html);
+                if (!md) return; // bukan tabel -> biarkan tempel teks biasa
+                e.preventDefault();
+                const el = e.currentTarget;
+                const start = el.selectionStart ?? draft.length;
+                const end = el.selectionEnd ?? draft.length;
+                // Pastikan tabel berdiri sendiri (baris kosong sebelum & sesudah).
+                const before = draft.slice(0, start);
+                const after = draft.slice(end);
+                const pre = before && !before.endsWith("\n\n") ? (before.endsWith("\n") ? "\n" : "\n\n") : "";
+                const post = after && !after.startsWith("\n") ? "\n\n" : after ? "\n" : "";
+                const next = before + pre + md + post + after;
+                setDraft(next);
+                requestAnimationFrame(() => {
+                  el.style.height = "auto";
+                  el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+                  const caret = (before + pre + md).length;
+                  el.selectionStart = el.selectionEnd = caret;
+                });
+              }}
               rows={1}
               placeholder="Tulis pesan… (Enter kirim, Shift+Enter baris baru)"
               className="max-h-52 w-full resize-none bg-transparent px-3 py-2.5 text-base outline-none placeholder:text-muted md:text-sm"
