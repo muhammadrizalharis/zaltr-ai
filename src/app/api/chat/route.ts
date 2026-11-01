@@ -107,7 +107,8 @@ export const POST = guarded(async (req: Request) => {
   // tapi cek ini jadi pertahanan tambahan. Potongan riil dilakukan SETELAH
   // jawaban selesai, berdasarkan nano-AIU aktual dari provider.
   const billed = isBilled(modelId);
-  if (billed && me.creditBalance <= 0) {
+  const unlimited = me.role === "superadmin";
+  if (billed && !unlimited && me.creditBalance <= 0) {
     return Response.json(
       { error: "Kredit habis — hubungi admin untuk menambah kredit" },
       { status: 402 },
@@ -639,7 +640,7 @@ export const POST = guarded(async (req: Request) => {
 
       // Potong kredit = pemakaian nano-AIU riil Copilot (mirror metering asli).
       // Lokal/gratis: usedNanoAiu = 0 -> tak terpotong. Dibatasi agar tak minus.
-      if (billed && usedNanoAiu > 0) {
+      if (billed && !unlimited && usedNanoAiu > 0) {
         const charge = Math.min(usedNanoAiu, Math.max(0, me.creditBalance));
         if (charge > 0) {
           await db.user.update({
