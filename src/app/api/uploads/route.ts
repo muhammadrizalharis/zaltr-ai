@@ -46,6 +46,7 @@ export const POST = guarded(async (req: Request) => {
   const written: string[] = [];
   const saved: Array<{
     url: string;
+    key: string;
     name: string;
     size: number;
     type: string;
@@ -96,7 +97,7 @@ export const POST = guarded(async (req: Request) => {
         },
       });
       if (!ephemeral) usage += file.size;
-      saved.push({ url: `/api/files/${key}`, name: file.name, size: file.size, type, ephemeral });
+      saved.push({ url: `/api/files/${key}`, key, name: file.name, size: file.size, type, ephemeral });
     }
   } catch {
     await rollback();

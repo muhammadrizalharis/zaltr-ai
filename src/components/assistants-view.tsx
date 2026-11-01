@@ -71,7 +71,10 @@ export function AssistantsView() {
       const fd = new FormData();
       fd.append("file", file);
       const up = await fetch("/api/uploads", { method: "POST", body: fd }).then((r) => r.json());
-      const key = up.files?.[0]?.key;
+      const entry = up.files?.[0];
+      const key: string =
+        entry?.key ??
+        (typeof entry?.url === "string" ? entry.url.replace(/^\/api\/files\//, "") : "");
       if (!key) throw new Error(up.error ?? `Unggah ${file.name} gagal`);
       const res = await fetch("/api/knowledge", {
         method: "POST",
