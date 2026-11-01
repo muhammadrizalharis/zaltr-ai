@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { rateLimit } from "@/server/ratelimit";
 import { notifyTelegram } from "@/server/notify";
+import { getSessionUser } from "@/server/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,15 +33,26 @@ export async function POST(req: Request) {
     const stack = clip(body.stack, 1000);
     const kind = clip(body.kind, 40) || "error";
     const ua = clip(h.get("user-agent"), 200);
+
+    // Identitas pelapor (best-effort via cookie sesi) supaya tahu SIAPA yang
+    // mengalami error. Gagal resolve -> "anonim" (mis. belum login).
+    let who = "anonim";
+    try {
+      const me = await getSessionUser();
+      if (me) who = `${me.name || me.email} <${me.email}> (${me.role})`;
+    } catch {
+      /* tak ada sesi valid -> biarkan anonim */
+    }
+
     console.error(
-      `[client-error] kind=${kind} ip=${ip} url=${url} ua="${ua}" msg="${message}"` +
+      `[client-error] kind=${kind} user="${who}" ip=${ip} url=${url} ua="${ua}" msg="${message}"` +
         (stack ? ` stack="${stack}"` : ""),
     );
     // Alert ke Telegram untuk error nyata (bukan uji), di-throttle per pesan.
     if (kind !== "test") {
       void notifyTelegram(
-        `\u26a0\ufe0f Error klien\n${kind}: ${message}\nurl=${url}\nua=${ua}`,
-        { key: `clienterr:${message.slice(0, 60)}`, cooldownMs: 600_000 },
+        `\u26a0\ufe0f Error klien\n\ud83d\udc64 ${who}\n${kind}: ${message}\nurl=${url}\nua=${ua}`,
+        { key: `clienterr:${who}:${message.slice(0, 60)}`, cooldownMs: 600_000 },
       );
     }
   } catch {
