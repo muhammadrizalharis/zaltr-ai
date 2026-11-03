@@ -30,13 +30,111 @@ type UploadResp = {
   error?: string;
 };
 
+/** Simbol Unicode umum di rumus -> perintah LaTeX (agar KaTeX merender benar). */
+const MATH_SYM: Record<string, string> = {
+  "μ": "\\mu", "σ": "\\sigma", "α": "\\alpha", "β": "\\beta", "γ": "\\gamma",
+  "δ": "\\delta", "ε": "\\epsilon", "θ": "\\theta", "λ": "\\lambda", "π": "\\pi",
+  "ρ": "\\rho", "τ": "\\tau", "φ": "\\phi", "ϕ": "\\phi", "χ": "\\chi", "ψ": "\\psi",
+  "ω": "\\omega", "Γ": "\\Gamma", "Δ": "\\Delta", "Θ": "\\Theta", "Λ": "\\Lambda",
+  "Σ": "\\Sigma", "Φ": "\\Phi", "Ω": "\\Omega", "∞": "\\infty", "∑": "\\sum",
+  "∏": "\\prod", "∫": "\\int", "∂": "\\partial", "∇": "\\nabla", "√": "\\sqrt",
+  "×": "\\times", "÷": "\\div", "±": "\\pm", "∓": "\\mp", "·": "\\cdot",
+  "≤": "\\leq", "≥": "\\geq", "≠": "\\neq", "≈": "\\approx", "≡": "\\equiv",
+  "∈": "\\in", "∉": "\\notin", "⊂": "\\subset", "⊆": "\\subseteq", "∪": "\\cup",
+  "∩": "\\cap", "→": "\\to", "⇒": "\\Rightarrow", "←": "\\leftarrow", "↔": "\\leftrightarrow",
+  "∀": "\\forall", "∃": "\\exists", "∅": "\\emptyset", "−": "-", "⋅": "\\cdot",
+};
+function mathEsc(t: string): string {
+  let s = "";
+  for (const ch of (t || "").trim()) s += MATH_SYM[ch] ?? ch;
+  return s;
+}
+/** localName tanpa prefix namespace (mis. "m:sSub" -> "ssub"), huruf kecil. */
+const localName = (el: Element) =>
+  (el.localName || el.tagName || "").toLowerCase().replace(/^[a-z]+:/, "");
+const childByName = (el: Element, name: string) =>
+  Array.from(el.children).find((c) => localName(c) === name) || null;
+
+/** Office Math (OMML, dari Word) -> LaTeX. Best-effort untuk konstruksi umum. */
+function ommlToLatex(node: Element): string {
+  let out = "";
+  for (const c of Array.from(node.childNodes)) {
+    if (c.nodeType !== Node.ELEMENT_NODE) continue;
+    const el = c as Element;
+    const n = localName(el);
+    if (n === "t") out += mathEsc(el.textContent || "");
+    else if (n === "f") {
+      const num = childByName(el, "num");
+      const den = childByName(el, "den");
+      out += `\\frac{${num ? ommlToLatex(num) : ""}}{${den ? ommlToLatex(den) : ""}}`;
+    } else if (n === "ssub") {
+      const e = childByName(el, "e"), sub = childByName(el, "sub");
+      out += `${e ? ommlToLatex(e) : ""}_{${sub ? ommlToLatex(sub) : ""}}`;
+    } else if (n === "ssup") {
+      const e = childByName(el, "e"), sup = childByName(el, "sup");
+      out += `${e ? ommlToLatex(e) : ""}^{${sup ? ommlToLatex(sup) : ""}}`;
+    } else if (n === "ssubsup") {
+      const e = childByName(el, "e"), sub = childByName(el, "sub"), sup = childByName(el, "sup");
+      out += `${e ? ommlToLatex(e) : ""}_{${sub ? ommlToLatex(sub) : ""}}^{${sup ? ommlToLatex(sup) : ""}}`;
+    } else if (n === "rad") {
+      const deg = childByName(el, "deg"), e = childByName(el, "e");
+      const base = e ? ommlToLatex(e) : "";
+      out += deg && deg.textContent ? `\\sqrt[${ommlToLatex(deg)}]{${base}}` : `\\sqrt{${base}}`;
+    } else if (n === "d") {
+      const parts = Array.from(el.children).filter((x) => localName(x) === "e").map(ommlToLatex);
+      out += `\\left(${parts.join(",")}\\right)`;
+    } else if (n === "nary") {
+      const op = childByName(el, "naryPr");
+      const sub = childByName(el, "sub"), sup = childByName(el, "sup"), e = childByName(el, "e");
+      const sym = mathEsc(op?.textContent || "∑");
+      out += sym + (sub ? `_{${ommlToLatex(sub)}}` : "") + (sup ? `^{${ommlToLatex(sup)}}` : "") + (e ? ommlToLatex(e) : "");
+    } else {
+      out += ommlToLatex(el); // r, e, num, den, sub, sup, deg, oMath, oMathPara, ...
+    }
+  }
+  return out;
+}
+
+/** MathML (<math>, dari web) -> LaTeX. Best-effort untuk konstruksi umum. */
+function mathmlToLatex(el: Element): string {
+  const n = localName(el);
+  const ch = el.children;
+  if (n === "mi" || n === "mn" || n === "mo" || n === "mtext") return mathEsc(el.textContent || "");
+  if (n === "mfrac") return `\\frac{${mathmlToLatex(ch[0])}}{${mathmlToLatex(ch[1])}}`;
+  if (n === "msup") return `${mathmlToLatex(ch[0])}^{${mathmlToLatex(ch[1])}}`;
+  if (n === "msub") return `${mathmlToLatex(ch[0])}_{${mathmlToLatex(ch[1])}}`;
+  if (n === "msubsup") return `${mathmlToLatex(ch[0])}_{${mathmlToLatex(ch[1])}}^{${mathmlToLatex(ch[2])}}`;
+  if (n === "msqrt") return `\\sqrt{${Array.from(ch).map(mathmlToLatex).join("")}}`;
+  if (n === "mroot") return `\\sqrt[${mathmlToLatex(ch[1])}]{${mathmlToLatex(ch[0])}}`;
+  if (n === "mfenced") return `\\left(${Array.from(ch).map(mathmlToLatex).join("")}\\right)`;
+  return Array.from(ch).map(mathmlToLatex).join(""); // mrow, math, semantics, mstyle, ...
+}
+
+/** True bila elemen (atau keturunannya) adalah rumus OMML/MathML. */
+function isMathEl(el: Element): boolean {
+  const n = localName(el);
+  return n === "omath" || n === "omathpara" || n === "math";
+}
+
+/** Ubah elemen rumus -> potongan LaTeX ber-delimiter $...$ (atau "" bila kosong). */
+function mathElToLatex(el: Element): string {
+  const n = localName(el);
+  const tex = (n === "math" ? mathmlToLatex(el) : ommlToLatex(el)).replace(/\s+/g, " ").trim();
+  return tex ? `$${tex}$` : "";
+}
+
 /** Ubah satu elemen <table> menjadi tabel Markdown GFM. */
 function tableElToMarkdown(table: Element): string | null {
-  const cellText = (el: Element) =>
-    (el.textContent || "")
+  const cellText = (el: Element) => {
+    // Rumus di dalam sel ikut dikonversi ke LaTeX sebelum diratakan.
+    el.querySelectorAll("*").forEach((d) => {
+      if (isMathEl(d)) d.replaceWith(table.ownerDocument.createTextNode(` ${mathElToLatex(d)} `));
+    });
+    return (el.textContent || "")
       .replace(/\s+/g, " ")
       .replace(/\|/g, "\\|") // lindungi pemisah kolom markdown
       .trim();
+  };
 
   const rows: string[][] = [];
   for (const tr of Array.from(table.querySelectorAll("tr"))) {
@@ -45,6 +143,14 @@ function tableElToMarkdown(table: Element): string | null {
     rows.push(cells.map(cellText));
   }
   if (rows.length === 0) return null;
+
+  // Tabel tata letak persamaan (mis. "rumus | (1)"): bukan tabel data sungguhan.
+  // Ciri: satu baris & kebanyakan sel kosong -> inline-kan isinya, jangan buat tabel.
+  const nonEmpty = rows.flat().filter((c) => c.trim().length > 0);
+  const looksLikeEquationLayout =
+    rows.length <= 2 && rows.every((r) => r.filter((c) => c.trim()).length <= 2) &&
+    rows.flat().some((c) => c.includes("$"));
+  if (looksLikeEquationLayout) return nonEmpty.join("  ");
 
   const cols = Math.max(...rows.map((r) => r.length));
   const pad = (r: string[]) => {
@@ -61,19 +167,41 @@ function tableElToMarkdown(table: Element): string | null {
 
 /**
  * Ubah HTML papan klip (hasil salin dari Word/Excel/web) menjadi Markdown yang
- * MEMPERTAHANKAN URUTAN: paragraf tetap jadi teks, tabel jadi tabel Markdown
- * GFM, dan keduanya tetap pada posisi semula. Mengembalikan null bila tak ada
- * tabel sama sekali (biar paste teks biasa berjalan normal).
+ * MEMPERTAHANKAN URUTAN: paragraf jadi teks, tabel jadi tabel Markdown GFM,
+ * rumus (OMML Word / MathML web) jadi LaTeX $...$. Mengembalikan null bila tak
+ * ada tabel MAUPUN rumus (biar paste teks biasa berjalan normal).
  */
-function htmlTableToMarkdown(html: string): string | null {
-  if (!html || !/<table[\s>]/i.test(html)) return null;
+function htmlClipboardToMarkdown(html: string): string | null {
+  if (!html) return null;
+  // Word menyimpan OMML di dalam komentar bersyarat MSO; buka pembungkusnya agar
+  // node rumus bisa diparse. Juga buang gambar/VML fallback persamaan Word
+  // supaya tidak muncul duplikat/placeholder gambar kosong.
+  const unwrapped = html
+    .replace(/<!--\[if[^\]]*\]>/gi, "")
+    .replace(/<!\[if[^\]]*\]>/gi, "")
+    .replace(/<!\[endif\]-->/gi, "")
+    .replace(/<!\[endif\]>/gi, "");
+
+  const hasTable = /<table[\s>]/i.test(unwrapped);
+  const hasMath = /<(m:oMath|math)[\s>]/i.test(unwrapped);
+  if (!hasTable && !hasMath) return null;
+
   let doc: Document;
   try {
-    doc = new DOMParser().parseFromString(html, "text/html");
+    doc = new DOMParser().parseFromString(unwrapped, "text/html");
   } catch {
     return null;
   }
-  if (!doc.querySelector("table")) return null;
+  // Buang gambar/VML persamaan Word (duplikat dari OMML yang sudah dibuka).
+  if (hasMath) {
+    try {
+      doc
+        .querySelectorAll("v\\:shape, v\\:shapetype, v\\:group, o\\:OLEObject, img[v\\:shapes]")
+        .forEach((e) => e.remove());
+    } catch {
+      /* selektor namespaced tak didukung -> abaikan */
+    }
+  }
 
   const BLOCK = new Set([
     "P", "DIV", "SECTION", "ARTICLE", "BLOCKQUOTE", "PRE",
@@ -89,10 +217,15 @@ function htmlTableToMarkdown(html: string): string | null {
       }
       if (child.nodeType !== Node.ELEMENT_NODE) return;
       const el = child as Element;
+      if (isMathEl(el)) {
+        const tex = mathElToLatex(el);
+        if (tex) out += ` ${tex} `;
+        return;
+      }
       const tag = el.tagName;
       if (tag === "TABLE") {
         const md = tableElToMarkdown(el);
-        if (md) out += `\n\n${md}\n\n`;
+        if (md) out += md.startsWith("|") ? `\n\n${md}\n\n` : `\n\n${md}\n\n`;
       } else if (tag === "BR") {
         out += "\n";
       } else if (tag === "LI") {
@@ -109,6 +242,7 @@ function htmlTableToMarkdown(html: string): string | null {
   };
 
   const md = serialize(doc.body)
+    .replace(/[ \t]{2,}/g, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -1047,8 +1181,8 @@ export function ChatView({
               onKeyDown={onKeyDown}
               onPaste={(e) => {
                 const html = e.clipboardData.getData("text/html");
-                const md = htmlTableToMarkdown(html);
-                if (!md) return; // bukan tabel -> biarkan tempel teks biasa
+                const md = htmlClipboardToMarkdown(html);
+                if (!md) return; // bukan tabel/rumus -> biarkan tempel teks biasa
                 e.preventDefault();
                 const el = e.currentTarget;
                 const start = el.selectionStart ?? draft.length;
