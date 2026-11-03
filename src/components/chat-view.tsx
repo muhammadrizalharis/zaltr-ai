@@ -30,22 +30,8 @@ type UploadResp = {
   error?: string;
 };
 
-/**
- * Ubah tabel HTML (mis. hasil salin dari Word/Excel/web) menjadi tabel Markdown
- * GFM, supaya saat ditempel di kolom pesan tetap tampil sebagai tabel. Mengambil
- * hanya tabel PERTAMA bila ada beberapa; mengembalikan null bila tak ada tabel.
- */
-function htmlTableToMarkdown(html: string): string | null {
-  if (!html || !/<table[\s>]/i.test(html)) return null;
-  let doc: Document;
-  try {
-    doc = new DOMParser().parseFromString(html, "text/html");
-  } catch {
-    return null;
-  }
-  const table = doc.querySelector("table");
-  if (!table) return null;
-
+/** Ubah satu elemen <table> menjadi tabel Markdown GFM. */
+function tableElToMarkdown(table: Element): string | null {
   const cellText = (el: Element) =>
     (el.textContent || "")
       .replace(/\s+/g, " ")
@@ -66,12 +52,67 @@ function htmlTableToMarkdown(html: string): string | null {
     while (c.length < cols) c.push("");
     return c;
   };
-
   const header = pad(rows[0]);
   const body = rows.slice(1).map(pad);
   const line = (r: string[]) => `| ${r.join(" | ")} |`;
   const sep = `| ${Array(cols).fill("---").join(" | ")} |`;
   return [line(header), sep, ...body.map(line)].join("\n");
+}
+
+/**
+ * Ubah HTML papan klip (hasil salin dari Word/Excel/web) menjadi Markdown yang
+ * MEMPERTAHANKAN URUTAN: paragraf tetap jadi teks, tabel jadi tabel Markdown
+ * GFM, dan keduanya tetap pada posisi semula. Mengembalikan null bila tak ada
+ * tabel sama sekali (biar paste teks biasa berjalan normal).
+ */
+function htmlTableToMarkdown(html: string): string | null {
+  if (!html || !/<table[\s>]/i.test(html)) return null;
+  let doc: Document;
+  try {
+    doc = new DOMParser().parseFromString(html, "text/html");
+  } catch {
+    return null;
+  }
+  if (!doc.querySelector("table")) return null;
+
+  const BLOCK = new Set([
+    "P", "DIV", "SECTION", "ARTICLE", "BLOCKQUOTE", "PRE",
+    "H1", "H2", "H3", "H4", "H5", "H6", "UL", "OL",
+  ]);
+
+  const serialize = (node: Node): string => {
+    let out = "";
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        out += (child.textContent || "").replace(/\s+/g, " ");
+        return;
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE) return;
+      const el = child as Element;
+      const tag = el.tagName;
+      if (tag === "TABLE") {
+        const md = tableElToMarkdown(el);
+        if (md) out += `\n\n${md}\n\n`;
+      } else if (tag === "BR") {
+        out += "\n";
+      } else if (tag === "LI") {
+        const inner = serialize(el).replace(/\s+/g, " ").trim();
+        if (inner) out += `\n- ${inner}`;
+      } else if (BLOCK.has(tag)) {
+        const inner = serialize(el).trim();
+        if (inner) out += `\n\n${inner}\n\n`;
+      } else {
+        out += serialize(el);
+      }
+    });
+    return out;
+  };
+
+  const md = serialize(doc.body)
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return md || null;
 }
 
 /** Upload via XHR agar dapat progres unggah (fetch tidak memberi progres). */
