@@ -28,11 +28,12 @@ import { webSearch, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
 import { embedMessage } from "@/server/msgsearch";
 import { describeImages, isNativeVisionModel } from "@/server/vision";
-import { copilotSupportsVision } from "@/server/providers/copilot";
+import { copilotSupportsVision, modelBilling } from "@/server/providers/copilot";
 import type { AttachedImage, HistoryItem } from "@/server/providers/contract";
 import { generateTitle } from "@/server/titles";
 import { isModeParafrase, promptParafrase } from "@/server/paraphrase";
 import { effectiveDailyLimit } from "@/server/plans";
+import { emptyUsage, addUsage, creditsForUsage } from "@/server/billing";
 import { startRun, endRun } from "@/server/runs";
 import type { StreamLine } from "@/lib/types";
 
@@ -554,7 +555,7 @@ export const POST = guarded(async (req: Request) => {
       if (peringatan) send({ type: "error", message: peringatan });
 
       let acc = "";
-      let usedNanoAiu = 0;
+      const usage = emptyUsage();
       let status: "completed" | "stopped" | "failed" = "completed";
       let errorMessage = "";
       try {
@@ -579,7 +580,7 @@ export const POST = guarded(async (req: Request) => {
               acc += chunk.text;
               send({ type: "delta", text: chunk.text });
             } else if (chunk.kind === "usage") {
-              usedNanoAiu += chunk.nanoAiu;
+              addUsage(usage, chunk);
             } else {
               send({ type: "step", text: chunk.text.replace(/\s+/g, " ").trim() });
             }
@@ -597,8 +598,8 @@ export const POST = guarded(async (req: Request) => {
               acc += part.text;
               send({ type: "delta", text: part.text });
             } else if (part.kind === "usage") {
-              // Pemakaian riil Copilot (nano-AIU) — diakumulasi untuk potong kredit.
-              usedNanoAiu += part.nanoAiu;
+              // Pemakaian riil Copilot (token) — diakumulasi untuk potong kredit.
+              addUsage(usage, part);
             } else {
               // Gambar sudah dipersistenkan ke MinIO oleh provider;
               // simpan sebagai markdown agar ikut kontrak "chat = markdown".
@@ -638,10 +639,13 @@ export const POST = guarded(async (req: Request) => {
         return;
       }
 
-      // Potong kredit = pemakaian nano-AIU riil Copilot (mirror metering asli).
-      // Lokal/gratis: usedNanoAiu = 0 -> tak terpotong. Dibatasi agar tak minus.
-      if (billed && !unlimited && usedNanoAiu > 0) {
-        const charge = Math.min(usedNanoAiu, Math.max(0, me.creditBalance));
+      // Potong kredit = usage-based billing ala GitHub (sejak Juni 2026):
+      // token (input/output/cache) × tarif AI Credits per batch model.
+      // Lokal/gratis: tak ada token berbayar -> tak terpotong. Dibatasi agar tak minus.
+      if (billed && !unlimited) {
+        const info = await modelBilling(modelId);
+        const cost = creditsForUsage(info, contextTier, usage);
+        const charge = Math.min(cost, Math.max(0, me.creditBalance));
         if (charge > 0) {
           await db.user.update({
             where: { id: me.id },
