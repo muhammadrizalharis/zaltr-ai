@@ -25,8 +25,19 @@ export type StreamPart =
   | { kind: "text"; text: string }
   /** Gambar yang SUDAH dipersistenkan ke MinIO; url = path internal /api/files/... */
   | { kind: "image"; url: string; alt: string }
-  /** Pemakaian riil provider berbayar (Copilot): nanoAiu = satuan kredit yang dipotong. */
-  | { kind: "usage"; nanoAiu: number; inputTokens?: number; outputTokens?: number };
+  /**
+   * Pemakaian riil provider berbayar (Copilot). Kredit dipotong berbasis token
+   * (usage-based billing ala GitHub): token × tarif AI Credits per batch model.
+   * nanoAiu tetap disertakan sebagai info metering mentah.
+   */
+  | {
+      kind: "usage";
+      nanoAiu: number;
+      inputTokens?: number;
+      outputTokens?: number;
+      cacheReadTokens?: number;
+      cacheWriteTokens?: number;
+    };
 
 export interface ChatRequest {
   /** id model tanpa prefix provider, mis. "gpt-5.4" atau "llama3.2:3b" */

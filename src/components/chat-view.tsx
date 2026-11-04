@@ -120,7 +120,16 @@ function isMathEl(el: Element): boolean {
 function mathElToLatex(el: Element): string {
   const n = localName(el);
   const tex = (n === "math" ? mathmlToLatex(el) : ommlToLatex(el)).replace(/\s+/g, " ").trim();
-  return tex ? `$${tex}$` : "";
+  // Degenerasi: dokumen tanpa teks di <m:t> menghasilkan grup kosong "{}" atau
+  // sub/sup tanpa basis (mis. "_0", "\frac{}{}"). Itu tak terbaca -> jatuhkan ke
+  // teks mentah elemen (karakter unicode rumusnya) agar setidaknya tampil utuh.
+  const degenerate =
+    !tex || /\{\}/.test(tex) || /(^|[^A-Za-z0-9}\])])[_^]/.test(tex);
+  if (degenerate) {
+    const raw = (el.textContent || "").replace(/\s+/g, " ").trim();
+    return raw ? `$${mathEsc(raw)}$` : "";
+  }
+  return `$${tex}$`;
 }
 
 /** Ubah satu elemen <table> menjadi tabel Markdown GFM. */
@@ -1448,6 +1457,16 @@ const Bubble = memo(function Bubble({
   // Pesan user dengan lampiran berisi markdown gambar/link -> render markdown
   // supaya lampiran tampil; teks murni tetap plain (tanpa formatting tak sengaja).
   const hasAttachment = isUser && message.content.includes("](/api/files/");
+  // Pesan user yang memuat rumus ($...$ / \(..\) / \[..\]), tabel GFM, atau blok
+  // kode dirender sebagai Markdown agar tampil sesuai (bukan teks mentah seperti
+  // "$z_{tj}$"). Teks biasa tetap plain agar line-break & simbol tak berubah.
+  const richUser =
+    isUser &&
+    (/(^|[^\\])\$[^$\n]+\$/.test(message.content) ||
+      /\\\([^)]*\\\)|\\\[[\s\S]*?\\\]/.test(message.content) ||
+      /\$\$[\s\S]+?\$\$/.test(message.content) ||
+      /^\s*\|.*\|.*\n\s*\|[\s:-]+\|/m.test(message.content) ||
+      /```/.test(message.content));
 
   async function copy() {
     await navigator.clipboard.writeText(message.content).catch(() => {});
@@ -1494,7 +1513,7 @@ const Bubble = memo(function Bubble({
             : ""
         }`}
       >
-        {isUser && !hasAttachment ? (
+        {isUser && !hasAttachment && !richUser ? (
           <p className="whitespace-pre-wrap break-words">{message.content}</p>
         ) : (
           <Markdown>{message.content}</Markdown>

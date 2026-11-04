@@ -83,6 +83,29 @@ export async function copilotSupportsVision(modelId: string): Promise<boolean> {
   return visionModels.has(modelId);
 }
 
+/**
+ * Cache info billing per model (dari katalog Copilot) untuk hitung potongan
+ * kredit berbasis token tanpa fetch katalog ulang tiap jawaban.
+ */
+export interface ModelBillingInfo {
+  multiplier?: number;
+  pricing?: ModelDescriptor["pricing"];
+  pricingLongContext?: ModelDescriptor["pricingLongContext"];
+}
+const billingCache = new Map<string, ModelBillingInfo>();
+
+/** Ambil info billing model (full id, mis. "copilot:gpt-5"); isi cache bila kosong. */
+export async function modelBilling(id: string): Promise<ModelBillingInfo | undefined> {
+  if (!billingCache.has(id)) {
+    try {
+      await copilotCatalog();
+    } catch {
+      /* katalog offline — biarkan undefined, pemanggil pakai fallback */
+    }
+  }
+  return billingCache.get(id);
+}
+
 export async function copilotCatalog(): Promise<ModelDescriptor[]> {
   try {
     const models = await withTimeout(
@@ -129,8 +152,14 @@ export async function copilotCatalog(): Promise<ModelDescriptor[]> {
         ? ["chat", "vision"]
         : ["chat"];
       if (supportsReasoning) caps.push("reasoning");
+      const fullId = `copilot:${m.id}`;
+      billingCache.set(fullId, {
+        ...(typeof costMultiplier === "number" ? { multiplier: costMultiplier } : {}),
+        ...(pricing ? { pricing } : {}),
+        ...(pricingLongContext ? { pricingLongContext } : {}),
+      });
       return {
-        id: `copilot:${m.id}`,
+        id: fullId,
         label: m.name || m.id,
         provider: "copilot" as const,
         providerLabel: "Calyzr Pro",
@@ -219,20 +248,30 @@ export async function* copilotChat(req: ChatRequest): ProviderGenerator {
       queue.push({ kind: "text", text: event.data.deltaContent });
       notify();
     } else if (event.type === "assistant.usage") {
-      // Pemakaian riil Copilot (nano-AIU) = satuan kredit yang dipotong.
+      // Pemakaian riil Copilot: token (input/output/cache) untuk hitung kredit
+      // usage-based; nanoAiu disimpan sebagai info metering mentah.
       const d = event.data as {
         copilotUsage?: { totalNanoAiu?: number };
         cost?: number;
         inputTokens?: number;
         outputTokens?: number;
+        cacheReadTokens?: number;
+        cacheWriteTokens?: number;
       };
       const nanoAiu = d.copilotUsage?.totalNanoAiu;
-      if (typeof nanoAiu === "number" && nanoAiu > 0) {
+      const hasTokens =
+        typeof d.inputTokens === "number" ||
+        typeof d.outputTokens === "number" ||
+        typeof d.cacheReadTokens === "number" ||
+        typeof d.cacheWriteTokens === "number";
+      if ((typeof nanoAiu === "number" && nanoAiu > 0) || hasTokens) {
         queue.push({
           kind: "usage",
-          nanoAiu,
+          nanoAiu: typeof nanoAiu === "number" ? nanoAiu : 0,
           ...(typeof d.inputTokens === "number" ? { inputTokens: d.inputTokens } : {}),
           ...(typeof d.outputTokens === "number" ? { outputTokens: d.outputTokens } : {}),
+          ...(typeof d.cacheReadTokens === "number" ? { cacheReadTokens: d.cacheReadTokens } : {}),
+          ...(typeof d.cacheWriteTokens === "number" ? { cacheWriteTokens: d.cacheWriteTokens } : {}),
         });
         notify();
       }

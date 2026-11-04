@@ -55,7 +55,7 @@ async function callModel(
   history: HistoryItem[],
   conversationId: string,
   signal: AbortSignal,
-  onUsage?: (nanoAiu: number) => void,
+  onUsage?: (u: UsageDelta) => void,
 ): Promise<string> {
   let out = "";
   let lastCheck = 0;
@@ -66,7 +66,7 @@ async function callModel(
   try {
     for await (const part of dispatch(modelId, { history, conversationId, signal: ac.signal })) {
       if (part.kind === "text") out += part.text;
-      else if (part.kind === "usage") onUsage?.(part.nanoAiu);
+      else if (part.kind === "usage") onUsage?.(part);
       else out += `\n![${part.alt}](${part.url})\n`;
       if (out.length - lastCheck > 300) {
         lastCheck = out.length;
@@ -137,9 +137,17 @@ async function readDrive(link: string): Promise<string> {
   return parts.join("\n\n").slice(0, 12_000) || "(kosong)";
 }
 
+export interface UsageDelta {
+  nanoAiu: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+}
+
 export type AgentChunk =
   | { kind: "progress" | "final"; text: string }
-  | { kind: "usage"; nanoAiu: number };
+  | ({ kind: "usage" } & UsageDelta);
 
 export async function* runAgent(opts: {
   modelId: string;
@@ -157,11 +165,27 @@ export async function* runAgent(opts: {
   const base = `agent-${randomUUID()}`;
   const attachmentKeys = opts.attachmentKeys ?? [];
   const produced = new Map<string, { path: string; url: string }>();
-  // Akumulasi pemakaian nano-AIU riil Copilot lintas langkah agen (untuk potong kredit).
-  let usedNanoAiu = 0;
-  const addUsage = (n: number) => {
-    usedNanoAiu += n;
+  // Akumulasi pemakaian token riil Copilot lintas langkah agen (untuk potong kredit).
+  const usage: UsageDelta = {
+    nanoAiu: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
   };
+  const addUsage = (u: UsageDelta) => {
+    usage.nanoAiu += u.nanoAiu;
+    usage.inputTokens = (usage.inputTokens ?? 0) + (u.inputTokens ?? 0);
+    usage.outputTokens = (usage.outputTokens ?? 0) + (u.outputTokens ?? 0);
+    usage.cacheReadTokens = (usage.cacheReadTokens ?? 0) + (u.cacheReadTokens ?? 0);
+    usage.cacheWriteTokens = (usage.cacheWriteTokens ?? 0) + (u.cacheWriteTokens ?? 0);
+  };
+  const hasUsage = (u: UsageDelta) =>
+    u.nanoAiu > 0 ||
+    (u.inputTokens ?? 0) > 0 ||
+    (u.outputTokens ?? 0) > 0 ||
+    (u.cacheReadTokens ?? 0) > 0 ||
+    (u.cacheWriteTokens ?? 0) > 0;
 
   // Konteks workspace awal: berkas input + hasil sebelumnya (agar model tahu nama berkas).
   let wsNote = "";
@@ -313,7 +337,7 @@ export async function* runAgent(opts: {
     }
 
     // Tidak ada aksi -> ini jawaban final.
-    if (usedNanoAiu > 0) yield { kind: "usage", nanoAiu: usedNanoAiu };
+    if (hasUsage(usage)) yield { kind: "usage", ...usage };
     yield { kind: "final", text: reply + filesFooter(produced) };
     return;
   }
@@ -326,7 +350,7 @@ export async function* runAgent(opts: {
     opts.signal,
     addUsage,
   );
-  if (usedNanoAiu > 0) yield { kind: "usage", nanoAiu: usedNanoAiu };
+  if (hasUsage(usage)) yield { kind: "usage", ...usage };
   yield { kind: "final", text: finalReply + filesFooter(produced) };
 }
 
