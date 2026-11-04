@@ -203,6 +203,18 @@ function htmlClipboardToMarkdown(html: string): string | null {
     }
   }
 
+  // Buang definisi gaya/metadata Word yang bukan konten (kalau ikut, teksnya
+  // muncul sebagai sampah: "@font-face{...}", "mso-...", "Normal 0 false...").
+  doc.querySelectorAll("style, script, meta, link, title").forEach((e) => e.remove());
+  try {
+    doc.querySelectorAll("xml, o\\:shapedefaults, o\\:shapelayout, w\\:WordDocument").forEach((e) => e.remove());
+  } catch {
+    /* selektor namespaced tak didukung -> abaikan */
+  }
+
+  // Elemen non-konten yang dilewati total (jaga-jaga bila masih tersisa).
+  const SKIP = new Set(["STYLE", "SCRIPT", "META", "LINK", "TITLE", "XML", "HEAD"]);
+
   const BLOCK = new Set([
     "P", "DIV", "SECTION", "ARTICLE", "BLOCKQUOTE", "PRE",
     "H1", "H2", "H3", "H4", "H5", "H6", "UL", "OL",
@@ -217,12 +229,13 @@ function htmlClipboardToMarkdown(html: string): string | null {
       }
       if (child.nodeType !== Node.ELEMENT_NODE) return;
       const el = child as Element;
+      const tag = el.tagName;
+      if (SKIP.has(tag.toUpperCase())) return; // lewati style/script/metadata
       if (isMathEl(el)) {
         const tex = mathElToLatex(el);
         if (tex) out += ` ${tex} `;
         return;
       }
-      const tag = el.tagName;
       if (tag === "TABLE") {
         const md = tableElToMarkdown(el);
         if (md) out += md.startsWith("|") ? `\n\n${md}\n\n` : `\n\n${md}\n\n`;
