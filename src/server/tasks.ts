@@ -149,7 +149,13 @@ async function sweepWorkspaces(): Promise<void> {
 async function expireCredits(): Promise<void> {
   try {
     const r = await db.user.updateMany({
-      where: { creditsExpireAt: { lte: new Date() }, creditBalance: { gt: 0 } },
+      // Superadmin dikecualikan: kredit tak terbatas, tak pernah dihanguskan
+      // (konsisten dengan applyAccessPolicy di server/auth.ts).
+      where: {
+        role: { not: "superadmin" },
+        creditsExpireAt: { lte: new Date() },
+        creditBalance: { gt: 0 },
+      },
       data: { creditBalance: 0 },
     });
     if (r.count) console.log(`[scheduler] ${r.count} user: kredit hangus (masa aktif habis)`);
