@@ -1,18 +1,26 @@
-<!-- ═══════════════════════ CALYZR.AI · NEON CYBERPUNK ═══════════════════════ -->
+<!-- ════════════════════ CALYZR.AI · NEON HYPERSPACE ════════════════════ -->
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&height=235&color=0:05060A,25:7F00FF,55:FF00E5,100:00F0FF&text=CALYZR.AI&fontColor=FFFFFF&fontSize=74&fontAlignY=33&desc=NEURAL%20WORKSPACE%20%E2%80%94%20ALL%20AI%2C%20ONE%20SPACE&descSize=16&descAlignY=53&animation=fadeIn" width="100%" alt="CALYZR.AI" />
+<!-- ░▒▓█ HERO BANNER █▓▒░ -->
+<img src="https://capsule-render.vercel.app/api?type=waving&height=280&color=0:05060A,16:7F00FF,40:FF00E5,68:B026FF,100:00F0FF&text=CALYZR.AI&fontColor=FFFFFF&fontSize=88&fontAlignY=32&stroke=00F0FF&strokeWidth=1&desc=%E2%97%A2%E2%97%A4%20%20NEURAL%20WORKSPACE%20%E2%80%94%20ALL%20AI%2C%20ONE%20SPACE%20%20%E2%97%A2%E2%97%A4&descSize=17&descAlignY=53&animation=fadeIn" width="100%" alt="CALYZR.AI — Neural Workspace · All AI, One Space" />
 
-<img src="public/logo-512.png" alt="CALYZR.AI" width="108" />
+<!-- ░ glowing core logo ░ -->
+<img src="public/logo-512.png" alt="CALYZR.AI" width="120" />
 
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=22&duration=2600&pause=600&color=00F0FF&center=true&vCenter=true&width=780&lines=%3E_+booting+CALYZR.AI+core...;CHAT+%C2%B7+CODE+%C2%B7+IMAGE+%C2%B7+AGENT;CLOUD+%2B+LOCAL+%2B+GENERATIVE+%E2%80%94+one+interface;OpenAI-compatible+%2Fv1+gateway+ONLINE" alt="" />
+<!-- ░ animated boot terminal ░ -->
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=800&size=23&duration=2600&pause=700&color=00F0FF&center=true&vCenter=true&width=860&lines=%3E_+booting+CALYZR.AI+core...;CLOUD+%2B+LOCAL+%2B+GENERATIVE+%E2%80%94+one+interface;CHAT+%C2%B7+CODE+%C2%B7+IMAGE+%C2%B7+AGENT+%E2%80%94+online;OpenAI-compatible+%2Fv1+gateway+%E2%96%B8+READY" alt="" />
 
 <br />
 
-<img src="https://img.shields.io/badge/⚡%20STREAMING-REALTIME-0A0A0F?style=for-the-badge&labelColor=00F0FF" alt="" />
-<img src="https://img.shields.io/badge/🤖%20AGENT-EKSEKUSI%20KODE-0A0A0F?style=for-the-badge&labelColor=FF2EC4" alt="" />
-<img src="https://img.shields.io/badge/🎨%20COMFYUI-GAMBAR-0A0A0F?style=for-the-badge&labelColor=00FF9C" alt="" />
-<img src="https://img.shields.io/badge/🔌%20OPENAI%20API-%2Fv1-0A0A0F?style=for-the-badge&labelColor=B026FF" alt="" />
+<!-- ░▒▓ capability badges ▓▒░ -->
+<img src="https://img.shields.io/badge/%E2%9A%A1%20STREAMING-REALTIME-05060A?style=for-the-badge&labelColor=00F0FF" alt="" />
+<img src="https://img.shields.io/badge/%F0%9F%A4%96%20AGENT-EKSEKUSI%20KODE-05060A?style=for-the-badge&labelColor=FF2EC4" alt="" />
+<img src="https://img.shields.io/badge/%F0%9F%8E%A8%20COMFYUI-GAMBAR-05060A?style=for-the-badge&labelColor=00FF9C" alt="" />
+<img src="https://img.shields.io/badge/%F0%9F%94%8C%20OPENAI%20API-%2Fv1-05060A?style=for-the-badge&labelColor=B026FF" alt="" />
+<br />
+<img src="https://img.shields.io/badge/%F0%9F%A7%A0%20RAG-KNOWLEDGE%20BASE-05060A?style=for-the-badge&labelColor=FFB300" alt="" />
+<img src="https://img.shields.io/badge/%F0%9F%91%81%20VISION-MULTIMODAL-05060A?style=for-the-badge&labelColor=FF5C7A" alt="" />
+<img src="https://img.shields.io/badge/%F0%9F%94%92%20SELF--HOSTED-LOCAL--FIRST-05060A?style=for-the-badge&labelColor=8A2BE2" alt="" />
 
 <br /><br />
 
