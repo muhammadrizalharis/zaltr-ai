@@ -1,16 +1,11 @@
 <!-- ════════════════════ CALYZR.AI · NEON HYPERSPACE ════════════════════ -->
 <div align="center">
 
-<!-- ░▒▓█ HERO BANNER █▓▒░ -->
-<img src="https://capsule-render.vercel.app/api?type=waving&height=280&color=0:05060A,16:7F00FF,40:FF00E5,68:B026FF,100:00F0FF&text=CALYZR.AI&fontColor=FFFFFF&fontSize=88&fontAlignY=32&stroke=00F0FF&strokeWidth=1&desc=%E2%97%A2%E2%97%A4%20%20NEURAL%20WORKSPACE%20%E2%80%94%20ALL%20AI%2C%20ONE%20SPACE%20%20%E2%97%A2%E2%97%A4&descSize=17&descAlignY=53&animation=fadeIn" width="100%" alt="CALYZR.AI — Neural Workspace · All AI, One Space" />
-
-<!-- ░ glowing core logo ░ -->
-<img src="public/logo-512.png" alt="CALYZR.AI" width="120" />
-
-<!-- ░ animated boot terminal ░ -->
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=800&size=23&duration=2600&pause=700&color=00F0FF&center=true&vCenter=true&width=860&lines=%3E_+booting+CALYZR.AI+core...;CLOUD+%2B+LOCAL+%2B+GENERATIVE+%E2%80%94+one+interface;CHAT+%C2%B7+CODE+%C2%B7+IMAGE+%C2%B7+AGENT+%E2%80%94+online;OpenAI-compatible+%2Fv1+gateway+%E2%96%B8+READY" alt="" />
-
+<!-- ░▒▓█ HERO (banner + logo + boot — compact) █▓▒░ -->
+<img src="https://capsule-render.vercel.app/api?type=waving&height=200&color=0:05060A,16:7F00FF,40:FF00E5,68:B026FF,100:00F0FF&text=CALYZR.AI&fontColor=FFFFFF&fontSize=72&fontAlignY=36&stroke=00F0FF&strokeWidth=1&desc=%E2%97%A2%E2%97%A4%20%20NEURAL%20WORKSPACE%20%E2%80%94%20ALL%20AI%2C%20ONE%20SPACE%20%20%E2%97%A2%E2%97%A4&descSize=15&descAlignY=60&animation=fadeIn" width="100%" alt="CALYZR.AI — Neural Workspace · All AI, One Space" />
 <br />
+<img src="public/logo-512.png" alt="CALYZR.AI" width="74" />
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=800&size=20&duration=2600&pause=700&color=00F0FF&center=true&vCenter=true&width=820&lines=CLOUD+%2B+LOCAL+%2B+GENERATIVE+%E2%80%94+one+interface;CHAT+%C2%B7+CODE+%C2%B7+IMAGE+%C2%B7+AGENT+%E2%80%94+online;OpenAI-compatible+%2Fv1+gateway+%E2%96%B8+READY" alt="" />
 
 <!-- ░▒▓ capability badges ▓▒░ -->
 <img src="https://img.shields.io/badge/%E2%9A%A1%20STREAMING-REALTIME-05060A?style=for-the-badge&labelColor=00F0FF" alt="" />
