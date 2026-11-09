@@ -1,21 +1,8 @@
-<!-- ════════════════════ CALYZR.AI · NEON HYPERSPACE ════════════════════ -->
+<!-- ═════════════════════ CALYZR.AI · FLAT NEO HEADER ═════════════════════ -->
 <div align="center">
 
-<!-- ░▒▓█ HERO (banner + logo + boot — compact) █▓▒░ -->
-<img src="https://capsule-render.vercel.app/api?type=waving&height=200&color=0:05060A,16:7F00FF,40:FF00E5,68:B026FF,100:00F0FF&text=CALYZR.AI&fontColor=FFFFFF&fontSize=72&fontAlignY=36&stroke=00F0FF&strokeWidth=1&desc=%E2%97%A2%E2%97%A4%20%20NEURAL%20WORKSPACE%20%E2%80%94%20ALL%20AI%2C%20ONE%20SPACE%20%20%E2%97%A2%E2%97%A4&descSize=15&descAlignY=60&animation=fadeIn" width="100%" alt="CALYZR.AI — Neural Workspace · All AI, One Space" />
-<br />
-<img src="public/logo-512.png" alt="CALYZR.AI" width="74" />
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=800&size=20&duration=2600&pause=700&color=00F0FF&center=true&vCenter=true&width=820&lines=CLOUD+%2B+LOCAL+%2B+GENERATIVE+%E2%80%94+one+interface;CHAT+%C2%B7+CODE+%C2%B7+IMAGE+%C2%B7+AGENT+%E2%80%94+online;OpenAI-compatible+%2Fv1+gateway+%E2%96%B8+READY" alt="" />
-
-<!-- ░▒▓ capability badges ▓▒░ -->
-<img src="https://img.shields.io/badge/%E2%9A%A1%20STREAMING-REALTIME-05060A?style=for-the-badge&labelColor=00F0FF" alt="" />
-<img src="https://img.shields.io/badge/%F0%9F%A4%96%20AGENT-EKSEKUSI%20KODE-05060A?style=for-the-badge&labelColor=FF2EC4" alt="" />
-<img src="https://img.shields.io/badge/%F0%9F%8E%A8%20COMFYUI-GAMBAR-05060A?style=for-the-badge&labelColor=00FF9C" alt="" />
-<img src="https://img.shields.io/badge/%F0%9F%94%8C%20OPENAI%20API-%2Fv1-05060A?style=for-the-badge&labelColor=B026FF" alt="" />
-<br />
-<img src="https://img.shields.io/badge/%F0%9F%A7%A0%20RAG-KNOWLEDGE%20BASE-05060A?style=for-the-badge&labelColor=FFB300" alt="" />
-<img src="https://img.shields.io/badge/%F0%9F%91%81%20VISION-MULTIMODAL-05060A?style=for-the-badge&labelColor=FF5C7A" alt="" />
-<img src="https://img.shields.io/badge/%F0%9F%94%92%20SELF--HOSTED-LOCAL--FIRST-05060A?style=for-the-badge&labelColor=8A2BE2" alt="" />
+<!-- ░▒▓█ UNIFIED HERO — flat solid bg; constellation + logo + wordmark + cards + pills, all-in-one █▓▒░ -->
+<img src="public/readme-hero.svg" width="100%" alt="CALYZR.AI — Neural Workspace · All AI, One Space" />
 
 <br /><br />
 
@@ -50,7 +37,7 @@
 └────────────────────────────────────────────────────────────────────
 ```
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 🎯 Satu Ruang Kerja, Semua Model AI
 
@@ -91,7 +78,7 @@ Endpoint `/v1` (`chat/completions`, `responses`, `embeddings`) dengan **emulasi 
 </tr>
 </table>
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## ✨ Fitur Unggulan
 
@@ -160,7 +147,7 @@ Endpoint `/v1` (`chat/completions`, `responses`, `embeddings`) dengan **emulasi 
 
 </details>
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 🧩 Arsitektur
 
@@ -215,7 +202,7 @@ sequenceDiagram
     Web->>DB: simpan pesan + usage
 ```
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 🧰 Teknologi
 
@@ -239,7 +226,7 @@ sequenceDiagram
 | **Deploy** | Docker · docker-compose · cloudflared | Reproducible & tunnel publik |
 | **Kualitas** | Vitest · ESLint | Unit test & lint |
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 📂 Struktur Proyek
 
@@ -260,7 +247,7 @@ zaltr-ai/
 └─ .env.example
 ```
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 🚀 Mulai Cepat
 
@@ -308,7 +295,7 @@ Butuh Postgres/Redis/MinIO aktif — cara termudah:
 </tr>
 </table>
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 🔧 Konfigurasi
 
@@ -325,7 +312,7 @@ Seluruh konfigurasi dibaca dari variabel lingkungan berawalan `ZALTR_`. Salin `.
 
 > 🔒 Rahasia sungguhan (`.env`, isi `secrets/`) **tidak pernah** di-commit — lihat `.gitignore`.
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 🔌 Provider AI
 
@@ -335,7 +322,7 @@ Seluruh konfigurasi dibaca dari variabel lingkungan berawalan `ZALTR_`. Salin `.
 | 🐙 **GitHub Copilot** | Isi token *service account* di `secrets/copilot_github_token`, aktifkan profile `ai` |
 | 🎨 **ComfyUI** | Isi `ZALTR_COMFYUI_URL`; setiap checkpoint tampil sebagai model gambar |
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 📟 Perintah
 
@@ -348,7 +335,7 @@ Seluruh konfigurasi dibaca dari variabel lingkungan berawalan `ZALTR_`. Salin `.
 | `npm test` | Unit test (Vitest) |
 | `bin/zaltrctl <cmd>` | Orkestrasi Docker (`init` / `up` / `deploy-web` / `status` / `logs`) |
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 🔒 Keamanan
 
@@ -357,7 +344,7 @@ Seluruh konfigurasi dibaca dari variabel lingkungan berawalan `ZALTR_`. Salin `.
 - 🔐 **Backup AES-256** harian dengan retensi.
 - 🚦 **Rate limiting** & sanitasi input pada boundary API.
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 📈 Star History
 
@@ -367,7 +354,7 @@ Seluruh konfigurasi dibaca dari variabel lingkungan berawalan `ZALTR_`. Salin `.
 </a>
 </div>
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:00F0FF,50:FF2EC4,100:B026FF&height=3&width=1200" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=22D3EE&height=2&width=1200" width="100%" alt="" />
 
 ## 📄 Lisensi
 
@@ -382,7 +369,7 @@ Kode ini ditampilkan publik **hanya** untuk referensi/transparansi — **bukan**
 
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&height=140&color=0:00F0FF,45:FF00E5,100:05060A&section=footer&reversal=true" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=waving&height=120&color=22D3EE&section=footer&reversal=true" width="100%" alt="" />
 
 <sub>◢◤ Dibuat dengan 💜 oleh <b>Developer CALYZR.AI RZL</b> ◢◤</sub>
 
