@@ -32,38 +32,64 @@ export function addUsage(
 }
 
 /**
+ * Berapa nano-AIU setara 1 kredit. GitHub menagih dalam nano-AIU (1 AIU = 1e9
+ * nano-AIU); default kita 1 kredit = 1 AIU. Bisa di-tune lewat env tanpa rebuild
+ * logika (mis. ZALTR_NANOAIU_PER_CREDIT=2000000000 => 1 kredit = 2 AIU, lebih murah).
+ */
+function nanoAiuPerCredit(): number {
+  const raw = Number(process.env.ZALTR_NANOAIU_PER_CREDIT);
+  return Number.isFinite(raw) && raw > 0 ? raw : 1_000_000_000;
+}
+
+/**
  * Hitung potongan kredit (AI Credits) untuk satu jawaban — usage-based billing
- * ala GitHub (sejak Juni 2026): token × tarif AI Credits per batch model.
+ * ala GitHub (sejak Juni 2026).
  *
- *   biaya = Σ (token_jenis / batchSize) × harga_AIcredit_per_batch_jenis
+ * SUMBER UTAMA: totalNanoAiu dari event usage Copilot (field copilotUsage).
+ * Ini angka biaya RESMI GitHub yang sudah memecah token dengan benar (input
+ * "fresh" vs cache_read vs cache_write vs output, masing-masing tarifnya sendiri,
+ * plus reasoning tokens). Kredit = totalNanoAiu / nanoAiuPerCredit.
  *
- * tarif diambil dari katalog Copilot (ModelBillingTokenPrices, satuannya memang
- * AI Credits per batch). Tier long-context memakai tarif pricingLongContext bila
- * ada. Bila model tak punya tarif token, fallback ke multiplier (flat per jawaban).
- * nanoAiu TIDAK dipakai langsung sebagai kredit (satuannya nano-AIU, bukan kredit).
+ * Kenapa bukan hitung sendiri dari token: field `inputTokens` yang dilaporkan
+ * adalah TOTAL prompt (= fresh input + cacheRead + cacheWrite). Menagih inputTokens
+ * di tarif input PENUH lalu menambah lagi cacheRead/cacheWrite = hitung GANDA token
+ * cache. Di mode agen (tiap langkah membaca ulang konteks besar sebagai cache) ini
+ * menggelembung berlipat dan bisa menguras saldo dalam satu permintaan.
+ *
+ * FALLBACK (bila totalNanoAiu tak tersedia): hitung dari tarif katalog, tapi input
+ * "fresh" = inputTokens - cacheRead - cacheWrite agar tak dobel. Terakhir: multiplier.
  */
 export function creditsForUsage(
   info: ModelBillingInfo | undefined,
   tier: ContextTier | undefined,
   totals: UsageTotals,
 ): number {
+  // Sumber otoritatif: biaya resmi GitHub (nano-AIU) -> kredit.
+  if (totals.nanoAiu > 0) {
+    return totals.nanoAiu / nanoAiuPerCredit();
+  }
+
   const price =
     tier === "long_context" && info?.pricingLongContext ? info.pricingLongContext : info?.pricing;
 
   if (price) {
     const batch = price.batchSize && price.batchSize > 0 ? price.batchSize : 1_000_000;
+    // Input "fresh" saja di tarif penuh; sisanya ditagih sebagai cache (hindari dobel).
+    const freshInput = Math.max(
+      0,
+      totals.inputTokens - totals.cacheReadTokens - totals.cacheWriteTokens,
+    );
     const cost =
-      (totals.inputTokens / batch) * (price.input ?? 0) +
+      (freshInput / batch) * (price.input ?? 0) +
       (totals.outputTokens / batch) * (price.output ?? 0) +
       (totals.cacheReadTokens / batch) * (price.cacheRead ?? 0) +
       (totals.cacheWriteTokens / batch) * (price.cacheWrite ?? 0);
     if (cost > 0) return cost;
   }
 
-  // Fallback: tak ada tarif token (atau biaya 0 padahal ada pemakaian) ->
-  // tagih flat per jawaban sebesar multiplier model (default 1), ala premium request.
+  // Fallback terakhir: tak ada tarif token -> tagih flat multiplier (ala premium request).
   const used =
     totals.inputTokens + totals.outputTokens + totals.cacheReadTokens + totals.cacheWriteTokens;
-  if (used <= 0 && totals.nanoAiu <= 0) return 0;
+  if (used <= 0) return 0;
   return Math.max(0, info?.multiplier ?? 1);
 }
