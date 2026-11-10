@@ -5,7 +5,7 @@
  * API, atau berkas lampiran ke cache. Tugasnya hanya dua: memenuhi syarat
  * "installable" dan menampilkan halaman offline saat jaringan mati.
  */
-const CACHE = "calyzr-shell-v1";
+const CACHE = "calyzr-shell-v2";
 const SHELL = ["/offline.html", "/logo-192.png", "/logo-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -29,8 +29,27 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET" || req.mode !== "navigate") return;
-  event.respondWith(fetch(req).catch(() => caches.match("/offline.html")));
+  event.respondWith(navigateWithRetry(req));
 });
+
+// Navigasi gagal sesaat (ganti WiFi/seluler, blip tunnel) tidak boleh langsung
+// memunculkan layar offline. Coba ulang beberapa kali dengan jeda singkat, dan
+// hanya menyerah ke halaman offline bila perangkat benar-benar offline atau
+// semua percobaan gagal.
+async function navigateWithRetry(req) {
+  const delays = [400, 900, 1600];
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      return await fetch(req);
+    } catch (e) {
+      const terakhir = i === delays.length;
+      // Browser yakin offline: tak ada gunanya menunggu, langsung fallback.
+      if (terakhir || self.navigator.onLine === false) break;
+      await new Promise((r) => setTimeout(r, delays[i]));
+    }
+  }
+  return (await caches.match("/offline.html")) || Response.error();
+}
 
 // Web Push: tampilkan notifikasi saat pesan push tiba (app boleh tertutup).
 self.addEventListener("push", (event) => {
