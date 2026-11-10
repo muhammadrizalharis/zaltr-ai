@@ -14,6 +14,8 @@ import {
   flattenToolMessages,
 } from "@/server/gateway-tools";
 import { isDegenerate, trimDegenerate } from "@/server/degenerate";
+import { emptyUsage, addUsage, creditsForUsage } from "@/server/billing";
+import { modelBilling } from "@/server/providers/copilot";
 
 export const runtime = "nodejs";
 
@@ -104,11 +106,14 @@ export async function POST(req: Request) {
   await db.message.create({
     data: { conversationId: convId, role: "user", content: (lastUser?.content ?? "").slice(0, 2_000), model: modelId },
   });
-  // Akumulasi pemakaian nano-AIU riil Copilot lalu potong kredit (dibatasi saldo).
-  let usedNanoAiu = 0;
+  // Akumulasi pemakaian token/nano-AIU riil Copilot lalu potong kredit (dibatasi saldo).
+  // Sama seperti /api/chat: kredit = biaya resmi GitHub (totalNanoAiu / AIU-per-kredit),
+  // BUKAN nano-AIU mentah (yang nilainya ~1e9 -> sekali panggil langsung menguras saldo).
+  const usage = emptyUsage();
   const chargeUsage = async () => {
-    if (!billed || me.role === "superadmin" || usedNanoAiu <= 0) return;
-    const charge = Math.min(usedNanoAiu, Math.max(0, me.creditBalance));
+    if (!billed || me.role === "superadmin") return;
+    const cost = creditsForUsage(await modelBilling(modelId), undefined, usage);
+    const charge = Math.min(cost, Math.max(0, me.creditBalance));
     if (charge > 0) {
       await db.user
         .update({ where: { id: me.id }, data: { creditBalance: { decrement: charge }, creditUsed: { increment: charge } } })
@@ -150,7 +155,7 @@ export async function POST(req: Request) {
           chunk({ role: "assistant" });
           for await (const part of gen) {
             if (part.kind === "usage") {
-              usedNanoAiu += part.nanoAiu;
+              addUsage(usage, part);
               continue;
             }
             const text = part.kind === "text" ? part.text : `\n![${part.alt}](${part.url})\n`;
@@ -234,7 +239,7 @@ export async function POST(req: Request) {
   try {
     for await (const part of gen) {
       if (part.kind === "usage") {
-        usedNanoAiu += part.nanoAiu;
+        addUsage(usage, part);
         continue;
       }
       acc += part.kind === "text" ? part.text : `\n![${part.alt}](${part.url})\n`;
