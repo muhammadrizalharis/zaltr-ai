@@ -12,6 +12,7 @@ import type { ChatRequest, ProviderGenerator, StreamPart } from "./contract";
  */
 
 const COPILOT_URL = process.env.ZALTR_COPILOT_URL ?? "127.0.0.1:46321";
+const COPILOT_CONNECTION_TOKEN = process.env.ZALTR_COPILOT_CONNECTION_TOKEN;
 
 const globalForCopilot = globalThis as unknown as {
   zaltrCopilot?: { client: CopilotClient; ready: Promise<unknown> };
@@ -25,7 +26,10 @@ const globalForCopilot = globalThis as unknown as {
 async function client(): Promise<CopilotClient> {
   if (!globalForCopilot.zaltrCopilot) {
     const c = new CopilotClient({
-      connection: RuntimeConnection.forUri(COPILOT_URL),
+      connection: RuntimeConnection.forUri(
+        COPILOT_URL,
+        COPILOT_CONNECTION_TOKEN ? { connectionToken: COPILOT_CONNECTION_TOKEN } : undefined,
+      ),
       mode: "empty",
     });
     const entry = {

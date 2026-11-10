@@ -175,6 +175,8 @@ services:
       DATABASE_URL: postgresql://${ZALTR_POSTGRES_USER:?}:${ZALTR_POSTGRES_PASSWORD:?}@postgres:5432/${ZALTR_POSTGRES_DB:?}?schema=public
       # URL provider versi DALAM network zaltr-net (bukan loopback host)
       ZALTR_COPILOT_URL: ${ZALTR_WEB_COPILOT_URL:-copilot-runtime:4321}
+      # Token auth koneksi ke copilot-runtime (wajib utk CLI >=1.0.107 saat bind 0.0.0.0)
+      ZALTR_COPILOT_CONNECTION_TOKEN: ${ZALTR_COPILOT_CONNECTION_TOKEN:-}
       ZALTR_OLLAMA_URL: ${ZALTR_WEB_OLLAMA_URL:-http://ollama:11434}
       ZALTR_COMFYUI_URL: ${ZALTR_COMFYUI_URL:-}
       ZALTR_MINIO_URL: http://minio:9000
@@ -265,7 +267,7 @@ services:
     build:
       context: ./docker/copilot-runtime
       args:
-        COPILOT_CLI_VERSION: ${ZALTR_COPILOT_CLI_VERSION:-1.0.85}
+        COPILOT_CLI_VERSION: ${ZALTR_COPILOT_CLI_VERSION:-1.0.107}
     image: zaltr/copilot-runtime:local
     container_name: zaltr-copilot-runtime
     restart: unless-stopped
@@ -277,6 +279,8 @@ services:
       - zaltr_copilot_state:/home/copilot/.copilot
     environment:
       TZ: ${TZ:-Asia/Makassar}
+      # CLI >=1.0.107 menolak bind 0.0.0.0 tanpa token ini. Dipakai bersama service web.
+      COPILOT_CONNECTION_TOKEN: ${ZALTR_COPILOT_CONNECTION_TOKEN:?set ZALTR_COPILOT_CONNECTION_TOKEN di .env}
     healthcheck:
       # Image runtime tidak punya wget/curl/nc — cek port langsung lewat bash.
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/4321"]
