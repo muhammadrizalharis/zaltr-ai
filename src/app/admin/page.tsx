@@ -246,7 +246,7 @@ function UserCard({
               <Section title="Role & status">
                 <div className="flex flex-wrap gap-2">
                   <select
-                    disabled={!isSuper}
+                    disabled={!isSuper || u.id === me?.id}
                     value={u.role}
                     onChange={(e) => void onPatch(u.id, { role: e.target.value })}
                     className="input w-auto disabled:opacity-40"
@@ -268,6 +268,11 @@ function UserCard({
                 </div>
                 {!isSuper && (
                   <p className="mt-1 text-[11px] text-muted">Role hanya bisa diubah superadmin.</p>
+                )}
+                {isSuper && u.id === me?.id && (
+                  <p className="mt-1 text-[11px] text-muted">
+                    Role sendiri tidak bisa diubah — minta superadmin lain.
+                  </p>
                 )}
               </Section>
 

@@ -23,9 +23,10 @@ const patchSchema = z.object({
 
 /**
  * Aturan wewenang:
- * - superadmin: bebas mengatur siapa pun (kecuali menurunkan dirinya sendiri
- *   bila ia superadmin terakhir).
- * - admin: hanya boleh mengatur user biasa; tidak boleh mengubah role.
+ * - superadmin: bebas mengatur siapa pun, TAPI tidak boleh mengubah role
+ *   dirinya sendiri (cegah self-demotion/lockout) dan tidak boleh menurunkan
+ *   superadmin aktif terakhir.
+ * - admin: hanya boleh mengatur user biasa; tidak boleh mengubah role apa pun.
  */
 export const PATCH = guarded(async (req: Request, { params }: Params) => {
   const actor = await requireAdmin();
@@ -40,6 +41,15 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
     select: { id: true, role: true, status: true, creditBalance: true },
   });
   if (!target) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
+
+  // Tidak seorang pun boleh mengubah ROLE akunnya SENDIRI — termasuk superadmin.
+  // Cegah self-demotion/lockout tak sengaja; promosi/demosi orang lain tetap boleh.
+  if (body.data.role && target.id === actor.id) {
+    return NextResponse.json(
+      { error: "Tidak bisa mengubah role akun sendiri — minta superadmin lain" },
+      { status: 403 },
+    );
+  }
 
   // Aktivasi akun (pending -> active) HANYA oleh superadmin.
   if (
