@@ -45,6 +45,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       >
+        {/* Terapkan tema tersimpan SEBELUM paint agar tak ada kedipan putih/gelap. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('calyzr-theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}",
+          }}
+        />
         {/* use-credentials: tanpa ini Chrome mengambil manifest TANPA cookie, dan
             proxy publik (mis. halaman peringatan ngrok) membalas HTML — PWA gagal dipasang. */}
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />

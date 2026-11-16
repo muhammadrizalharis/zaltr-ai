@@ -12,6 +12,28 @@
   --muted: #8b98a9;
   --accent-a: #2dd4bf;
   --accent-b: #8b5cf6;
+  --code-bg: #0d1320;
+  --scrollbar: #2a3648;
+  --input-bg: rgba(10, 14, 20, 0.6);
+}
+
+/* ===== MODE TERANG — "soft cream" (putih hangat kekuningan, bukan putih pucat).
+   Diaktifkan lewat <html data-theme="light"> (toggle di sidebar, disimpan di
+   localStorage). Hanya meng-override variabel warna; semua komponen membaca
+   variabel ini sehingga ikut berubah tanpa menyentuh markup. ===== */
+:root[data-theme="light"] {
+  --bg: #f4efe3;
+  --panel: rgba(255, 253, 247, 0.78);
+  --panel-2: rgba(248, 243, 231, 0.82);
+  --panel-solid: #fffdf6;
+  --border: #e5ddc8;
+  --text: #2e2a21;
+  --muted: #847a64;
+  --accent-a: #0d9488;
+  --accent-b: #7c3aed;
+  --code-bg: #f1ead7;
+  --scrollbar: #d8cfb8;
+  --input-bg: rgba(255, 253, 247, 0.85);
 }
 
 @theme inline {
@@ -193,6 +215,9 @@ body {
   overflow: hidden;
   background: #070b12;
 }
+:root[data-theme="light"] .scene-app {
+  background: #f4efe3;
+}
 @keyframes gridslide {
   to { transform: translate(44px, 44px); }
 }
@@ -274,14 +299,14 @@ body {
 /* Scrollbar tipis khas calyzr */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a3648 transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #2a3648;
+  background: var(--scrollbar);
   border-radius: 999px;
 }
 *::-webkit-scrollbar-track {
@@ -306,7 +331,7 @@ body {
   width: 100%;
   border-radius: 0.75rem;
   border: 1px solid var(--border);
-  background: rgba(10, 14, 20, 0.6);
+  background: var(--input-bg);
   padding: 0.55rem 0.8rem;
   font-size: 0.9rem;
   color: var(--text);

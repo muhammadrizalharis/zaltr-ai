@@ -208,7 +208,7 @@ function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) 
         </button>
       </div>
       <pre
-        className="overflow-x-auto rounded-xl border border-line bg-[#0d1320] p-3 font-mono text-[13px] leading-relaxed"
+        className="overflow-x-auto rounded-xl border border-line bg-[var(--code-bg)] p-3 font-mono text-[13px] leading-relaxed"
         {...rest}
       >
         {children}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ConversationSummary, ProjectSummary } from "@/lib/types";
 import { InstallAppButton } from "@/components/install-app";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const CONVERSATIONS_CHANGED = "zaltr:conversations-changed";
 
@@ -404,7 +405,7 @@ export function Sidebar({
             Keluar
           </button>
         </div>
-        <div className="relative" data-menu-root>
+        <div className="relative flex items-center gap-2" data-menu-root>
           <button
             onClick={() => setMoreOpen((v) => !v)}
             className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs ${
@@ -415,6 +416,7 @@ export function Sidebar({
           >
             ☰ Menu
           </button>
+          <ThemeToggle />
           {moreOpen && (
             <div className="absolute bottom-9 left-0 z-30 w-52 rounded-xl border border-line bg-panel-solid p-1.5 shadow-2xl">
               {[
