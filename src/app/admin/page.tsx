@@ -143,11 +143,16 @@ function UserCard({
   }, [u]);
 
   const isSuper = me?.role === "superadmin";
-  const canManage =
-    isSuper || (me?.role === "admin" && (u.role === "user" || u.id === me.id));
-  // Admin tidak boleh menaikkan wewenang/kuota akunnya sendiri (server juga menolak).
-  const canEditPolicy = canManage && (isSuper || u.id !== me?.id);
-  const isSelfAdmin = !isSuper && u.id === me?.id;
+  const isSelf = u.id === me?.id;
+  // Siapa boleh MEMBUKA & mengatur kartu ini:
+  // - tidak pernah akun sendiri;
+  // - superadmin: admin biasa & user biasa (TIDAK sesama superadmin);
+  // - admin biasa: HANYA user biasa.
+  const canOpen =
+    !isSelf &&
+    ((isSuper && u.role !== "superadmin") || (me?.role === "admin" && u.role === "user"));
+  const canManage = canOpen;
+  const canEditPolicy = canManage;
 
   function togglePattern(p: string) {
     setAllowed((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
@@ -163,12 +168,15 @@ function UserCard({
   return (
     <div className="rounded-2xl border border-line bg-panel">
       <button
-        onClick={onToggle}
-        className="flex w-full items-center gap-4 px-5 py-4 text-left max-md:flex-col max-md:items-start max-md:gap-2 max-md:px-4"
+        onClick={canOpen ? onToggle : undefined}
+        disabled={!canOpen}
+        aria-disabled={!canOpen}
+        className="flex w-full items-center gap-4 px-5 py-4 text-left max-md:flex-col max-md:items-start max-md:gap-2 max-md:px-4 disabled:cursor-not-allowed"
       >
         <div className="min-w-0 flex-1 max-md:w-full">
           <p className="truncate font-medium">
             {u.name} <span className="text-sm text-muted">· {u.email}</span>
+            {isSelf && <span className="ml-1 text-[11px] text-muted">· akunmu</span>}
           </p>
           <p className="mt-0.5 text-xs text-muted">
             {u.conversationCount} chat · terpakai {u.creditUsed.toLocaleString("id-ID")} kredit ·
@@ -191,23 +199,14 @@ function UserCard({
               s/d {new Date(u.creditsExpireAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
             </span>
           )}
-          <span className="text-muted max-md:ml-auto">{open ? "▾" : "▸"}</span>
+          <span className="text-muted max-md:ml-auto">
+            {canOpen ? (open ? "▾" : "▸") : "🔒"}
+          </span>
         </div>
       </button>
 
-      {open && (
+      {open && canOpen && (
         <div className="border-t border-line px-5 py-5 max-md:px-4 max-md:py-4">
-          {!canManage && (
-            <p className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
-              Hanya superadmin yang bisa mengatur akun admin/superadmin lain.
-            </p>
-          )}
-          {isSelfAdmin && (
-            <p className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
-              Ini akunmu sendiri — kamu hanya bisa mengubah catatan & password. Paket, model,
-              limit, kredit, dan status harus diatur superadmin.
-            </p>
-          )}
           <div className="grid gap-6 lg:grid-cols-2">
             {/* --- Kolom kiri: akses & status --- */}
             <div className="space-y-5">
@@ -246,7 +245,7 @@ function UserCard({
               <Section title="Role & status">
                 <div className="flex flex-wrap gap-2">
                   <select
-                    disabled={!isSuper || u.id === me?.id}
+                    disabled={!isSuper}
                     value={u.role}
                     onChange={(e) => void onPatch(u.id, { role: e.target.value })}
                     className="input w-auto disabled:opacity-40"
@@ -268,11 +267,6 @@ function UserCard({
                 </div>
                 {!isSuper && (
                   <p className="mt-1 text-[11px] text-muted">Role hanya bisa diubah superadmin.</p>
-                )}
-                {isSuper && u.id === me?.id && (
-                  <p className="mt-1 text-[11px] text-muted">
-                    Role sendiri tidak bisa diubah — minta superadmin lain.
-                  </p>
                 )}
               </Section>
 
@@ -325,7 +319,6 @@ function UserCard({
                 <p className="mt-1 text-[11px] text-muted">
                   1 kredit = 1 pesan Copilot. Model lokal (Ollama/ComfyUI/demo) gratis.
                   Menaikkan saldo kredit otomatis mengirim email struk ke user.
-                  {!isSuper && u.id === me?.id && " Kredit sendiri hanya bisa diubah superadmin."}
                 </p>
               </Section>
 

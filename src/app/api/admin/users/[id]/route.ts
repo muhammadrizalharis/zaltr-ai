@@ -22,11 +22,11 @@ const patchSchema = z.object({
 });
 
 /**
- * Aturan wewenang:
- * - superadmin: bebas mengatur siapa pun, TAPI tidak boleh mengubah role
- *   dirinya sendiri (cegah self-demotion/lockout) dan tidak boleh menurunkan
- *   superadmin aktif terakhir.
- * - admin: hanya boleh mengatur user biasa; tidak boleh mengubah role apa pun.
+ * Aturan wewenang (dipaksakan di server, bukan sekadar UI):
+ * - Tidak seorang pun boleh mengatur AKUN SENDIRI lewat panel admin.
+ * - admin biasa: hanya boleh mengatur user biasa; tak bisa ubah role apa pun.
+ * - superadmin: boleh mengatur admin biasa & user biasa, TAPI tidak sesama
+ *   superadmin (saling untouchable; demosi superadmin hanya lewat DB).
  */
 export const PATCH = guarded(async (req: Request, { params }: Params) => {
   const actor = await requireAdmin();
@@ -42,16 +42,29 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
   });
   if (!target) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
 
-  // Tidak seorang pun boleh mengubah ROLE akunnya SENDIRI — termasuk superadmin.
-  // Cegah self-demotion/lockout tak sengaja; promosi/demosi orang lain tetap boleh.
-  if (body.data.role && target.id === actor.id) {
+  // ===== Gerbang akses akun: siapa boleh mengatur siapa =====
+  // 1) Tidak seorang pun boleh mengatur AKUN SENDIRI lewat panel admin
+  //    (termasuk superadmin) — cegah self-demotion, self-topup, dan lockout.
+  if (target.id === actor.id) {
     return NextResponse.json(
-      { error: "Tidak bisa mengubah role akun sendiri — minta superadmin lain" },
+      { error: "Tidak bisa mengatur akun sendiri lewat panel admin" },
       { status: 403 },
     );
   }
+  // 2) Admin biasa HANYA boleh mengatur user biasa.
+  if (actor.role === "admin" && target.role !== "user") {
+    return NextResponse.json({ error: "Admin hanya bisa mengatur user biasa" }, { status: 403 });
+  }
+  // 3) Superadmin mengatur admin & user — TIDAK sesama superadmin.
+  if (actor.role === "superadmin" && target.role === "superadmin") {
+    return NextResponse.json({ error: "Tidak bisa mengatur sesama superadmin" }, { status: 403 });
+  }
+  // Admin tak boleh mengubah role apa pun (hanya superadmin).
+  if (actor.role === "admin" && body.data.role) {
+    return NextResponse.json({ error: "Hanya superadmin yang bisa mengubah role" }, { status: 403 });
+  }
 
-  // Aktivasi akun (pending -> active) HANYA oleh superadmin.
+  // Aktivasi akun baru (pending -> active) hanya oleh superadmin.
   if (
     body.data.status === "active" &&
     target.status === "pending" &&
@@ -61,42 +74,6 @@ export const PATCH = guarded(async (req: Request, { params }: Params) => {
       { error: "Hanya superadmin yang bisa mengaktifkan akun baru" },
       { status: 403 },
     );
-  }
-
-  // Admin tidak boleh mengubah kredit dirinya sendiri (anti self-topup).
-  if (
-    actor.role !== "superadmin" &&
-    target.id === actor.id &&
-    body.data.creditBalance !== undefined
-  ) {
-    return NextResponse.json(
-      { error: "Admin tidak bisa mengubah kredit sendiri — minta superadmin" },
-      { status: 403 },
-    );
-  }
-
-  if (actor.role === "admin") {
-    if (target.role !== "user" && target.id !== actor.id) {
-      return NextResponse.json({ error: "Admin tidak bisa mengatur admin lain" }, { status: 403 });
-    }
-    if (body.data.role) {
-      return NextResponse.json({ error: "Hanya superadmin yang bisa mengubah role" }, { status: 403 });
-    }
-    // Anti self-escalation: pada akunnya sendiri admin hanya boleh mengubah
-    // catatan & password. Paket, model, limit, dan status wajib lewat superadmin.
-    if (target.id === actor.id) {
-      const bolehUntukDiriSendiri = new Set(["notes", "newPassword"]);
-      const terlarang = Object.keys(body.data).filter((k) => !bolehUntukDiriSendiri.has(k));
-      if (terlarang.length > 0) {
-        return NextResponse.json(
-          {
-            error:
-              "Admin hanya bisa mengubah catatan & password sendiri — paket, model, limit, dan status minta superadmin",
-          },
-          { status: 403 },
-        );
-      }
-    }
   }
 
   // Lindungi superadmin terakhir dari penurunan role/penonaktifan.
@@ -200,10 +177,7 @@ export const DELETE = guarded(async (_req: Request, { params }: Params) => {
   const target = await db.user.findUnique({ where: { id }, select: { role: true } });
   if (!target) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
   if (target.role === "superadmin") {
-    const supers = await db.user.count({ where: { role: "superadmin" } });
-    if (supers <= 1) {
-      return NextResponse.json({ error: "Tidak bisa menghapus superadmin terakhir" }, { status: 400 });
-    }
+    return NextResponse.json({ error: "Tidak bisa menghapus sesama superadmin" }, { status: 403 });
   }
   await db.user.delete({ where: { id } }); // cascade: session, project, conversation, message
   return NextResponse.json({ ok: true });
