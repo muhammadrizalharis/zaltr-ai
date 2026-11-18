@@ -6,16 +6,48 @@
 import { webSearchSmart, formatSearchContext, type SearchHit } from "@/server/search";
 import { crawlEnabled, readPageText } from "@/server/crawl";
 
+/** Istilah riset yang sebenarnya pertanyaan tentang metodologi, bukan permintaan mencari sumber. */
+const RISET_METODOLOGI =
+  /\b(metode|metodologi|desain|design|method(ology)?|jenis|tipe|pendekatan)\s+(riset|research|penelitian)\b|\b(riset|research)\s+(design|method(ology)?|desain|metode|question|gap)\b/;
+/** Konteks "kerjakan dokumen/kode yang sudah ada" -> bukan cari di web, kecuali ada penanda web/akademik eksplisit. */
+const KONTEKS_DOKUMEN =
+  /\b(upload|unggah|lampir|dokumen (ini|yang)|file (ini|yang)|berkas|pdf yang|di atas|di bawah ini|berikut|tabel (ini|excel)|excel ini|csv|spreadsheet|kode (ini|saya)|fungsi ini)/;
+const PENANDA_WEB = /\b(internet|web|online|google|jurnal|paper|referensi|literatur|riset|research)\b/;
+
+const CARI = "(?:cari|carikan|cariin|carikanlah|temukan|telusuri|find|search(?: for)?|look(?:ing)? for|need|want|butuh|perlu)";
+const OBJEK_AKADEMIK =
+  "(?:referensi|references?|jurnal|journals?|papers?|literatur|literature|sitasi|citations?|artikel ilmiah|journal articles?|penelitian terdahulu|studi terkait|(?:credible|reliable|trusted) sources?|sumber (?:terpercaya|kredibel|valid|rujukan|pustaka|ilmiah|akademik))";
+
+const POLA_RISET: RegExp[] = [
+  // a. kata kerja/nomina riset (kecuali pertanyaan metodologi, diperiksa terpisah)
+  /\b(research|riset|meriset)\b/,
+  // b. perintah cari + objek akademik
+  new RegExp(`\\b${CARI}\\b.{0,50}\\b${OBJEK_AKADEMIK}\\b`),
+  // c. "referensi/literatur ... tentang/untuk"
+  /\b(referensi|literatur|literature)\b.{0,40}\b(untuk|tentang|mengenai|terkait|soal|about|on)\b/,
+  // d. frasa akademik baku
+  /\b(penelitian terdahulu|tinjauan pustaka|state of the art|systematic review|literature review|studi literatur)\b/,
+  // e. perintah cari di web/internet; googling/browsing
+  /\b(?:cari|carikan|search|browse|telusuri)\b.{0,25}\b(?:di |on |the )?(?:web|internet|google|online)\b/,
+  /\b(googling|browsing|browse)\b/,
+  // f. cari berita/informasi/statistik
+  /\b(?:cari|carikan|cariin|find)\b.{0,30}\b(?:berita|informasi|info|statistik|kabar|data (?:statistik|terbaru|tentang|mengenai))\b/,
+  // g. informasi waktu nyata (butuh web walau tanpa kata "cari")
+  /\b(?:berita|harga|kurs|cuaca|skor)\b.{0,30}\b(?:hari ini|terbaru|terkini|saat ini|sekarang|besok|live)\b/,
+  /\b(?:terkini|terbaru)\b.{0,20}\b(?:berita|kabar)\b/,
+  /\b(?:berita|kabar)\b.{0,15}\b(?:terbaru|terkini)\b/,
+  // "paper/jurnal terbaru", "latest papers on ..." -> mencari literatur terkini
+  /\b(?:latest|recent|terbaru|terkini)\b.{0,15}\b(?:papers?|journals?|jurnal|literature|literatur)\b/,
+  /\b(?:papers?|jurnal)\b.{0,15}\b(?:terbaru|terkini)\b/,
+  /\bcari tahu\b.{0,60}\b(?:terbaru|terkini|tahun ini|saat ini)\b/,
+];
+
 /** Niat riset/pencarian sumber (hanya 600 karakter pertama agar tempelan naskah tak memicu). */
 export function wantsResearch(text: string): boolean {
   const t = text.slice(0, 600).toLowerCase();
-  return (
-    /\b(research|riset|meriset|deep research)\b/.test(t) ||
-    /\b(cari|carikan|cariin|temukan|telusuri|find|search|looking for)\b.{0,50}\b(referensi|references?|jurnal|journals?|papers?|literatur|literature|sumber|sources?|sitasi|penelitian|studi|studies|artikel|articles?|berita|informasi|data)\b/.test(t) ||
-    /\b(referensi|jurnal|literatur|sumber)\b.{0,40}\b(untuk|tentang|mengenai|terkait|soal|about|on)\b/.test(t) ||
-    /\b(penelitian terdahulu|tinjauan pustaka|state of the art|systematic review|literature review|studi literatur)\b/.test(t) ||
-    /\b(cari|search|browse|telusuri|googling?)\b.{0,25}\b(di )?(web|internet|google|online)\b/.test(t)
-  );
+  if (!t.trim()) return false;
+  if (KONTEKS_DOKUMEN.test(t) && !PENANDA_WEB.test(t)) return false;
+  return POLA_RISET.some((re, i) => re.test(t) && !(i === 0 && RISET_METODOLOGI.test(t)));
 }
 
 const MAX_PAGES = 4; // batas keras halaman yang dibaca
