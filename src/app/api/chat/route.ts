@@ -25,6 +25,7 @@ import { retrieve, formatKnowledge, countIndexed, ingestUploadOnce, listSourceNa
 import { runAgent } from "@/server/agent";
 import { wantsAction } from "@/server/intent";
 import { webSearchSmart, formatSearchContext } from "@/server/search";
+import { researchForChat, wantsResearch } from "@/server/research";
 import { extractMemories, memoryContext } from "@/server/memories";
 import { embedMessage } from "@/server/msgsearch";
 import { describeImages, isNativeVisionModel } from "@/server/vision";
@@ -182,6 +183,8 @@ export const POST = guarded(async (req: Request) => {
     content: m.content,
   }));
   const last = providerHistory.at(-1);
+  /** Pengguna minta riset/cari referensi -> dijalankan otomatis di dalam stream (tanpa toggle). */
+  let researchIntent = false;
   // Sitasi RAG untuk ditampilkan di klien ([K#] -> nama sumber + cuplikan).
   const citations: Array<{ k: number; name: string; snippet: string }> = [];
   /** Peringatan untuk pengguna (mis. gambar tak terbaca), dikirim di awal stream. */
@@ -434,6 +437,7 @@ export const POST = guarded(async (req: Request) => {
     const isParafrase =
       !isImageGen && parsed.data.paraphrase != null && isModeParafrase(parsed.data.paraphrase);
     const noContext = isFree || isImageGen || isParafrase;
+    researchIntent = !noContext && modelId !== "zaltr-core" && wantsResearch(content);
     const preamble: string[] = [];
     if (!noContext && me.customInstructions?.trim()) {
       preamble.push(`Instruksi pribadi dari pengguna (patuhi):\n${me.customInstructions.trim().slice(0, 2_000)}`);
@@ -465,8 +469,8 @@ export const POST = guarded(async (req: Request) => {
     const mem = noContext ? null : await memoryContext(me.id);
     if (mem) preamble.push(mem);
 
-    // Web search (toggle "Cari web" di composer).
-    if (web && !noContext) {
+    // Web search (toggle "Cari web" di composer). Permintaan riset ditangani riset otomatis di stream.
+    if (web && !noContext && !researchIntent) {
       try {
         const hits = await webSearchSmart(content.split("\n")[0] || content);
         preamble.push(formatSearchContext(content.split("\n")[0] || content, hits));
@@ -586,6 +590,21 @@ export const POST = guarded(async (req: Request) => {
             }
           }
         } else {
+          // Riset otomatis (cari referensi/jurnal/research): baca halaman teratas, berhenti bila cukup.
+          if (researchIntent) {
+            try {
+              for await (const ev of researchForChat(content, signal)) {
+                if (ev.kind === "step") {
+                  send({ type: "step", text: ev.text });
+                } else {
+                  const u = providerHistory.at(-1);
+                  if (u && u.role === "user") u.content = `${ev.text}\n\n---\n\n${u.content}`;
+                }
+              }
+            } catch {
+              /* riset opsional — lanjut jawab tanpa bahan tambahan */
+            }
+          }
           const gen = dispatch(modelId, {
             history: providerHistory,
             conversationId,
