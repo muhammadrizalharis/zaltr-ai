@@ -5,11 +5,14 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import { escapeCurrencyDollars } from "./markdown-math";
 
 // Model kadang menulis math dengan \[..\] / \(..\); samakan ke $$..$$ / $..$ agar
 // remark-math + KaTeX merendernya jadi rumus typeset (seperti Word/Gemini).
+// Nominal uang ("US$3.776,60") di-escape LEBIH DULU agar tak dibaca sebagai rumus; urutan ini
+// penting karena \( x \) -> "$ x $" (berspasi) tak boleh ikut ter-escape.
 function normalizeMath(s: string): string {
-  return s
+  return escapeCurrencyDollars(s)
     .replace(/\\\[/g, () => "$$")
     .replace(/\\\]/g, () => "$$")
     .replace(/\\\(/g, () => "$")
