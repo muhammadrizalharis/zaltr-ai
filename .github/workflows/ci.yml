@@ -38,7 +38,8 @@ jobs:
       # Aturan set-state-in-effect memberi 20 galat gaya pada pola yang disengaja di komponen UI;
       # dimatikan di CI agar semua aturan lain tetap wajib lulus.
       - name: Lint
-        run: npx eslint --rule 'react-hooks/set-state-in-effect: off'
+        run: |
+          npx eslint --rule 'react-hooks/set-state-in-effect: off'
 
       - name: Tes
         run: npm test
