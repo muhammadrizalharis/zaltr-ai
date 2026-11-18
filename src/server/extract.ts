@@ -147,26 +147,46 @@ const DOCLING_MAX_BYTES = 30 * 1024 * 1024;
 // Di bawah rata-rata karakter/halaman ini, PDF dianggap hasil scan (tanpa lapisan teks).
 const SPARSE_CHARS_PER_PAGE = 150;
 
-/** PDF -> Markdown via Docling (OCR, tabel, multi-kolom). null bila tak tersedia/gagal. */
-async function pdfViaDocling(buf: Buffer, ocr: boolean): Promise<string | null> {
+/** Kegagalan sesaat (GPU penuh dsb): job gagal tampil sebagai 404/5xx, atau koneksi putus. */
+function transientStatus(s: number): boolean {
+  return s === 404 || s >= 500;
+}
+
+/**
+ * PDF -> Markdown via Docling (OCR, tabel, multi-kolom). null bila tak tersedia/gagal.
+ * Server GPU dipakai bersama, jadi kegagalan sesaat (CUDA OOM) dicoba SEKALI lagi setelah jeda;
+ * timeout & galat berkas (400/413/422) tidak diulang.
+ */
+export async function pdfViaDocling(buf: Buffer, ocr: boolean, retryDelayMs = 4_000): Promise<string | null> {
   if (!DOCLING_URL || buf.length > DOCLING_MAX_BYTES) return null;
-  try {
-    const form = new FormData();
-    form.append("files", new Blob([new Uint8Array(buf)], { type: "application/pdf" }), "dokumen.pdf");
-    form.append("to_formats", "md");
-    form.append("do_ocr", ocr ? "true" : "false");
-    const res = await fetch(`${DOCLING_URL}/v1/convert/file`, {
-      method: "POST",
-      body: form,
-      signal: AbortSignal.timeout(120_000),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { status?: string; document?: { md_content?: string } };
-    const md = data.document?.md_content?.trim();
-    return data.status === "success" && md ? md : null;
-  } catch {
-    return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let retry = false;
+    try {
+      const form = new FormData();
+      form.append("files", new Blob([new Uint8Array(buf)], { type: "application/pdf" }), "dokumen.pdf");
+      form.append("to_formats", "md");
+      form.append("do_ocr", ocr ? "true" : "false");
+      const res = await fetch(`${DOCLING_URL}/v1/convert/file`, {
+        method: "POST",
+        body: form,
+        signal: AbortSignal.timeout(120_000),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { status?: string; document?: { md_content?: string } };
+        const md = data.document?.md_content?.trim();
+        if (data.status === "success" && md) return md;
+        retry = data.status !== "success";
+      } else {
+        retry = transientStatus(res.status);
+      }
+    } catch (e) {
+      const name = (e as Error).name;
+      retry = name !== "TimeoutError" && name !== "AbortError";
+    }
+    if (!retry || attempt === 1) return null;
+    await new Promise((r) => setTimeout(r, retryDelayMs));
   }
+  return null;
 }
 
 async function fromPdf(buf: Buffer): Promise<string> {
