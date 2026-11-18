@@ -8,6 +8,28 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+type Platform = "ios" | "android" | "desktop-firefox" | "desktop-safari" | "desktop";
+
+/** Platform + browser: menentukan apakah APK relevan dan petunjuk pasang yang benar. */
+function detectPlatform(ua: string, touchPoints = 0): Platform {
+  if (/iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && touchPoints > 1)) return "ios"; // iPadOS mengaku Mac
+  if (/android/i.test(ua)) return "android";
+  if (/firefox|fxios/i.test(ua)) return "desktop-firefox";
+  if (/safari/i.test(ua) && !/chrome|chromium|crios|edg|opr|brave/i.test(ua)) return "desktop-safari";
+  return "desktop";
+}
+
+/** Petunjuk pasang manual untuk desktop saat browser tidak menampilkan tombol instal. */
+function desktopHint(p: Platform): string {
+  if (p === "desktop-firefox") {
+    return "Firefox di desktop belum bisa memasang aplikasi web. Buka calyzr di Chrome, Edge, atau Brave lalu pilih Instal, atau tetap pakai di Firefox seperti biasa.";
+  }
+  if (p === "desktop-safari") {
+    return "Di Safari (macOS): menu Berkas → Tambahkan ke Dock.";
+  }
+  return "Di Chrome/Edge/Brave: klik ikon instal di bilah alamat, atau menu ⋮ → Instal CALYZR.";
+}
+
 /**
  * Ajakan memasang calyzr sebagai aplikasi: tombol "Install App" (PWA, Android/
  * Chrome & desktop), unduh APK Android, dan petunjuk "Add to Home Screen" untuk
@@ -16,7 +38,7 @@ type BeforeInstallPromptEvent = Event & {
 export function InstallApp() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
+  const [platform, setPlatform] = useState<Platform>("desktop");
 
   useEffect(() => {
     const onBIP = (e: Event) => {
@@ -28,7 +50,7 @@ export function InstallApp() {
     window.addEventListener("appinstalled", onInstalled);
 
     const ua = navigator.userAgent || "";
-    setIsIOS(/iphone|ipad|ipod/i.test(ua));
+    setPlatform(detectPlatform(ua, navigator.maxTouchPoints || 0));
     const nav = navigator as Navigator & { standalone?: boolean };
     const standalone =
       window.matchMedia?.("(display-mode: standalone)")?.matches || nav.standalone === true;
@@ -64,24 +86,28 @@ export function InstallApp() {
             Install App
           </button>
         )}
-        <a
-          href="/calyzr.apk"
-          download
-          className="rounded-xl border border-line bg-panel-2 px-3 py-2 text-sm hover:text-ink"
-        >
-          Unduh APK Android
-        </a>
+        {platform === "android" && (
+          <a
+            href="/calyzr.apk"
+            download
+            className="rounded-xl border border-line bg-panel-2 px-3 py-2 text-sm hover:text-ink"
+          >
+            Unduh APK Android
+          </a>
+        )}
       </div>
-      {isIOS ? (
+      {platform === "ios" ? (
         <p className="text-xs text-muted">
           iPhone: ketuk tombol <b>Bagikan</b> (kotak dengan panah) → <b>Add to Home Screen</b>.
         </p>
-      ) : (
+      ) : platform === "android" ? (
         !deferred && (
           <p className="text-xs text-muted">
             Android/Chrome: menu ⋮ → <b>Install app / Tambahkan ke Layar Utama</b>, atau unduh APK di atas.
           </p>
         )
+      ) : (
+        !deferred && <p className="text-xs text-muted">{desktopHint(platform)}</p>
       )}
     </section>
   );
@@ -95,7 +121,7 @@ export function InstallApp() {
 export function InstallAppButton() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
+  const [platform, setPlatform] = useState<Platform>("desktop");
   const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
@@ -106,8 +132,7 @@ export function InstallAppButton() {
     const onInstalled = () => setInstalled(true);
     window.addEventListener("beforeinstallprompt", onBIP);
     window.addEventListener("appinstalled", onInstalled);
-    const ua = navigator.userAgent || "";
-    setIsIOS(/iphone|ipad|ipod/i.test(ua));
+    setPlatform(detectPlatform(navigator.userAgent || "", navigator.maxTouchPoints || 0));
     const nav = navigator as Navigator & { standalone?: boolean };
     if (window.matchMedia?.("(display-mode: standalone)")?.matches || nav.standalone === true) {
       setInstalled(true);
@@ -127,11 +152,11 @@ export function InstallAppButton() {
       setDeferred(null);
       return;
     }
-    if (isIOS) {
-      setShowHint((v) => !v);
+    if (platform === "android") {
+      window.location.href = "/calyzr.apk"; // APK hanya relevan di Android
       return;
     }
-    window.location.href = "/calyzr.apk"; // Android/desktop: unduh APK
+    setShowHint((v) => !v); // iOS & desktop: petunjuk pasang manual
   }
 
   return (
@@ -140,11 +165,24 @@ export function InstallAppButton() {
         onClick={() => void onClick()}
         className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-accent-a/40 bg-accent-a/10 px-3 py-2 text-xs font-semibold text-accent-a hover:bg-accent-a/20"
       >
-        📥 {deferred ? "Pasang Aplikasi" : isIOS ? "Pasang di iPhone" : "Unduh Aplikasi"}
+        📥{" "}
+        {deferred
+          ? "Pasang Aplikasi"
+          : platform === "ios"
+            ? "Pasang di iPhone"
+            : platform === "android"
+              ? "Unduh Aplikasi"
+              : "Cara Pasang Aplikasi"}
       </button>
-      {showHint && isIOS && (
+      {showHint && !deferred && platform !== "android" && (
         <p className="mt-1 text-[10px] leading-relaxed text-muted">
-          Di Safari: ketuk <b>Bagikan</b> (kotak panah) → <b>Add to Home Screen</b>.
+          {platform === "ios" ? (
+            <>
+              Di Safari: ketuk <b>Bagikan</b> (kotak panah) → <b>Add to Home Screen</b>.
+            </>
+          ) : (
+            desktopHint(platform)
+          )}
         </p>
       )}
     </div>

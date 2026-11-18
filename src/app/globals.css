@@ -87,6 +87,12 @@ body {
     radial-gradient(90% 60% at 50% 0%, rgba(10, 14, 20, 0.25), rgba(10, 14, 20, 0.6) 75%),
     linear-gradient(rgba(10, 14, 20, 0.42), rgba(10, 14, 20, 0.6));
 }
+/* Mode terang: foto kota dikaburkan jadi wash krem lembut (bukan putih, bukan gelap) */
+:root[data-theme="light"] .scene-city-veil {
+  background:
+    radial-gradient(90% 60% at 50% 0%, rgba(244, 239, 227, 0.72), rgba(244, 239, 227, 0.9) 75%),
+    linear-gradient(rgba(244, 239, 227, 0.8), rgba(244, 239, 227, 0.9));
+}
 
 /* ===== SCENE LOGIN: gerbang orbit calyzr (tanpa foto) ===== */
 .scene-portal {
@@ -100,6 +106,28 @@ body {
     #05070d;
 }
 /* lantai grid perspektif yang mengalir — via transform (GPU) */
+:root[data-theme="light"] .scene-portal {
+  background:
+    radial-gradient(80% 65% at 50% 36%, rgba(124, 58, 237, 0.1), transparent 62%),
+    radial-gradient(55% 45% at 50% 42%, rgba(13, 148, 136, 0.1), transparent 55%),
+    #f4efe3;
+}
+:root[data-theme="light"] .scene-portal::before {
+  background-image:
+    linear-gradient(rgba(13, 148, 136, 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.18) 1px, transparent 1px);
+}
+:root[data-theme="light"] .scene-portal::after {
+  box-shadow:
+    12vw 18vh 0 rgba(132, 122, 100, 0.55), 26vw 8vh 0 rgba(13, 148, 136, 0.7),
+    38vw 26vh 0 rgba(132, 122, 100, 0.4), 55vw 12vh 0 rgba(124, 58, 237, 0.65),
+    68vw 30vh 0 rgba(132, 122, 100, 0.5), 82vw 16vh 0 rgba(13, 148, 136, 0.6),
+    90vw 34vh 0 rgba(132, 122, 100, 0.4), 8vw 42vh 0 rgba(124, 58, 237, 0.5),
+    47vw 5vh 0 rgba(132, 122, 100, 0.6), 74vw 44vh 0 rgba(13, 148, 136, 0.5);
+}
+:root[data-theme="light"] .orbit { border-color: rgba(13, 148, 136, 0.35); }
+:root[data-theme="light"] .orbit-b { border-color: rgba(124, 58, 237, 0.3); }
+:root[data-theme="light"] .orbit-c { border-color: rgba(190, 80, 140, 0.22); }
 @keyframes gridflow {
   from { transform: perspective(420px) rotateX(62deg) translateY(-44px); }
   to   { transform: perspective(420px) rotateX(62deg) translateY(0); }

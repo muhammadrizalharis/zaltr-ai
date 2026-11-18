@@ -30,6 +30,13 @@ if [ "$cur" = "$latest" ]; then
   exit 0
 fi
 
+# Versi yang sudah terbukti tak cocok dengan SDK aplikasi dilewati (tak restart runtime tiap malam).
+BAD="$LOGDIR/copilot-bad-versions"
+if grep -qxF "$latest" "$BAD" 2>/dev/null; then
+  log "SKIP: CLI $latest sudah pernah gagal uji kompatibilitas SDK (tetap di $cur)"
+  exit 0
+fi
+
 log "UPDATE CLI Copilot: $cur -> $latest"
 bak=$(mktemp)
 cp -p .env "$bak"
@@ -37,6 +44,8 @@ cp -p .env "$bak"
 restore() {
   cp -p "$bak" .env
   chmod 600 .env
+  # Tag image tetap ":local" -> wajib build ulang agar versi lama benar-benar kembali.
+  "${DC[@]}" build copilot-runtime >>"$LOG" 2>&1 || true
   "${DC[@]}" up -d copilot-runtime >>"$LOG" 2>&1 || true
   rm -f "$bak"
 }
@@ -58,6 +67,18 @@ for _ in $(seq 1 24); do
   [ "$st" = healthy ] && { ok=1; break; }
   sleep 5
 done
+
+# Gerbang kompatibilitas: container sehat belum berarti SDK aplikasi bisa bicara dengan CLI baru
+# (mis. "SDK protocol version mismatch"). Uji dari container web; gagal -> rollback.
+if [ "$ok" = 1 ]; then
+  probe=$(sudo -n docker exec -i -w /app zaltr-web node --input-type=module < "$ROOT/bin/zaltr-copilot-probe.mjs" 2>&1 | tail -1 || true)
+  if [ "$probe" != "PROBE_OK" ]; then
+    log "FAIL: SDK aplikasi tak cocok dengan CLI $latest (${probe:-tanpa keluaran}) -> rollback ke $cur"
+    echo "$latest" >> "$BAD"
+    restore
+    exit 1
+  fi
+fi
 
 if [ "$ok" = 1 ]; then
   rm -f "$bak"

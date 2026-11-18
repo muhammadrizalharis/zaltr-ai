@@ -23,4 +23,6 @@ fi
 
 # Bind 0.0.0.0 aman: port 4321 hanya ada di network internal zaltr-net,
 # tidak pernah dipublikasikan ke host/internet.
-exec copilot --headless --host 0.0.0.0 --port 4321
+# --no-auto-update: versi CLI hanya berubah lewat bin/zaltr-copilot-update.sh (ada uji kompatibilitas
+# + rollback). Tanpa ini CLI mengunduh & memakai rilis baru sendiri saat start, di luar pengawasan.
+exec copilot --headless --no-auto-update --host 0.0.0.0 --port 4321

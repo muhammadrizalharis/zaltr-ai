@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSessionUser } from "@/server/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export default async function WelcomePage() {
           <span className="wordmark text-xl font-bold">CALYZR.AI</span>
         </span>
         <nav className="flex items-center gap-3 text-sm">
+          <ThemeToggle />
           {user ? (
             <Link
               href="/chat"

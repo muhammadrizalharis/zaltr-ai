@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function AuthForm({
   mode,
@@ -70,6 +71,9 @@ export function AuthForm({
       >
         ← Beranda
       </Link>
+      <div className="absolute right-4 top-4 z-20 md:right-6 md:top-6">
+        <ThemeToggle />
+      </div>
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 text-center">
           <Link href="/" className="flex flex-col items-center gap-3">
