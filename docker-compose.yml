@@ -199,6 +199,9 @@ services:
       # Crawl4AI (server GPU): baca isi halaman web utk aksi agent "buka"; kosong = nonaktif
       ZALTR_CRAWL4AI_URL: ${ZALTR_CRAWL4AI_URL:-}
       ZALTR_CRAWL4AI_API_TOKEN: ${ZALTR_CRAWL4AI_API_TOKEN:-}
+      # Baca halaman langsung dari server ini lebih dulu (0 = matikan) & cache pencarian (detik; 0 = matikan)
+      ZALTR_PAGE_DIRECT: ${ZALTR_PAGE_DIRECT:-1}
+      ZALTR_SEARCH_CACHE_SEC: ${ZALTR_SEARCH_CACHE_SEC:-600}
       ZALTR_RUNNER_URL: http://runner:8484
       ZALTR_WA_ADMIN: ${ZALTR_WA_ADMIN:-}
       # Batas teks lampiran yang dibaca model (kosong = default 200rb/file, 300rb total)
