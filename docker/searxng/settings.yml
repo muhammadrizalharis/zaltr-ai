@@ -6,6 +6,13 @@ search:
     - html
     - json
 
+# Mesin ilmiah (kategori "science") — pencarian jurnal/referensi gratis tanpa API key.
+engines:
+  - name: crossref
+    disabled: false
+  - name: openalex
+    disabled: false
+
 server:
   # secret_key dioverride env SEARXNG_SECRET (di docker-compose).
   limiter: false

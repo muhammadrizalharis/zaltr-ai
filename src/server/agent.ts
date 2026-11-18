@@ -9,7 +9,7 @@
 import { randomUUID } from "node:crypto";
 import { dispatch } from "@/server/providers";
 import type { HistoryItem } from "@/server/providers";
-import { webSearch, formatSearchContext } from "@/server/search";
+import { webSearchSmart, scholarSearch, formatSearchContext } from "@/server/search";
 import { retrieve, formatKnowledge } from "@/server/knowledge";
 import {
   parseDriveLinks,
@@ -36,6 +36,7 @@ const TOOL_INSTRUCTIONS =
   "AKSI: baca <path>                      (baca isi berkas workspace atau input/<nama> — pdf/docx/xlsx ok)\n" +
   "AKSI: daftar                           (lihat semua berkas workspace)\n" +
   "AKSI: web <kata kunci>                 (cari web)\n" +
+  "AKSI: jurnal <kata kunci>              (cari jurnal/paper ilmiah: PubMed, arXiv, Crossref, OpenAlex, dll — pakai kata kunci bahasa Inggris untuk hasil terbaik)\n" +
   "AKSI: catatan <kata kunci>             (cari knowledge base pengguna)\n" +
   "AKSI: drive <link>                     (baca Google Drive publik)\n" +
   "Aturan: (1) Untuk membuat Word/PDF/Excel/PPT pakai AKSI: kode dgn pustaka di atas dan simpan ke " +
@@ -228,6 +229,7 @@ export async function* runAgent(opts: {
     const readM = reply.match(/^\s*AKSI:\s*baca\s+(.+)$/im);
     const listM = reply.match(/^\s*AKSI:\s*daftar\s*$/im);
     const webM = reply.match(/^\s*AKSI:\s*web\s+(.+)$/im);
+    const jurnalM = reply.match(/^\s*AKSI:\s*jurnal\s+(.+)$/im);
     const kbM = reply.match(/^\s*AKSI:\s*catatan\s+(.+)$/im);
     const driveM = reply.match(/^\s*AKSI:\s*drive\s+(.+)$/im);
 
@@ -314,12 +316,24 @@ export async function* runAgent(opts: {
       observe(reply, obs);
       continue;
     }
+    if (jurnalM) {
+      const q = jurnalM[1].trim().slice(0, 200);
+      yield { kind: "progress", text: `\n📚 Mencari jurnal: “${q}”…\n` };
+      let obs: string;
+      try {
+        obs = formatSearchContext(q, await scholarSearch(q));
+      } catch {
+        obs = "(pencarian jurnal gagal)";
+      }
+      observe(reply, obs);
+      continue;
+    }
     if (webM) {
       const q = webM[1].trim().slice(0, 200);
       yield { kind: "progress", text: `\n🔎 Mencari web: “${q}”…\n` };
       let obs: string;
       try {
-        obs = formatSearchContext(q, await webSearch(q));
+        obs = formatSearchContext(q, await webSearchSmart(q));
       } catch {
         obs = "(pencarian web gagal)";
       }
@@ -331,7 +345,7 @@ export async function* runAgent(opts: {
     if (/^\s*AKSI:/im.test(reply)) {
       observe(
         reply,
-        "(format AKSI tidak dikenali. Gunakan persis salah satu: shell, kode, tulis <path> lalu baris baru + isi, baca <path>, daftar, web, catatan, drive.)",
+        "(format AKSI tidak dikenali. Gunakan persis salah satu: shell, kode, tulis <path> lalu baris baru + isi, baca <path>, daftar, web, jurnal, catatan, drive.)",
       );
       continue;
     }

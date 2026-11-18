@@ -24,7 +24,7 @@ import {
 import { retrieve, formatKnowledge, countIndexed, ingestUploadOnce, listSourceNames, fullTextOfNamedSources } from "@/server/knowledge";
 import { runAgent } from "@/server/agent";
 import { wantsAction } from "@/server/intent";
-import { webSearch, formatSearchContext } from "@/server/search";
+import { webSearchSmart, formatSearchContext } from "@/server/search";
 import { extractMemories, memoryContext } from "@/server/memories";
 import { embedMessage } from "@/server/msgsearch";
 import { describeImages, isNativeVisionModel } from "@/server/vision";
@@ -468,7 +468,7 @@ export const POST = guarded(async (req: Request) => {
     // Web search (toggle "Cari web" di composer).
     if (web && !noContext) {
       try {
-        const hits = await webSearch(content.split("\n")[0] || content);
+        const hits = await webSearchSmart(content.split("\n")[0] || content);
         preamble.push(formatSearchContext(content.split("\n")[0] || content, hits));
       } catch {
         preamble.push("[Pencarian web gagal — jawab dari pengetahuanmu dan katakan itu.]");

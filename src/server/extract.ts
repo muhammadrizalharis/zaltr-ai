@@ -142,13 +142,46 @@ async function fromXlsx(buf: Buffer): Promise<string> {
   return parts.join("\n\n") || shared.join("\n");
 }
 
+const DOCLING_URL = (process.env.ZALTR_DOCLING_URL ?? "").replace(/\/$/, "");
+const DOCLING_MAX_BYTES = 30 * 1024 * 1024;
+// Di bawah rata-rata karakter/halaman ini, PDF dianggap hasil scan (tanpa lapisan teks).
+const SPARSE_CHARS_PER_PAGE = 150;
+
+/** PDF -> Markdown via Docling (OCR, tabel, multi-kolom). null bila tak tersedia/gagal. */
+async function pdfViaDocling(buf: Buffer, ocr: boolean): Promise<string | null> {
+  if (!DOCLING_URL || buf.length > DOCLING_MAX_BYTES) return null;
+  try {
+    const form = new FormData();
+    form.append("files", new Blob([new Uint8Array(buf)], { type: "application/pdf" }), "dokumen.pdf");
+    form.append("to_formats", "md");
+    form.append("do_ocr", ocr ? "true" : "false");
+    const res = await fetch(`${DOCLING_URL}/v1/convert/file`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { status?: string; document?: { md_content?: string } };
+    const md = data.document?.md_content?.trim();
+    return data.status === "success" && md ? md : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fromPdf(buf: Buffer): Promise<string> {
   // Import langsung lib internal: index pdf-parse punya kode debug yang
   // membaca file uji saat dimuat di luar CommonJS parent (bug dikenal).
   const { default: pdfParse } = (await import("pdf-parse/lib/pdf-parse.js")) as {
-    default: (b: Buffer) => Promise<{ text: string }>;
+    default: (b: Buffer) => Promise<{ text: string; numpages?: number }>;
   };
   const out = await pdfParse(buf);
+  const pages = Math.max(1, out.numpages ?? 1);
+  // Teks sangat sedikit = kemungkinan scan -> Docling dengan OCR; bila gagal pakai hasil asli.
+  if (out.text.trim().length / pages < SPARSE_CHARS_PER_PAGE) {
+    const md = await pdfViaDocling(buf, true);
+    if (md) return md;
+  }
   return out.text;
 }
 

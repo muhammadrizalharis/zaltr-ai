@@ -7,16 +7,22 @@ const SEARXNG_URL = (process.env.ZALTR_SEARXNG_URL ?? "").replace(/\/$/, "");
 
 export type SearchHit = { title: string; url: string; snippet: string };
 
-export async function webSearch(query: string, max = 5): Promise<SearchHit[]> {
+export async function webSearch(
+  query: string,
+  max = 5,
+  opts?: { science?: boolean },
+): Promise<SearchHit[]> {
   if (!SEARXNG_URL) throw new Error("SearXNG belum dikonfigurasi (ZALTR_SEARXNG_URL)");
   const qs = new URLSearchParams({
     q: query.slice(0, 300),
     format: "json",
-    language: "id",
+    language: opts?.science ? "all" : "id",
     safesearch: "1",
   });
+  // Kategori "science": PubMed, arXiv, Semantic Scholar, Crossref, OpenAlex, dll.
+  if (opts?.science) qs.set("categories", "science");
   const res = await fetch(`${SEARXNG_URL}/search?${qs}`, {
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(opts?.science ? 20_000 : 10_000),
     cache: "no-store",
     headers: { "User-Agent": "zaltr-web" },
   });
@@ -47,4 +53,27 @@ export function formatSearchContext(query: string, hits: SearchHit[]): string {
     `${rows}\n=== Akhir hasil pencarian ===\n` +
     `Jawab berdasarkan hasil di atas bila relevan dan sebutkan sumbernya sebagai link markdown.`
   );
+}
+
+/** Pertanyaan bernuansa akademik (jurnal/referensi/sitasi) -> sertakan hasil ilmiah. */
+export function isScholarlyQuery(q: string): boolean {
+  return /\b(jurnal|journal|paper|referensi|sitasi|citation|literatur|literature|artikel ilmiah|scopus|sinta|doi|penelitian terdahulu|state of the art|systematic review|tinjauan pustaka)\b/i.test(
+    q,
+  );
+}
+
+/** Pencarian web; bila query akademik, gabungkan dengan hasil mesin ilmiah (tanpa duplikat URL). */
+export async function webSearchSmart(query: string, max = 5): Promise<SearchHit[]> {
+  if (!isScholarlyQuery(query)) return webSearch(query, max);
+  const [web, sci] = await Promise.all([
+    webSearch(query, max).catch(() => [] as SearchHit[]),
+    webSearch(query, max + 3, { science: true }).catch(() => [] as SearchHit[]),
+  ]);
+  const seen = new Set<string>();
+  return [...sci, ...web].filter((h) => !seen.has(h.url) && seen.add(h.url)).slice(0, max + 3);
+}
+
+/** Khusus jurnal/referensi ilmiah (aksi agen "jurnal"). */
+export async function scholarSearch(query: string, max = 8): Promise<SearchHit[]> {
+  return webSearch(query, max, { science: true });
 }
