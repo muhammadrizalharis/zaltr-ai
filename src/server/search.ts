@@ -55,6 +55,9 @@ export function formatSearchContext(query: string, hits: SearchHit[]): string {
   );
 }
 
+/** Batas tunggu hasil mesin ilmiah (kadang lambat sampai 20 dtk) agar hasil web biasa tak tertahan. */
+const SCIENCE_WAIT_MS = 9_000;
+
 /** Pertanyaan bernuansa akademik (jurnal/referensi/sitasi) -> sertakan hasil ilmiah. */
 export function isScholarlyQuery(q: string): boolean {
   return /\b(jurnal|journal|paper|referensi|sitasi|citation|literatur|literature|artikel ilmiah|scopus|sinta|doi|penelitian terdahulu|state of the art|systematic review|tinjauan pustaka)\b/i.test(
@@ -65,10 +68,15 @@ export function isScholarlyQuery(q: string): boolean {
 /** Pencarian web; bila query akademik, gabungkan dengan hasil mesin ilmiah (tanpa duplikat URL). */
 export async function webSearchSmart(query: string, max = 5): Promise<SearchHit[]> {
   if (!isScholarlyQuery(query)) return webSearch(query, max);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const sciSlow = new Promise<SearchHit[]>((r) => {
+    timer = setTimeout(() => r([]), SCIENCE_WAIT_MS);
+  });
   const [web, sci] = await Promise.all([
     webSearch(query, max).catch(() => [] as SearchHit[]),
-    webSearch(query, max + 3, { science: true }).catch(() => [] as SearchHit[]),
+    Promise.race([webSearch(query, max + 3, { science: true }).catch(() => [] as SearchHit[]), sciSlow]),
   ]);
+  clearTimeout(timer);
   const seen = new Set<string>();
   return [...sci, ...web].filter((h) => !seen.has(h.url) && seen.add(h.url)).slice(0, max + 3);
 }

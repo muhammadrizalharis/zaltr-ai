@@ -19,18 +19,26 @@ export function wantsResearch(text: string): boolean {
 }
 
 const MAX_PAGES = 4; // batas keras halaman yang dibaca
-const BATCH = 2; // dibaca paralel per gelombang
+const CONCURRENCY = 4; // halaman dibaca bersamaan (bergulir: yang selesai langsung diganti kandidat berikut)
+const MIN_PAGES = 2; // dengan >= ENOUGH_CHARS bahan, 2 halaman sudah cukup -> sisanya dibatalkan
 const ENOUGH_CHARS = 10_000; // berhenti bila bahan terkumpul segini
 const PAGE_CHARS = 5_000; // potong per halaman
-const DEADLINE_MS = 50_000; // total waktu membaca halaman
+const PAGE_TIMEOUT_MS = 10_000; // halaman yang lebih lambat dari ini dilewati (Crawl4AI keluar via Tor)
+const DEADLINE_MS = 30_000; // total waktu membaca halaman
 const SKIP_URL = /\.(zip|rar|7z|mp4|mp3|mkv|avi|jpg|jpeg|png|gif|webp|exe|apk|iso)(\?|#|$)/i;
+
+export type ResearchTuning = { concurrency?: number; pageTimeoutMs?: number; deadlineMs?: number };
 
 export type ResearchEvent = { kind: "step"; text: string } | { kind: "block"; text: string };
 
 export async function* researchForChat(
   rawQuery: string,
   signal?: AbortSignal,
+  tune: ResearchTuning = {},
 ): AsyncGenerator<ResearchEvent> {
+  const concurrency = tune.concurrency ?? CONCURRENCY;
+  const pageTimeoutMs = tune.pageTimeoutMs ?? PAGE_TIMEOUT_MS;
+  const deadlineMs = tune.deadlineMs ?? DEADLINE_MS;
   const query = (rawQuery.split("\n").find((l) => l.trim()) ?? rawQuery).trim().slice(0, 300);
   yield { kind: "step", text: `🔎 Mencari sumber: “${query.slice(0, 60)}”…` };
 
@@ -48,28 +56,51 @@ export async function* researchForChat(
   }
 
   const candidates = hits.filter((h) => !SKIP_URL.test(h.url));
-  const pages: Array<{ url: string; title: string; text: string; omitted: number }> = [];
+  type Page = { url: string; title: string; text: string; omitted: number; rank: number };
+  const pages: Page[] = [];
   let total = 0;
   const started = Date.now();
 
-  for (let i = 0; i < candidates.length && pages.length < MAX_PAGES; i += BATCH) {
-    if (signal?.aborted || Date.now() - started > DEADLINE_MS || total >= ENOUGH_CHARS) break;
-    const batch = candidates.slice(i, i + BATCH);
-    yield { kind: "step", text: `🌐 Membaca ${batch.length} halaman (${Math.min(i + batch.length, candidates.length)}/${candidates.length})…` };
-    const remain = Math.max(5_000, DEADLINE_MS - (Date.now() - started));
-    const results = await Promise.all(
-      batch.map((h) =>
-        readPageText(h.url, PAGE_CHARS, Math.min(25_000, remain), signal)
-          .then((r) => ({ ...r, title: h.title }))
-          .catch(() => null),
-      ),
-    );
-    for (const r of results) {
-      if (!r || pages.length >= MAX_PAGES) continue;
-      pages.push(r);
-      total += r.text.length;
+  yield { kind: "step", text: `🌐 Membaca halaman teratas (${Math.min(concurrency, candidates.length)} sekaligus)…` };
+
+  // Pembacaan bergulir: jaga `concurrency` halaman berjalan; berhenti begitu bahan cukup lalu
+  // batalkan yang masih berjalan (halaman lambat tak perlu ditunggu).
+  const stop = new AbortController();
+  const sig = signal ? AbortSignal.any([signal, stop.signal]) : stop.signal;
+  const enough = () => pages.length >= MAX_PAGES || (pages.length >= MIN_PAGES && total >= ENOUGH_CHARS);
+  const inflight = new Map<number, Promise<void>>();
+  let next = 0;
+  const launch = () => {
+    while (inflight.size < concurrency && next < candidates.length && !enough()) {
+      const rank = next++;
+      const h = candidates[rank];
+      const p = readPageText(h.url, PAGE_CHARS, pageTimeoutMs, sig)
+        .then((r) => {
+          if (enough()) return; // sudah cukup saat ini baru selesai
+          pages.push({ ...r, title: h.title, rank });
+          total += r.text.length;
+        })
+        .catch(() => {})
+        .finally(() => inflight.delete(rank));
+      inflight.set(rank, p);
     }
+  };
+  launch();
+  while (inflight.size > 0 && !enough() && !signal?.aborted) {
+    const left = deadlineMs - (Date.now() - started);
+    if (left <= 0) break;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      ...inflight.values(),
+      new Promise<void>((r) => {
+        timer = setTimeout(r, left);
+      }),
+    ]);
+    clearTimeout(timer);
+    launch();
   }
+  stop.abort();
+  pages.sort((a, b) => a.rank - b.rank); // urutan sesuai peringkat pencarian
 
   if (pages.length > 0) {
     yield {
