@@ -26,10 +26,21 @@ TOKEN="$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$ENV_FILE" 2>/dev/null | head -1)"
 CHAT="$(sed -n 's/^TELEGRAM_CHAT_ID=//p' "$ENV_FILE" 2>/dev/null | head -1)"
 
 send() {
-  if [ "$DRY" = 1 ]; then echo "[DRY alert] $1"; return 0; fi
-  [ -n "$TOKEN" ] && [ -n "$CHAT" ] || return 0
-  printf 'url = "https://api.telegram.org/bot%s/sendMessage"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "text=%s"\n' \
-    "$TOKEN" "$CHAT" "$1" | curl -s -m 15 -K - >/dev/null 2>&1
+  if [ "$DRY" = 1 ]; then
+    [ "${ZALTR_CHECK_SEND_FAIL:-0}" = 1 ] && { echo "[DRY alert GAGAL TERKIRIM] $1"; return 1; }
+    echo "[DRY alert] $1"; return 0
+  fi
+  [ -n "$TOKEN" ] && [ -n "$CHAT" ] || return 0 # Telegram belum dikonfigurasi: tak ada yang bisa dikirim
+  # Jaringan ke Telegram kadang tersendat sesaat: 3 percobaan; sukses hanya bila API menjawab ok:true.
+  local i resp
+  for i in 1 2 3; do
+    resp="$(printf 'url = "https://api.telegram.org/bot%s/sendMessage"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "text=%s"\n' \
+      "$TOKEN" "$CHAT" "$1" | curl -s -m 15 -K - 2>/dev/null)"
+    case "$resp" in *'"ok":true'*) return 0;; esac
+    [ "$i" -lt 3 ] && sleep 3
+  done
+  echo "WARN  gagal mengirim Telegram setelah 3 percobaan (akan dicoba lagi di putaran berikutnya)" >&2
+  return 1
 }
 
 # report <kunci> <ok:1|0> <label> <detail> <petunjuk-perbaikan>
@@ -40,15 +51,19 @@ report() {
   local prev fails; prev="$(cat "$sf" 2>/dev/null)"; fails="$(cat "$ff" 2>/dev/null)"; [ -n "$fails" ] || fails=0
   if [ "$ok" = 1 ]; then
     echo 0 >"$ff"
-    [ "$prev" = "DOWN" ] && send "🟢 $label PULIH ($(date '+%F %T'))."
-    echo "UP" >"$sf"
+    if [ "$prev" = "DOWN" ]; then
+      # Status baru dianggap pulih hanya bila notifikasinya terkirim; kalau tidak, dicoba lagi nanti.
+      send "🟢 $label PULIH ($(date '+%F %T'))." && echo "UP" >"$sf"
+    else
+      echo "UP" >"$sf"
+    fi
     echo "ok    $label — $detail"
   else
     fails=$((fails + 1)); echo "$fails" >"$ff"
     echo "FAIL  $label — $detail (gagal berturut: $fails)"
     if [ "$fails" -ge "$FAIL_THRESHOLD" ] && [ "$prev" != "DOWN" ]; then
-      send "🔴 $label BERMASALAH: $detail ($(date '+%F %T')). $hint"
-      echo "DOWN" >"$sf"
+      # Tandai DOWN hanya bila alert terkirim, supaya alert yang gagal terkirim tidak hilang selamanya.
+      send "🔴 $label BERMASALAH: $detail ($(date '+%F %T')). $hint" && echo "DOWN" >"$sf"
     fi
   fi
 }
@@ -62,7 +77,11 @@ seen=""
 while IFS=$'\t' read -r name st detail; do
   [ -n "${LABEL[$name]:-}" ] || continue
   seen="$seen $name"
-  [ "$st" = ok ] && report "$name" 1 "${LABEL[$name]}" "$detail" "${HINT[$name]}" || report "$name" 0 "${LABEL[$name]}" "$detail" "${HINT[$name]}"
+  if [ "$st" = ok ]; then
+    report "$name" 1 "${LABEL[$name]}" "$detail" "${HINT[$name]}"
+  else
+    report "$name" 0 "${LABEL[$name]}" "$detail" "${HINT[$name]}"
+  fi
 done <<<"$probe_out"
 # Container web tak bisa dijalankan probe -> app mati; itu urusan zaltr-healthcheck, jangan banjir alert.
 if [ "$probe_rc" -ne 0 ] && [ -z "$seen" ]; then
