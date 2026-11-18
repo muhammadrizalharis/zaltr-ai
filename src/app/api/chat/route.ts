@@ -49,7 +49,7 @@ const bodySchema = z.object({
   conversationId: z.string().min(1),
   content: z.string().trim().max(32_000).default(""),
   modelId: z.string().min(1),
-  /** Toggle "Cari web" dari composer. */
+  /** Paksa pencarian web (cuplikan) untuk klien API; UI tak lagi punya toggle — riset otomatis menggantikannya. */
   web: z.boolean().optional(),
   /** Mode parafrase dari menu "+" (kosong = chat biasa). */
   paraphrase: z.string().max(20).optional(),
@@ -469,7 +469,7 @@ export const POST = guarded(async (req: Request) => {
     const mem = noContext ? null : await memoryContext(me.id);
     if (mem) preamble.push(mem);
 
-    // Web search (toggle "Cari web" di composer). Permintaan riset ditangani riset otomatis di stream.
+    // Web search via parameter `web` (klien API). Permintaan riset ditangani riset otomatis di stream.
     if (web && !noContext && !researchIntent) {
       try {
         const hits = await webSearchSmart(content.split("\n")[0] || content);

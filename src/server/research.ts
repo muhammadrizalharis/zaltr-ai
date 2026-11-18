@@ -3,7 +3,7 @@
  * dst., cari web (+ jurnal ilmiah bila akademik), lalu baca isi halaman teratas lewat
  * Crawl4AI. Membaca BERTAHAP dan berhenti begitu bahan sudah cukup (bukan semua hasil).
  */
-import { webSearchSmart, formatSearchContext, type SearchHit } from "@/server/search";
+import { webSearchSmart, formatSearchContext, STOPWORDS, type SearchHit } from "@/server/search";
 import { crawlEnabled, readPageText } from "@/server/crawl";
 
 /** Istilah riset yang sebenarnya pertanyaan tentang metodologi, bukan permintaan mencari sumber. */
@@ -59,6 +59,35 @@ const PAGE_TIMEOUT_MS = 10_000; // halaman yang lebih lambat dari ini dilewati (
 const DEADLINE_MS = 30_000; // total waktu membaca halaman
 const SKIP_URL = /\.(zip|rar|7z|mp4|mp3|mkv|avi|jpg|jpeg|png|gif|webp|exe|apk|iso)(\?|#|$)/i;
 
+// Ekor instruksi format jawaban ("..., ringkas 2 kalimat dengan link") bukan topik pencarian.
+const EKOR_INSTRUKSI =
+  /(?:[,;.—–]\s*|\s+)(?:(?:lalu|kemudian|dan|serta)\s+)?(?:ringkas|rangkum|singkat|sebutkan|jawab|buatkan|berikan|tampilkan|jelaskan|format|dalam bentuk|maksimal|maks|sertakan|lengkap dengan|dengan\s+(?:link|tautan|sumber)|cukup|pakai|gunakan|gunakan bahasa|summari[sz]e|list|give me|with links?)\b.*$/i;
+const KATA_PENGANTAR = /^(?:tolong|bisa tolong|bisa|coba|mohon|please|kak|hai|halo|dong|ya|bantu(?: aku| saya)?)\b[\s,]*/i;
+const KATA_PERINTAH =
+  /^(?:cari tahu|cari(?:kan|in|kanlah)?|temukan|telusuri|lakukan|buat(?:kan)?|find|search(?: for)?|look(?:ing)? for|i need|i want|can you find)\s+(?:me\s+)?(?:some\s+)?/i;
+const KATA_RISET = /^(?:riset|research|meriset|penelitian)\s+(?:singkat\s+)?(?:tentang|soal|mengenai|about|on)?\s*/i;
+
+/**
+ * Ubah kalimat perintah pengguna menjadi kata kunci pencarian: buang kata pengantar, kata perintah
+ * ("cari/carikan"), dan ekor instruksi format. Kata akademik ("referensi", "jurnal") dipertahankan
+ * karena memandu mesin dan pendeteksi pencarian ilmiah. Tak pernah mengembalikan string terlalu pendek.
+ */
+export function buildSearchQuery(raw: string): string {
+  const first = (raw.split("\n").find((l) => l.trim()) ?? raw).trim().slice(0, 300);
+  let q = first.replace(EKOR_INSTRUKSI, "").trim();
+  for (let i = 0; i < 3; i++) {
+    q = q.replace(KATA_PENGANTAR, "").replace(KATA_PERINTAH, "").replace(KATA_RISET, "").trim();
+  }
+  q = q.replace(/[\s,;.?!]+$/, "").replace(/\s+(?:dong|ya|nih|deh|please)$/i, "").trim();
+  return q.length >= 3 ? q : first;
+}
+
+/** Cadangan bila kata kunci utuh tak menghasilkan apa pun: sisakan kata inti saja. */
+export function keywordQuery(q: string): string {
+  const words = q.split(/\s+/).filter((w) => w && !STOPWORDS.has(w.toLowerCase()));
+  return words.slice(0, 8).join(" ");
+}
+
 export type ResearchTuning = { concurrency?: number; pageTimeoutMs?: number; deadlineMs?: number };
 
 export type ResearchEvent = { kind: "step"; text: string } | { kind: "block"; text: string };
@@ -71,12 +100,15 @@ export async function* researchForChat(
   const concurrency = tune.concurrency ?? CONCURRENCY;
   const pageTimeoutMs = tune.pageTimeoutMs ?? PAGE_TIMEOUT_MS;
   const deadlineMs = tune.deadlineMs ?? DEADLINE_MS;
-  const query = (rawQuery.split("\n").find((l) => l.trim()) ?? rawQuery).trim().slice(0, 300);
+  const query = buildSearchQuery(rawQuery);
   yield { kind: "step", text: `🔎 Mencari sumber: “${query.slice(0, 60)}”…` };
 
   let hits: SearchHit[];
   try {
     hits = await webSearchSmart(query, 6);
+    // Kata kunci utuh tak menghasilkan apa pun -> coba sekali lagi dengan kata inti saja.
+    const kw = keywordQuery(query);
+    if (hits.length === 0 && kw && kw !== query) hits = await webSearchSmart(kw, 6);
   } catch {
     yield { kind: "block", text: "[Pencarian web gagal — jawab dari pengetahuanmu dan katakan itu.]" };
     return;

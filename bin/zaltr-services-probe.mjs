@@ -14,17 +14,26 @@ async function check(name, fn) {
 }
 
 const searx = (process.env.ZALTR_SEARXNG_URL ?? "").replace(/\/$/, "");
+const searxFallback = (process.env.ZALTR_SEARXNG_FALLBACK_URL ?? "").replace(/\/$/, "");
 const crawl = (process.env.ZALTR_CRAWL4AI_URL ?? "").replace(/\/$/, "");
 const docling = (process.env.ZALTR_DOCLING_URL ?? "").replace(/\/$/, "");
 
 await Promise.all([
   searx &&
     check("searxng", async () => {
-      const r = await fetch(`${searx}/search?q=test&format=json`, { signal: timeout(20_000) });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const n = ((await r.json()).results ?? []).length;
-      if (n === 0) throw new Error("0 hasil (mesin diblokir?)");
-      return `${n} hasil`;
+      // Sehat bila instance utama ATAU cadangan memberi hasil (aplikasi otomatis beralih ke cadangan).
+      const count = async (base) => {
+        const r = await fetch(`${base}/search?q=test&format=json`, { signal: timeout(20_000), headers: { "User-Agent": "zaltr-web" } });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return ((await r.json()).results ?? []).length;
+      };
+      const primary = await count(searx).catch(() => 0);
+      if (primary > 0) return `utama ${primary} hasil`;
+      if (searxFallback) {
+        const fb = await count(searxFallback).catch(() => 0);
+        if (fb > 0) return `utama kosong/diblokir, memakai cadangan (${fb} hasil)`;
+      }
+      throw new Error("0 hasil di utama" + (searxFallback ? " dan cadangan" : "") + " (mesin diblokir?)");
     }),
   crawl &&
     check("crawl4ai", async () => {

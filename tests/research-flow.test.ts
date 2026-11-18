@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("@/server/search", () => ({
+  STOPWORDS: new Set<string>(),
   webSearchSmart: async () => {
     if (h.searchError) throw new Error("searxng mati");
     return h.hits;

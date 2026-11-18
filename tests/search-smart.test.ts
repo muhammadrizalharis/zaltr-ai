@@ -52,4 +52,36 @@ describe("webSearchSmart: batas tunggu mesin ilmiah", () => {
     const { webSearchSmart } = await import("@/server/search");
     expect((await webSearchSmart("cari jurnal tentang stunting")).map((x) => x.url)).toEqual(["https://web.test/1"]);
   });
+
+  it("hasil yang cocok topik didahulukan, hasil tak nyambung turun (tak ada yang dibuang)", async () => {
+    const sci = {
+      results: [
+        { title: "A new algorithm for Faà di Bruno's formula", url: "https://s.test/noise", content: "matematika" },
+        { title: "Pencegahan stunting di Sulawesi Selatan", url: "https://s.test/good", content: "jurnal stunting" },
+      ],
+    };
+    const web = { results: [{ title: "Berita stunting Sulawesi", url: "https://w.test/ok", content: "stunting di Sulawesi" }] };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => json(isScience(url) ? sci : web)));
+    const { webSearchSmart } = await import("@/server/search");
+    const r = await webSearchSmart("referensi jurnal tentang stunting di Sulawesi");
+    expect(r[r.length - 1].url).toBe("https://s.test/noise"); // yang tak cocok paling bawah
+    expect(r.map((x) => x.url)).toContain("https://s.test/noise"); // tetapi tidak dibuang
+    expect(r.slice(0, 2).map((x) => x.url).sort()).toEqual(["https://s.test/good", "https://w.test/ok"]);
+  });
+
+  it("kueri tanpa kata topik (hanya penanda sumber) -> urutan asli dipertahankan", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => json(isScience(url) ? SCI : WEB)));
+    const { webSearchSmart } = await import("@/server/search");
+    const r = await webSearchSmart("referensi jurnal");
+    expect(r.map((x) => x.url)).toEqual(["https://arxiv.test/1", "https://web.test/1"]);
+  });
+});
+
+describe("topicWords", () => {
+  it("membuang stopword, penanda sumber, dan kata pendek; unik & huruf kecil", async () => {
+    vi.resetModules();
+    const { topicWords } = await import("@/server/search");
+    expect(topicWords("Referensi jurnal tentang Stunting di Sulawesi, stunting")).toEqual(["stunting", "sulawesi"]);
+    expect(topicWords("AI di UI")).toEqual([]);
+  });
 });

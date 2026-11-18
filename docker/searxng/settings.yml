@@ -12,6 +12,15 @@ engines:
     disabled: false
   - name: openalex
     disabled: false
+  # Mesin web cadangan: mesin umum sering ditangguhkan (CAPTCHA/429) bila terlalu banyak query.
+  # Hanya bing yang berfungsi dari server ini (mojeek: access denied, yahoo: parsing error — diuji, dinonaktifkan);
+  # hasil bing kadang generik, jadi relevansi dijaga di aplikasi dan instance cadangan dipakai bila perlu.
+  - name: bing
+    disabled: false
+outgoing:
+  # Bawaan 3 dtk terlalu ketat: DuckDuckGo sering ConnectTimeout lalu ikut ditangguhkan.
+  request_timeout: 6.0
+  max_request_timeout: 10.0
 
 server:
   # secret_key dioverride env SEARXNG_SECRET (di docker-compose).

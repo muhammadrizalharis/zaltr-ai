@@ -192,6 +192,8 @@ services:
       # Model embedding utk RAG (harus ada di Ollama; default bge-m3:latest, 1024-dim)
       ZALTR_EMBED_MODEL: ${ZALTR_EMBED_MODEL:-}
       ZALTR_SEARXNG_URL: http://searxng:8080
+      # SearXNG cadangan (opsional, IP/jalur lain): dipakai bila hasil SearXNG lokal kurang/diblokir
+      ZALTR_SEARXNG_FALLBACK_URL: ${ZALTR_SEARXNG_FALLBACK_URL:-}
       # Docling (server GPU): OCR/tabel untuk PDF scan; kosong = nonaktif
       ZALTR_DOCLING_URL: ${ZALTR_DOCLING_URL:-}
       # Crawl4AI (server GPU): baca isi halaman web utk aksi agent "buka"; kosong = nonaktif
