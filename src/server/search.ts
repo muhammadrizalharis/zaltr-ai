@@ -9,6 +9,12 @@ const SEARXNG_URL = (process.env.ZALTR_SEARXNG_URL ?? "").replace(/\/$/, "");
 const SEARXNG_FALLBACK_URL = (process.env.ZALTR_SEARXNG_FALLBACK_URL ?? "").replace(/\/$/, "");
 const MIN_PRIMARY_HITS = 3;
 const MIN_RELEVANT = 2; // minimal hasil yang memuat kata topik agar instance utama dianggap cukup
+// Instance cadangan ikut jalan bila utama belum menjawab "cukup" dalam waktu ini (permintaan "hedged"),
+// jadi mesin yang tersendat tak membuat riset menunggu timeout penuh.
+const HEDGE_MS = 1_500;
+// Cache hasil pencarian: kueri berulang tak mengetuk mesin lagi (mengurangi penangguhan CAPTCHA/429).
+const CACHE_TTL_MS = Math.max(0, Number(process.env.ZALTR_SEARCH_CACHE_SEC ?? 600) || 0) * 1000;
+const CACHE_MAX = 200;
 
 export type SearchHit = { title: string; url: string; snippet: string };
 
@@ -17,6 +23,7 @@ async function searxQuery(
   query: string,
   max: number,
   opts: { science?: boolean } | undefined,
+  signal?: AbortSignal,
 ): Promise<SearchHit[]> {
   const qs = new URLSearchParams({
     q: query.slice(0, 300),
@@ -26,8 +33,9 @@ async function searxQuery(
   });
   // Kategori "science": PubMed, arXiv, Semantic Scholar, Crossref, OpenAlex, dll.
   if (opts?.science) qs.set("categories", "science");
+  const timeout = AbortSignal.timeout(opts?.science ? 20_000 : 10_000);
   const res = await fetch(`${base}/search?${qs}`, {
-    signal: AbortSignal.timeout(opts?.science ? 20_000 : 10_000),
+    signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
     cache: "no-store",
     headers: { "User-Agent": "zaltr-web" },
   });
@@ -45,6 +53,93 @@ async function searxQuery(
     }));
 }
 
+function dedupeByUrl(hits: SearchHit[]): SearchHit[] {
+  const seen = new Set<string>();
+  return hits.filter((h) => !seen.has(h.url) && seen.add(h.url));
+}
+
+/**
+ * "Cukup" = jumlahnya memadai DAN ada yang nyambung topik: mesin yang diblokir sering tetap
+ * menjawab, tetapi dengan hasil generik tak relevan (mis. hanya Bing), jadi hitungan saja menipu.
+ */
+function isEnough(hits: SearchHit[], words: string[], max: number): boolean {
+  if (hits.length < Math.min(MIN_PRIMARY_HITS, max)) return false;
+  if (words.length === 0) return true;
+  const relevant = hits.filter((h) => topicScore(h, words) > 0).length;
+  return relevant >= Math.min(MIN_RELEVANT, hits.length);
+}
+
+/**
+ * Utama dulu; cadangan menyusul (setelah HEDGE_MS, atau segera bila utama selesai tapi kurang).
+ * Hasil pertama yang "cukup" menang dan yang lain dibatalkan. Bila tak ada yang cukup, hasil
+ * semua instance yang menjawab digabung lalu diurutkan menurut topik. Galat dilempar hanya bila
+ * TIDAK ADA instance yang menjawab sah (0 hasil dari instance yang sehat = hasil kosong, bukan galat).
+ */
+async function searchHedged(
+  query: string,
+  max: number,
+  opts: { science?: boolean } | undefined,
+  words: string[],
+): Promise<SearchHit[]> {
+  type R = { from: "p" | "f"; hits: SearchHit[]; err?: unknown };
+  const stop = new AbortController();
+  const finished: R[] = [];
+  let launched = 0;
+  let fallbackStarted = false;
+  let wake: (() => void) | undefined;
+  const launch = (base: string, from: "p" | "f") => {
+    launched++;
+    searxQuery(base, query, max, opts, stop.signal)
+      .then(
+        (hits) => void finished.push({ from, hits }),
+        (err) => void finished.push({ from, hits: [], err }),
+      )
+      .finally(() => wake?.());
+  };
+  const startFallback = () => {
+    if (!SEARXNG_FALLBACK_URL || fallbackStarted) return;
+    fallbackStarted = true;
+    launch(SEARXNG_FALLBACK_URL, "f");
+  };
+  if (SEARXNG_URL) launch(SEARXNG_URL, "p");
+  else startFallback();
+  const hedge = setTimeout(startFallback, HEDGE_MS);
+  // Urutan gabungan deterministik: instance utama didahulukan, apa pun yang selesai lebih dulu.
+  const byPriority = (a: R, b: R) => (a.from === b.from ? 0 : a.from === "p" ? -1 : 1);
+  try {
+    for (;;) {
+      const good = finished.find((r) => !r.err && isEnough(r.hits, words, max));
+      if (good) {
+        // Utama didahulukan pada duplikat; urutan akhir ditentukan relevansi topik.
+        const merged = [...finished].sort(byPriority).flatMap((r) => r.hits);
+        return rankByTopic(dedupeByUrl(merged), words).slice(0, max);
+      }
+      if (finished.length === launched) {
+        if (!fallbackStarted && SEARXNG_FALLBACK_URL) {
+          startFallback(); // utama sudah selesai tapi kurang: jangan tunggu jeda hedge
+          continue;
+        }
+        break;
+      }
+      await new Promise<void>((resolve) => {
+        wake = resolve;
+      });
+    }
+  } finally {
+    clearTimeout(hedge);
+    stop.abort(); // batalkan permintaan yang kalah
+  }
+  const answered = finished.filter((r) => !r.err).sort(byPriority);
+  if (answered.length === 0) {
+    throw finished.find((r) => r.from === "p")?.err ?? finished[0]?.err ?? new Error("pencarian gagal");
+  }
+  return rankByTopic(dedupeByUrl(answered.flatMap((r) => r.hits)), words).slice(0, max);
+}
+
+const searchCache = new Map<string, { at: number; hits: SearchHit[] }>();
+const searchInflight = new Map<string, Promise<SearchHit[]>>();
+const copyHits = (hits: SearchHit[]) => hits.map((h) => ({ ...h }));
+
 export async function webSearch(
   query: string,
   max = 5,
@@ -53,35 +148,29 @@ export async function webSearch(
   if (!SEARXNG_URL && !SEARXNG_FALLBACK_URL) {
     throw new Error("SearXNG belum dikonfigurasi (ZALTR_SEARXNG_URL)");
   }
-  const words = topicWords(query);
-  let hits: SearchHit[] = [];
-  let primaryError: unknown;
-  if (SEARXNG_URL) {
-    try {
-      hits = await searxQuery(SEARXNG_URL, query, max, opts);
-    } catch (e) {
-      primaryError = e;
+  const key = `${opts?.science ? "s" : "w"}|${max}|${query.trim().toLowerCase().replace(/\s+/g, " ")}`;
+  if (CACHE_TTL_MS > 0) {
+    const cached = searchCache.get(key);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return copyHits(cached.hits);
+    const running = searchInflight.get(key); // permintaan identik yang sedang berjalan dipakai bersama
+    if (running) return copyHits(await running);
+  }
+  const p = searchHedged(query, max, opts, topicWords(query)).then((hits) => {
+    // Hanya hasil berisi yang di-cache: kosong/galat bisa saja sementara (mesin sedang ditangguhkan).
+    if (CACHE_TTL_MS > 0 && hits.length > 0) {
+      searchCache.set(key, { at: Date.now(), hits });
+      if (searchCache.size > CACHE_MAX) searchCache.delete(searchCache.keys().next().value!);
     }
+    return hits;
+  });
+  if (CACHE_TTL_MS > 0) {
+    searchInflight.set(key, p);
+    p.then(
+      () => searchInflight.delete(key),
+      () => searchInflight.delete(key),
+    );
   }
-  // "Cukup" = jumlahnya memadai DAN ada yang nyambung topik: mesin yang diblokir sering tetap
-  // menjawab, tetapi dengan hasil generik tak relevan (mis. hanya Bing), jadi hitungan saja menipu.
-  const relevant = hits.filter((h) => topicScore(h, words) > 0).length;
-  const enough =
-    hits.length >= Math.min(MIN_PRIMARY_HITS, max) && (words.length === 0 || relevant >= Math.min(MIN_RELEVANT, hits.length));
-  if (!SEARXNG_FALLBACK_URL || enough) {
-    if (primaryError && hits.length === 0) throw primaryError;
-    return rankByTopic(hits, words);
-  }
-  try {
-    const more = await searxQuery(SEARXNG_FALLBACK_URL, query, max, opts);
-    const seen = new Set(hits.map((h) => h.url));
-    return rankByTopic([...hits, ...more.filter((h) => !seen.has(h.url))], words).slice(0, max);
-  } catch (e) {
-    // Galat dilempar hanya bila tak ada instance lain yang menjawab sah: utama juga gagal, atau tak ada utama.
-    // Utama yang menjawab sah dengan 0 hasil = hasil kosong, bukan galat.
-    if (hits.length === 0 && (primaryError || !SEARXNG_URL)) throw primaryError ?? e;
-    return rankByTopic(hits, words);
-  }
+  return copyHits(await p);
 }
 
 /** Format hasil pencarian menjadi blok konteks untuk prompt model. */
