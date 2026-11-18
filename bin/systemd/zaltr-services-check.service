@@ -1,0 +1,8 @@
+[Unit]
+Description=Pemantauan layanan pendukung calyzr (SearXNG, Crawl4AI, Docling, Copilot, GPU, backup, disk) + alert Telegram
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/zaltr-ai/bin/zaltr-services-check.sh
+TimeoutStartSec=120

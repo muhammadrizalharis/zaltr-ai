@@ -1,0 +1,10 @@
+[Unit]
+Description=Jalankan pemantauan layanan pendukung calyzr tiap 5 menit
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
