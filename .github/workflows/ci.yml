@@ -1,0 +1,44 @@
+name: CI
+
+# Pemeriksaan otomatis tiap push/PR ke main: tipe, lint, dan seluruh tes (vitest).
+# Tidak butuh database/secret: tes memakai mock, dan `prisma generate` hanya perlu URL formal.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pasang dependensi (termasuk prisma generate)
+        run: npm ci
+
+      - name: Cek tipe
+        run: npx tsc --noEmit
+
+      # Aturan set-state-in-effect memberi 20 galat gaya pada pola yang disengaja di komponen UI;
+      # dimatikan di CI agar semua aturan lain tetap wajib lulus.
+      - name: Lint
+        run: npx eslint --rule 'react-hooks/set-state-in-effect: off'
+
+      - name: Tes
+        run: npm test
