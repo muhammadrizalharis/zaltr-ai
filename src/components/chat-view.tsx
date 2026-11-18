@@ -333,7 +333,6 @@ export function ChatView({
   } | null>(null);
   const [ephemeralActive, setEphemeralActive] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [webSearch, setWebSearch] = useState(false);
   const [agentMode, setAgentMode] = useState(false);
   const [parafrase, setParafrase] = useState<ModeParafrase | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
@@ -644,7 +643,6 @@ export function ChatView({
           conversationId: convId,
           content,
           modelId: model,
-          web: webSearch,
           regenerate,
           ...(agentMode ? { agent: true } : {}),
           ...(parafrase ? { paraphrase: parafrase } : {}),
@@ -965,7 +963,7 @@ export function ChatView({
             </div>
           </div>
         )}
-        {(attachments.length > 0 || webSearch || parafrase || agentMode) && (
+        {(attachments.length > 0 || parafrase || agentMode) && (
           <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap items-center gap-1.5">
             {parafrase && (
               <span className="inline-flex items-center gap-1.5 rounded-lg border border-accent-b/50 bg-accent-b/10 px-2 py-1 text-xs text-accent-b">
@@ -985,18 +983,6 @@ export function ChatView({
                   onClick={() => setParafrase(null)}
                   className="hover:text-ink"
                   aria-label="Matikan parafrase"
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {webSearch && (
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-accent-a/50 bg-accent-a/10 px-2 py-1 text-xs text-accent-a">
-                Cari web aktif
-                <button
-                  onClick={() => setWebSearch(false)}
-                  className="hover:text-ink"
-                  aria-label="Matikan cari web"
                 >
                   ×
                 </button>
@@ -1084,7 +1070,7 @@ export function ChatView({
               title="Tambah berkas & alat"
               aria-label="Tambah berkas & alat"
               className={`flex h-10 w-10 items-center justify-center rounded-xl border text-muted disabled:opacity-40 ${
-                plusOpen || webSearch
+                plusOpen
                   ? "border-accent-a/70 bg-accent-a/10 text-accent-a"
                   : "border-line bg-panel-2 hover:border-accent-b/60 hover:text-ink"
               }`}
@@ -1169,21 +1155,6 @@ export function ChatView({
                     <>
                       <path d="M12 20h9" />
                       <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </>
-                  }
-                />
-                <PlusItem
-                  title="Cari web"
-                  desc={webSearch ? "Aktif — jawaban memakai hasil pencarian" : "Info & berita terkini"}
-                  active={webSearch}
-                  onClick={() => {
-                    setWebSearch((v) => !v);
-                    setPlusOpen(false);
-                  }}
-                  icon={
-                    <>
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                     </>
                   }
                 />
@@ -1332,7 +1303,7 @@ export function ChatView({
   );
 }
 
-/** Satu baris di menu "+" (tambah berkas, buat gambar, cari web). */
+/** Satu baris di menu "+" (tambah berkas, buat gambar, parafrase, agent). */
 function PlusItem({
   title,
   desc,

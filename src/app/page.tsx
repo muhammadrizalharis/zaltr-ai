@@ -34,7 +34,7 @@ const FITUR: Array<[string, string, string]> = [
   ["model", "Semua model unggulan", "GPT, Claude, Gemini, dan puluhan model lain dalam satu tempat — ganti model semudah satu klik, di tengah percakapan sekalipun."],
   ["studio", "Studio media", "Buat gambar berkualitas tinggi, video pendek, dan musik hanya dari teks. Semua hasil tersimpan otomatis di galeri percakapanmu."],
   ["file", "Membaca semua file", "Lampirkan PDF, Word, PowerPoint, Excel, gambar, atau kode — AI membaca isinya dan menjawab langsung dari dokumenmu."],
-  ["web", "Terhubung ke internet", "Nyalakan mode cari web dan AI menjawab dengan informasi terkini lengkap dengan tautan sumbernya."],
+  ["web", "Terhubung ke internet", "Cukup minta riset atau carikan referensi — AI mencari web dan jurnal ilmiah sendiri, membaca halaman sumbernya, lalu menjawab lengkap dengan tautan."],
   ["memori", "Mengingatmu", "Memori antar percakapan dan instruksi pribadi — AI tahu siapa kamu, proyekmu, dan gaya jawaban yang kamu suka."],
   ["kode", "Menjalankan kode", "Blok Python di jawaban AI bisa langsung dieksekusi di lingkungan aman yang terisolasi — hasil tampil di chat."],
 ];
