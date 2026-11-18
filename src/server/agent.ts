@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import { dispatch } from "@/server/providers";
 import type { HistoryItem } from "@/server/providers";
 import { webSearchSmart, scholarSearch, formatSearchContext } from "@/server/search";
+import { readWebPage } from "@/server/crawl";
 import { retrieve, formatKnowledge } from "@/server/knowledge";
 import {
   parseDriveLinks,
@@ -37,6 +38,7 @@ const TOOL_INSTRUCTIONS =
   "AKSI: daftar                           (lihat semua berkas workspace)\n" +
   "AKSI: web <kata kunci>                 (cari web)\n" +
   "AKSI: jurnal <kata kunci>              (cari jurnal/paper ilmiah: PubMed, arXiv, Crossref, OpenAlex, dll — pakai kata kunci bahasa Inggris untuk hasil terbaik)\n" +
+  "AKSI: buka <url>                       (baca isi lengkap satu halaman web publik, mis. dari hasil AKSI: web)\n" +
   "AKSI: catatan <kata kunci>             (cari knowledge base pengguna)\n" +
   "AKSI: drive <link>                     (baca Google Drive publik)\n" +
   "Aturan: (1) Untuk membuat Word/PDF/Excel/PPT pakai AKSI: kode dgn pustaka di atas dan simpan ke " +
@@ -230,6 +232,7 @@ export async function* runAgent(opts: {
     const listM = reply.match(/^\s*AKSI:\s*daftar\s*$/im);
     const webM = reply.match(/^\s*AKSI:\s*web\s+(.+)$/im);
     const jurnalM = reply.match(/^\s*AKSI:\s*jurnal\s+(.+)$/im);
+    const bukaM = reply.match(/^\s*AKSI:\s*buka\s+(\S+)/im);
     const kbM = reply.match(/^\s*AKSI:\s*catatan\s+(.+)$/im);
     const driveM = reply.match(/^\s*AKSI:\s*drive\s+(.+)$/im);
 
@@ -303,6 +306,18 @@ export async function* runAgent(opts: {
       observe(reply, await readDrive(link));
       continue;
     }
+    if (bukaM) {
+      const target = bukaM[1].trim().slice(0, 500);
+      yield { kind: "progress", text: `\n🌐 Membaca halaman: ${target.slice(0, 80)}…\n` };
+      let obs: string;
+      try {
+        obs = await readWebPage(target);
+      } catch (e) {
+        obs = `(gagal membuka halaman: ${(e as Error).message.slice(0, 150)})`;
+      }
+      observe(reply, obs);
+      continue;
+    }
     if (kbM) {
       const q = kbM[1].trim().slice(0, 200);
       yield { kind: "progress", text: `\n📚 Mencari di dokumenmu: “${q}”…\n` };
@@ -345,7 +360,7 @@ export async function* runAgent(opts: {
     if (/^\s*AKSI:/im.test(reply)) {
       observe(
         reply,
-        "(format AKSI tidak dikenali. Gunakan persis salah satu: shell, kode, tulis <path> lalu baris baru + isi, baca <path>, daftar, web, jurnal, catatan, drive.)",
+        "(format AKSI tidak dikenali. Gunakan persis salah satu: shell, kode, tulis <path> lalu baris baru + isi, baca <path>, daftar, web, jurnal, buka, catatan, drive.)",
       );
       continue;
     }

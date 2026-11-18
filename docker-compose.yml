@@ -194,6 +194,9 @@ services:
       ZALTR_SEARXNG_URL: http://searxng:8080
       # Docling (server GPU): OCR/tabel untuk PDF scan; kosong = nonaktif
       ZALTR_DOCLING_URL: ${ZALTR_DOCLING_URL:-}
+      # Crawl4AI (server GPU): baca isi halaman web utk aksi agent "buka"; kosong = nonaktif
+      ZALTR_CRAWL4AI_URL: ${ZALTR_CRAWL4AI_URL:-}
+      ZALTR_CRAWL4AI_API_TOKEN: ${ZALTR_CRAWL4AI_API_TOKEN:-}
       ZALTR_RUNNER_URL: http://runner:8484
       ZALTR_WA_ADMIN: ${ZALTR_WA_ADMIN:-}
       # Batas teks lampiran yang dibaca model (kosong = default 200rb/file, 300rb total)
