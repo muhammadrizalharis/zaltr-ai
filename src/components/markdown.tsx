@@ -6,6 +6,8 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { escapeCurrencyDollars } from "./markdown-math";
+import { MermaidBlock } from "./mermaid-block";
+import { isMermaidClass } from "./mermaid-utils";
 
 // Model kadang menulis math dengan \[..\] / \(..\); samakan ke $$..$$ / $..$ agar
 // remark-math + KaTeX merendernya jadi rumus typeset (seperti Word/Gemini).
@@ -150,8 +152,12 @@ function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) 
   } | null>(null);
 
   const inner = children as React.ReactNode;
-  const python = isPythonBlock(Array.isArray(inner) ? inner[0] : inner);
-  const previewable = isPreviewBlock(Array.isArray(inner) ? inner[0] : inner);
+  const first = Array.isArray(inner) ? inner[0] : inner;
+  const python = isPythonBlock(first);
+  const previewable = isPreviewBlock(first);
+  const mermaid = isMermaidClass(
+    first && typeof first === "object" && "props" in first ? (first as { props: { className?: string } }).props.className : undefined,
+  );
 
   async function copy() {
     await navigator.clipboard.writeText(extractText(inner)).catch(() => {});
@@ -183,6 +189,19 @@ function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) 
     }
   }
 
+  const preEl = (
+    <pre
+      className="overflow-x-auto rounded-xl border border-line bg-[var(--code-bg)] p-3 font-mono text-[13px] leading-relaxed"
+      {...rest}
+    >
+      {children}
+    </pre>
+  );
+
+  if (mermaid) {
+    return <MermaidBlock code={extractText(inner)} fallback={preEl} onCopy={() => void copy()} copied={copied} />;
+  }
+
   return (
     <div className="group relative mb-3">
       <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100">
@@ -210,12 +229,7 @@ function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) 
           {copied ? "Tersalin ✓" : "Salin"}
         </button>
       </div>
-      <pre
-        className="overflow-x-auto rounded-xl border border-line bg-[var(--code-bg)] p-3 font-mono text-[13px] leading-relaxed"
-        {...rest}
-      >
-        {children}
-      </pre>
+      {preEl}
       {previewable && showPreview && (
         <iframe
           title="Pratinjau artifact"
